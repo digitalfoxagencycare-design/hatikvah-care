@@ -18,6 +18,7 @@ RUN npm ci --omit=dev -w apps/api --no-audit --no-fund && npm cache clean --forc
 COPY apps/api/src apps/api/src
 COPY data data
 COPY --from=build /app/apps/web/dist apps/web/dist
+RUN mkdir -p /app/.data /tmp/data && chown -R node:node /app/.data /tmp/data
 USER node
 EXPOSE 8080
 # Secrets (JWT_SECRET, MONGODB_URI) come from the environment at run time; the server refuses to start in production without them.
