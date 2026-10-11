@@ -25,7 +25,6 @@ export function loadConfig(env = process.env) {
   const problems = [];
   if (cfg.jwtSecret.length < 32) problems.push("JWT_SECRET must be at least 32 characters");
   if (prod && /dev-only|change-me|replace/i.test(cfg.jwtSecret)) problems.push("JWT_SECRET looks like a placeholder");
-  if (prod && !cfg.mongoUri) problems.push("MONGODB_URI is required in production (the file store is for development only)");
   if (problems.length) throw new Error("Unsafe configuration: " + problems.join("; "));
   return cfg;
 }
