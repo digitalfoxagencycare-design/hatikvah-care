@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.data/
+.env
+.env.*
+!.env.example
+e2e/out/
+*.log
+.DS_Store
+__pycache__/

@@ -1,0 +1,70 @@
+import { Router } from "express";
+import rateLimit from "express-rate-limit";
+import { enquiryInput, publicProduct } from "../model.js";
+
+export const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+
+export function publicRoutes({ store }) {
+  const r = Router();
+  const settings = async () => (await store.settings.findBy("key", "company")) || {};
+
+  r.get("/catalog", wrap(async (_req, res) => {
+    const s = await settings();
+    const [cats, prods] = await Promise.all([store.categories.all(), store.products.all()]);
+    const products = prods.filter((p) => p.active).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map((p) => publicProduct(p, s));
+    const categories = cats.sort((a, b) => a.order - b.order).map(({ id, slug, name, description, order }) => ({
+      id, slug, name, description, order, count: products.filter((p) => p.category === slug).length,
+    }));
+    res.set("Cache-Control", "public, max-age=60");
+    res.json({ categories, products, showPrices: !!s.showPrices });
+  }));
+
+  r.get("/products/:slug", wrap(async (req, res) => {
+    const s = await settings();
+    const p = await store.products.findBy("slug", req.params.slug);
+    if (!p || !p.active) return res.status(404).json({ error: "NOT_FOUND", message: "Product not found" });
+    res.json(publicProduct(p, s));
+  }));
+
+  r.get("/settings", wrap(async (_req, res) => {
+    const { id, key, ...pub } = await settings();
+    res.set("Cache-Control", "public, max-age=60");
+    res.json(pub);
+  }));
+
+  const limiter = rateLimit({
+    windowMs: 60 * 60 * 1000, limit: 8, standardHeaders: true, legacyHeaders: false,
+    message: { error: "RATE_LIMITED", message: "Too many requests from this network. Please try again later or call us." },
+  });
+  r.post("/enquiries", limiter, wrap(async (req, res) => {
+    const parsed = enquiryInput.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "INVALID", message: parsed.error.issues[0].message, field: parsed.error.issues[0].path.join(".") });
+    const d = parsed.data;
+    if (d.website) return res.status(201).json({ ok: true, ref: "HC-000000" }); // bot: pretend success, store nothing
+    if (!d.items.length && d.message.length < 5) return res.status(400).json({ error: "INVALID", message: "Add some products or tell us what you need" });
+    const products = await store.products.all();
+    const items = [];
+    for (const it of d.items) {
+      const p = products.find((x) => x.id === it.productId && x.active);
+      if (!p) return res.status(400).json({ error: "INVALID", message: "A product in your list is no longer available. Please refresh." });
+      items.push({ productId: p.id, sku: p.sku, name: p.name, qty: it.qty });
+    }
+    const n = (await store.enquiries.count()) + 1;
+    const ref = `HC-${new Date().getFullYear().toString().slice(2)}${String(n).padStart(4, "0")}`;
+    await store.enquiries.insert({ ref, name: d.name, company: d.company, phone: d.phone, email: d.email, message: d.message, items, status: "new", notes: "", createdAt: new Date().toISOString() });
+    res.status(201).json({ ok: true, ref });
+  }));
+
+  return r;
+}
+
+export function mediaRoute({ store }) {
+  const r = Router();
+  r.get("/:id", wrap(async (req, res) => {
+    const m = await store.getMedia(req.params.id);
+    if (!m) return res.status(404).end();
+    res.set({ "Content-Type": m.contentType, "Cache-Control": "public, max-age=31536000, immutable", "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; sandbox" });
+    res.send(m.data);
+  }));
+  return r;
+}
