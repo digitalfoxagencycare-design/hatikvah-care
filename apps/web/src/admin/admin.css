@@ -144,3 +144,122 @@ code.key { font-size: 1rem; letter-spacing: .08em; word-break: break-all; }
 .img-pick { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .img-pick img { width: 120px; height: 80px; object-fit: contain; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; }
 .sticky-save { position: sticky; bottom: 0; background: #f8fafc; padding: 12px 0; display: flex; gap: 12px; align-items: center; justify-content: flex-end; border-top: 1px solid #e2e8f0; }
+
+/* WhatsApp Integrations & Quick Parser */
+.btn-whatsapp {
+  background: #16a34a !important;
+  color: #ffffff !important;
+  border-color: #16a34a !important;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn-whatsapp:hover {
+  background: #15803d !important;
+  border-color: #15803d !important;
+  color: #ffffff !important;
+}
+.wa-parser-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.wa-parser-card {
+  background: #ffffff;
+  border-radius: 12px;
+  max-width: 920px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e2e8f0;
+  padding: 24px;
+}
+.wa-header-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.wa-header-row h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: #0f172a;
+}
+.wa-icon-badge {
+  font-size: 1.8rem;
+  background: #dcfce7;
+  padding: 8px 12px;
+  border-radius: 10px;
+}
+.wa-samples-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 14px 0 8px;
+}
+.btn-xs {
+  font-size: 0.78rem;
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+.wa-textarea {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-family: inherit;
+  font-size: 0.92rem;
+  margin-top: 6px;
+  resize: vertical;
+}
+.wa-textarea:focus {
+  border-color: #16a34a;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.15);
+}
+.wa-customer-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 12px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.wa-items-tbl input {
+  padding: 4px 8px;
+  font-size: 0.88rem;
+}
+.matched-row {
+  background: #f0fdf4;
+}
+.custom-row {
+  background: #fffbeb;
+}
+.badge-success {
+  background: #dcfce7;
+  color: #15803d;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+.badge-warning {
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+

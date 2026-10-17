@@ -8,6 +8,17 @@ import { DocEditor, fmtDate, fmtTime, Msg, Timeline, useAction } from "./ui.jsx"
 
 const strip = (items) => items.map(({ amount, tax, total, ...l }) => l);
 
+function getWhatsAppQuote(q) {
+  if (!q) return null;
+  const rawPhone = q.customer?.phone || "";
+  const clean = rawPhone.replace(/\D/g, "");
+  const waPhone = clean.length === 10 ? `91${clean}` : clean;
+  const quoteUrl = `${window.location.origin}/doc/quote/${q.token}`;
+  const total = ((q.totals?.total ?? q.total ?? 0) / 100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const text = `Hello ${q.customer?.name || "Customer"},\n\nPlease find your Quotation ${q.number} from HaTikvah Care.\nTotal Amount: ₹${total}\n\nYou can review, print, and approve your quotation online here:\n${quoteUrl}\n\nThank you,\nHaTikvah Care`;
+  return { waPhone, text, url: waPhone ? `https://wa.me/${waPhone}?text=${encodeURIComponent(text)}` : null };
+}
+
 export default function QuoteDetail() {
   const { id } = useParams();
   const [sp] = useSearchParams();
@@ -17,6 +28,18 @@ export default function QuoteDetail() {
   const [editing, setEditing] = useState(false);
   const [st, run] = useAction();
   const q = isNew ? null : s.data;
+  const wa = getWhatsAppQuote(q);
+  const openWhatsApp = () => {
+    if (wa?.url) {
+      window.open(wa.url, "_blank", "noopener,noreferrer");
+    } else {
+      const num = window.prompt("Enter customer WhatsApp mobile number (10 digits):", q?.customer?.phone || "");
+      if (!num) return;
+      const clean = num.replace(/\D/g, "");
+      const p = clean.length === 10 ? `91${clean}` : clean;
+      window.open(`https://wa.me/${p}?text=${encodeURIComponent(wa.text)}`, "_blank", "noopener,noreferrer");
+    }
+  };
   const save = (body) => run(async () => {
     const out = await api(isNew ? "/api/admin/quotes" : `/api/admin/quotes/${id}`, { method: isNew ? "POST" : "PUT", body });
     if (isNew) nav(`/admin/quotes/${out.id}`, { replace: true }); else { setEditing(false); s.reload(); }
@@ -41,6 +64,7 @@ export default function QuoteDetail() {
           <div className="row-between"><h1>Quotation {q.number} <small className="muted">v{q.version || 1}</small></h1>
             <div className="btn-row">
               <a className="btn ghost" href={`/doc/quote/${q.token}`} target="_blank" rel="noopener noreferrer">View / print PDF</a>
+              <button type="button" className="btn btn-whatsapp" onClick={openWhatsApp}>📱 Send via WhatsApp</button>
               {["draft", "sent"].includes(q.status) && <button className="btn ghost" onClick={() => setEditing(true)}>Edit</button>}
               {["draft", "sent"].includes(q.status) && <button className="btn" disabled={st.busy} onClick={() => act("send", undefined, "Sent ✓ The customer gets a link by email/WhatsApp (see Automation & messages).")}>{q.status === "sent" ? "Send again" : "Send to customer"}</button>}
             </div></div>

@@ -5,6 +5,18 @@ import { DocView } from "./DocParts.jsx";
 import { Loader, useLoad } from "./hooks.jsx";
 import { DocEditor, fmtDate, Modal, Msg, rs, Timeline, today, toPaise, useAction, useMeta } from "./ui.jsx";
 
+function getWhatsAppInvoice(inv) {
+  if (!inv) return null;
+  const rawPhone = inv.customer?.phone || "";
+  const clean = rawPhone.replace(/\D/g, "");
+  const waPhone = clean.length === 10 ? `91${clean}` : clean;
+  const invUrl = `${window.location.origin}/doc/invoice/${inv.token}`;
+  const total = ((inv.totals?.total ?? inv.total ?? 0) / 100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const bal = ((inv.balance ?? 0) / 100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const text = `Hello ${inv.customer?.name || "Customer"},\n\nPlease find your Tax Invoice ${inv.number} from HaTikvah Care.\nTotal Amount: ₹${total}\nBalance Due: ₹${bal}\n\nYou can view and download your invoice here:\n${invUrl}\n\nThank you,\nHaTikvah Care`;
+  return { waPhone, text, url: waPhone ? `https://wa.me/${waPhone}?text=${encodeURIComponent(text)}` : null };
+}
+
 export default function InvoiceDetail() {
   const { id } = useParams();
   const [sp] = useSearchParams();
@@ -14,6 +26,18 @@ export default function InvoiceDetail() {
   const [pay, setPay] = useState(null);
   const [st, run] = useAction();
   const inv = isNew ? null : s.data;
+  const wa = getWhatsAppInvoice(inv);
+  const openWhatsApp = () => {
+    if (wa?.url) {
+      window.open(wa.url, "_blank", "noopener,noreferrer");
+    } else {
+      const num = window.prompt("Enter customer WhatsApp mobile number (10 digits):", inv?.customer?.phone || "");
+      if (!num) return;
+      const clean = num.replace(/\D/g, "");
+      const p = clean.length === 10 ? `91${clean}` : clean;
+      window.open(`https://wa.me/${p}?text=${encodeURIComponent(wa.text)}`, "_blank", "noopener,noreferrer");
+    }
+  };
   const extra = (f, set) => <>
     <label className="field"><span>Invoice date</span><input type="date" value={f.date || ""} onChange={(e) => set("date", e.target.value)} /></label>
     <label className="field"><span>Due date (blank = customer terms)</span><input type="date" value={f.dueDate || ""} onChange={(e) => set("dueDate", e.target.value)} /></label>
@@ -37,6 +61,7 @@ export default function InvoiceDetail() {
           <div className="row-between"><h1>Invoice {inv.number}</h1>
             <div className="btn-row">
               <a className="btn ghost" href={`/doc/invoice/${inv.token}`} target="_blank" rel="noopener noreferrer">View / print PDF</a>
+              {inv.status !== "void" && <button type="button" className="btn btn-whatsapp" onClick={openWhatsApp}>📱 Send via WhatsApp</button>}
               {inv.status !== "void" && <button className="btn ghost" onClick={() => run(async () => { await api(`/api/admin/invoices/${id}/send`, { method: "POST" }); s.reload(); }, "Sent to the customer again ✓")}>Send to customer</button>}
               {inv.balance > 0 && <button className="btn" onClick={() => setPay({ amount: String(inv.balance / 100), date: today(), mode: "bank", reference: "", notes: "" })}>Record payment</button>}
             </div></div>

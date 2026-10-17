@@ -70,15 +70,17 @@ export const settingsInput = z.object({
 
 export const DEFAULT_SETTINGS = {
   key: "company",
-  name: "HaTikvah Care", legalName: "EXL Marketing",
+  name: "HaTikvah Care", legalName: "M/s. EXL MARKETING",
   tagline: "Hospitality · Hygiene · Wellness Supplies",
   about: "Established in 2002 and rebranded as EXL Marketing in 2022, HaTikvah Care is a trusted provider of premium hospitality supply solutions: guest amenities, F&B disposables, housekeeping products, hygiene solutions, eco-friendly products, healthcare and institutional supplies, and customised branding materials. We serve hotels, resorts, spas, serviced apartments, hospitals, corporate institutions and large-scale events across India.",
-  phone: "+91 79954 44434", whatsapp: "917995444434", email: "exlhygiene@gmail.com", website: "www.hatikvahcare.com",
-  address: "Eshwar Nilayam, Plot No. 4-1447, Kondapur Golden Tulip Estate, JV Hills, Gachibowli, Hyderabad, Telangana – 500084",
+  phone: "+91 7995444434, 7032998336", whatsapp: "917995444434", email: "exlhygiene@gmail.com", website: "www.hatikvahcare.com",
+  address: "Door No.12-7-134/BITNO.2/C/103, Flat No 103, C Block, R V Advaita, Road No.6, Sri Raghavendra Nagar, Habeeb Nagar, Hyderabad, Medchal Malkajgiri, TELANGANA, 500072",
   hours: "", showPrices: true,
-  gstin: "", stateCode: "36", bankDetails: "", upiId: "",
-  quoteTerms: "1. Prices are exclusive of freight unless stated.\n2. Delivery within 7–10 working days of order confirmation.\n3. Custom branding requires artwork approval.",
-  invoiceTerms: "Goods once sold will not be taken back. Subject to Hyderabad jurisdiction.",
+  gstin: "36ADDPC0083H1Z0", stateCode: "36",
+  bankDetails: "State Bank of India\nAccount #: 42157988420\nIFSC Code: SBIN0020308\nBranch: SANJEEVA REDDY NGR",
+  upiId: "42157988420@sbi",
+  quoteTerms: "1. Prices are exclusive of freight unless stated.\n2. Delivery within 7–10 working days of order confirmation.\n3. We declare that this quotation shows the actual price of the goods described and that all particulars are true and correct.",
+  invoiceTerms: "We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct. Subject to Hyderabad jurisdiction.",
   quoteValidityDays: 15, paymentTermsDays: 30, ga4Id: "", metaPixelId: "", brochureUrl: "",
 };
 /** Company settings with defaults filled in for fields added after the database was created. */

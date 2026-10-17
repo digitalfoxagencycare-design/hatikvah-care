@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, money } from "../api.js";
+import { WhatsAppMessageParser } from "./WhatsAppParser.jsx";
 
 /** Shared admin building blocks: look-up data, formatting, pills, modal, timeline, document line editor. */
 export const rs = (p) => (p == null ? "—" : money(p));
@@ -88,6 +89,7 @@ export function DocEditor({ initial, kind, onSave, busy, error, extra }) {
   const customers = useAsync("/api/admin/customers");
   const company = useAsync("/api/admin/settings");
   const [f, setF] = useState(() => ({ customerId: "", placeOfSupply: "", notes: "", items: [], ...initial }));
+  const [showParser, setShowParser] = useState(false);
   const rates = useAsync(`/api/admin/rates${f.customerId ? `?customerId=${f.customerId}` : ""}`);
   const [pick, setPick] = useState("");
   const cust = customers.data?.find((c) => c.id === f.customerId);
@@ -132,14 +134,27 @@ export function DocEditor({ initial, kind, onSave, busy, error, extra }) {
               </tr>
             );
           })}
-          {f.items.length === 0 && <tr><td colSpan="9" className="muted">Add products below.</td></tr>}
+          {f.items.length === 0 && <tr><td colSpan="9" className="muted">Add products below, or click "Paste from WhatsApp" to auto-extract items.</td></tr>}
         </tbody>
       </table></div>
       <div className="btn-row">
         <input className="grow" list={`products-${kind}`} value={pick} placeholder="Search a product to add (name or SKU)…" onChange={(e) => { setPick(e.target.value); addProduct(e.target.value); }} aria-label="Add product" />
         <datalist id={`products-${kind}`}>{rates.data?.map((r) => <option key={r.productId} value={`${r.sku} · ${r.name}`}>{r.pack}{r.rate ? ` · ₹${r.rate / 100}` : ""}</option>)}</datalist>
         <button type="button" className="btn ghost" onClick={() => set("items", [...f.items, { productId: "", sku: "", name: "", hsn: "", unit: "pcs", qty: 1, rate: 0, discountPct: 0, gstRate: 18 }])}>+ Custom line</button>
+        <button type="button" className="btn btn-whatsapp" onClick={() => setShowParser(true)}>📱 Paste from WhatsApp</button>
       </div>
+      {showParser && (
+        <WhatsAppMessageParser
+          catalog={rates.data || []}
+          customers={customers.data || []}
+          onApply={({ customerId, items }) => {
+            if (customerId && !f.customerId) set("customerId", customerId);
+            set("items", [...f.items, ...items]);
+            setShowParser(false);
+          }}
+          onClose={() => setShowParser(false)}
+        />
+      )}
       <div className="doc-foot">
         <div className="grow">
           <label className="field"><span>Notes (shown on the document)</span><textarea rows="3" maxLength={2000} value={f.notes} onChange={(e) => set("notes", e.target.value)} /></label>

@@ -1,20 +1,436 @@
-.doc-wrap { background: #eceae2; min-height: 100vh; padding: 24px 12px 48px; }
-.doc-actions { max-width: 860px; margin: 0 auto 12px; display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
-.doc { max-width: 860px; margin: 0 auto; background: #fff; padding: 36px 40px; border-radius: 6px; box-shadow: 0 2px 14px rgba(0,0,0,.08); font-size: .92rem; color: #222; }
-.doc h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: .02em; } .doc h3 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: #666; margin: 0 0 4px; }
-.doc-head { display: grid; grid-template-columns: 1fr auto; gap: 24px; border-bottom: 2px solid #2b3a1f; padding-bottom: 16px; } .doc-head p { margin: 6px 0 0; line-height: 1.45; }
-.doc-title { text-align: right; } .doc-title table { margin-left: auto; } .doc-title td { padding: 1px 0 1px 12px; } .doc-title td:first-child { color: #666; }
-.doc-status { display: inline-block; margin-top: 6px; padding: 2px 10px; border-radius: 999px; background: #eee; font-size: .75rem; text-transform: uppercase; }
-.doc-status.paid, .doc-status.accepted, .doc-status.converted { background: #cdeccd; } .doc-status.void, .doc-status.rejected, .doc-status.expired { background: #f3d0d0; }
-.doc-parties { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding: 16px 0; } .doc-parties p { margin: 0; line-height: 1.45; }
-.doc-lines, .doc-tax { width: 100%; border-collapse: collapse; } .doc-lines th, .doc-tax th { background: #f3f1e8; text-align: left; font-size: .75rem; text-transform: uppercase; padding: 6px 8px; }
-.doc-lines td, .doc-tax td { border-bottom: 1px solid #eee; padding: 6px 8px; vertical-align: top; } .doc .n { text-align: right; white-space: nowrap; }
-.doc-sum { display: grid; grid-template-columns: 1fr 260px; gap: 24px; margin-top: 16px; align-items: start; } .doc-tax { font-size: .82rem; }
-.doc-totals { width: 100%; border-collapse: collapse; } .doc-totals td { padding: 4px 0; } .doc-totals td:last-child { text-align: right; } .doc-totals .grand td { border-top: 2px solid #222; font-weight: 700; font-size: 1.05rem; padding-top: 6px; }
-.words { margin-top: 10px; } .doc-notes { background: #faf8f0; padding: 10px 12px; border-radius: 6px; white-space: pre-wrap; } .pre { white-space: pre-wrap; }
-.doc-pay { margin-top: 16px; display: grid; gap: 8px; } .small { font-size: .78rem; color: #555; } .center { text-align: center; }
-.doc-sign { display: flex; justify-content: space-between; gap: 24px; margin-top: 40px; } .doc-sign .right { margin-left: auto; text-align: right; }
-.respond { margin-top: 16px; } .respond .row { display: flex; gap: 10px; flex-wrap: wrap; margin: 10px 0; } .respond input { flex: 1 1 220px; min-height: 44px; padding: 8px 12px; border: 1px solid #ccc; border-radius: 8px; font: inherit; }
-.doc-note { max-width: 860px; margin: 16px auto; text-align: center; font-size: 1.05rem; }
-@media (max-width: 640px) { .doc { padding: 20px 16px; } .doc-head { grid-template-columns: 1fr; } .doc-parties, .doc-sum { grid-template-columns: 1fr; } .doc-title { text-align: left; } .doc-title table { margin-left: 0; } .doc-lines { font-size: .8rem; } }
-@media print { @page { size: A4; margin: 12mm; } .doc-wrap { background: #fff; padding: 0; } .doc { box-shadow: none; padding: 0; max-width: none; } .no-print { display: none !important; } }
+/* Official EXL Marketing Tax Invoice & Quotation Styling */
+.doc-page-container {
+  background: #f1f5f9;
+  min-height: 100vh;
+  padding: 24px 12px 60px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: #1e293b;
+}
+
+.doc-actions {
+  max-width: 820px;
+  margin: 0 auto 16px;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.official-bill-sheet {
+  max-width: 820px;
+  margin: 0 auto;
+  background: #ffffff;
+  padding: 36px 44px;
+  border-radius: 4px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  border: 1px solid #e2e8f0;
+}
+
+/* 1. Top Bar */
+.bill-top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid #2563eb;
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+}
+.bill-doc-type {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: #1e3a8a;
+  letter-spacing: 0.06em;
+  margin: 0;
+}
+.bill-recipient-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #475569;
+  text-transform: uppercase;
+}
+
+/* 2. Company Header */
+.bill-company-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #cbd5e1;
+  gap: 20px;
+}
+.bill-company-info {
+  flex: 1;
+}
+.bill-company-name {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 4px;
+}
+.bill-company-gstin {
+  margin: 2px 0 4px;
+  color: #0f172a;
+  font-size: 0.88rem;
+}
+.bill-company-address {
+  margin: 2px 0;
+  color: #334155;
+  font-size: 0.82rem;
+  max-width: 520px;
+  line-height: 1.35;
+}
+.bill-company-contact {
+  margin: 4px 0 0;
+  color: #334155;
+  font-size: 0.82rem;
+}
+.bill-brand-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #ffffff;
+  padding: 4px;
+  border-radius: 8px;
+}
+.bill-logo-exl {
+  height: 52px;
+  width: auto;
+  object-fit: contain;
+}
+.bill-logo-hatikvah {
+  height: 48px;
+  width: auto;
+  object-fit: contain;
+}
+
+/* 3. Document Meta Bar */
+.bill-meta-bar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-top: none;
+  padding: 8px 12px;
+  font-size: 0.83rem;
+  gap: 12px;
+}
+.bill-meta-cell {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}
+.meta-label {
+  color: #475569;
+  font-weight: 500;
+}
+
+/* 4. Parties Grid */
+.bill-parties-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid #cbd5e1;
+  border-top: none;
+}
+.bill-party-box {
+  padding: 10px 14px;
+}
+.bill-party-box:first-child {
+  border-right: 1px solid #cbd5e1;
+}
+.party-heading {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  margin: 0 0 4px;
+}
+.party-name {
+  font-size: 0.95rem;
+  margin: 0 0 2px;
+  color: #0f172a;
+}
+.party-address {
+  margin: 0 0 2px;
+  color: #334155;
+  line-height: 1.35;
+}
+.bill-pos-bar {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 14px;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-top: none;
+  font-size: 0.8rem;
+}
+
+/* 5. Items Table */
+.bill-items-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  border: 1px solid #cbd5e1;
+}
+.bill-items-table th {
+  background: #f1f5f9;
+  border-bottom: 2px solid #cbd5e1;
+  border-right: 1px solid #cbd5e1;
+  padding: 7px 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-align: left;
+  color: #0f172a;
+}
+.bill-items-table th:last-child {
+  border-right: none;
+}
+.bill-items-table td {
+  padding: 7px 8px;
+  border-bottom: 1px solid #e2e8f0;
+  border-right: 1px solid #e2e8f0;
+  vertical-align: top;
+  font-size: 0.82rem;
+}
+.bill-items-table td:last-child {
+  border-right: none;
+}
+.th-num, .td-num { width: 32px; text-align: center; }
+.th-rate, .td-rate { text-align: right; width: 85px; white-space: nowrap; }
+.th-qty, .td-qty { text-align: center; width: 68px; white-space: nowrap; }
+.th-val, .td-val { text-align: right; width: 95px; white-space: nowrap; }
+.th-tax, .td-tax { text-align: right; width: 110px; white-space: nowrap; }
+.th-amt, .td-amt { text-align: right; width: 95px; white-space: nowrap; font-weight: 600; }
+.item-name { font-weight: 600; color: #0f172a; margin-bottom: 2px; }
+.item-hsn { font-size: 0.75rem; color: #64748b; }
+
+/* 6. Subtotals Wrap */
+.bill-subtotals-wrap {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+.bill-subtotals-box {
+  width: 270px;
+  border: 1px solid #cbd5e1;
+  border-top: none;
+  background: #f8fafc;
+  padding: 6px 12px;
+}
+.subtotal-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 0;
+  font-size: 0.82rem;
+  color: #334155;
+}
+.grand-total-row {
+  border-top: 1.5px solid #0f172a;
+  border-bottom: 1.5px solid #0f172a;
+  margin-top: 4px;
+  padding: 6px 0;
+  font-size: 1rem;
+  color: #0f172a;
+}
+
+/* 7. Totals & Words Bar */
+.bill-totals-words-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid #cbd5e1;
+  margin-top: 8px;
+  padding: 8px 14px;
+  background: #f8fafc;
+  font-size: 0.82rem;
+  gap: 16px;
+}
+.qty-words-left p {
+  margin: 2px 0;
+}
+.payable-box {
+  background: #ffffff;
+  border: 1.5px solid #0f172a;
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+.payable-box strong {
+  color: #1e3a8a;
+  font-size: 1.05rem;
+}
+
+/* 8. Detailed HSN Table */
+.bill-hsn-wrap {
+  margin-top: 10px;
+}
+.bill-hsn-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid #cbd5e1;
+  font-size: 0.78rem;
+}
+.bill-hsn-table th {
+  background: #f1f5f9;
+  border-bottom: 1px solid #cbd5e1;
+  border-right: 1px solid #cbd5e1;
+  padding: 5px 8px;
+  font-weight: 700;
+  color: #0f172a;
+  text-align: right;
+}
+.bill-hsn-table th:first-child { text-align: left; }
+.bill-hsn-table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid #e2e8f0;
+  border-right: 1px solid #e2e8f0;
+  text-align: right;
+}
+.bill-hsn-table td:first-child { text-align: left; }
+.hsn-total-row {
+  background: #f8fafc;
+  border-top: 1px solid #0f172a;
+  font-weight: 700;
+}
+
+/* 9. Bottom Section: UPI + Bank + Stamp */
+.bill-bottom-grid {
+  display: grid;
+  grid-template-columns: 140px 1fr 220px;
+  gap: 16px;
+  border: 1px solid #cbd5e1;
+  margin-top: 10px;
+  padding: 12px 14px;
+  background: #ffffff;
+  align-items: center;
+}
+.bottom-label {
+  font-size: 0.78rem;
+  color: #0f172a;
+  margin: 0 0 6px;
+}
+.upi-qr-img {
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  display: block;
+}
+.bill-bank-col p {
+  margin: 2px 0;
+  font-size: 0.8rem;
+  color: #334155;
+}
+.bill-sign-col {
+  text-align: center;
+}
+.sign-company {
+  font-size: 0.78rem;
+  margin: 0 0 6px;
+  color: #0f172a;
+}
+.stamp-seal-wrap {
+  display: flex;
+  justify-content: center;
+  margin: 4px 0;
+}
+.stamp-seal-svg {
+  transform: rotate(-5deg);
+  opacity: 0.9;
+}
+.sign-label {
+  font-size: 0.76rem;
+  color: #475569;
+  margin: 4px 0 0;
+}
+
+/* 10. Terms */
+.bill-terms-section {
+  border: 1px solid #cbd5e1;
+  border-top: none;
+  padding: 8px 14px;
+  font-size: 0.78rem;
+  background: #f8fafc;
+}
+.terms-heading {
+  margin: 0 0 2px;
+  color: #0f172a;
+}
+.terms-body {
+  margin: 0;
+  color: #475569;
+  font-size: 0.75rem;
+}
+
+/* 11. Footer */
+.bill-footer-bar {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 8px;
+  font-size: 0.74rem;
+  color: #64748b;
+}
+
+/* Online Approval Box */
+.doc-respond-box {
+  max-width: 820px;
+  margin: 20px auto 0;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 20px 24px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+.doc-respond-box h2 {
+  font-size: 1.15rem;
+  margin: 0 0 6px;
+  color: #0f172a;
+}
+.respond-inputs {
+  display: flex;
+  gap: 12px;
+  margin: 12px 0;
+  flex-wrap: wrap;
+}
+.respond-inputs input {
+  flex: 1 1 240px;
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+.success-msg {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #86efac;
+  border-radius: 8px;
+  padding: 12px;
+  font-weight: 600;
+}
+
+/* Print Optimization */
+@media print {
+  @page {
+    size: A4;
+    margin: 8mm 10mm;
+  }
+  body, html {
+    background: #ffffff !important;
+  }
+  .doc-page-container {
+    background: #ffffff !important;
+    padding: 0 !important;
+    min-height: auto;
+  }
+  .official-bill-sheet {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    max-width: 100% !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+}

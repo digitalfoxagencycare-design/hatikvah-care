@@ -1,11 +1,15 @@
 import { createApp } from "./app.js";
 import { loadConfig } from "./config.js";
 import { seedIfEmpty } from "./seed.js";
+import { seedDemoData } from "./seedDemo.js";
 import { createStore } from "./store/index.js";
 
 const cfg = loadConfig();
 const store = await createStore(cfg);
 await seedIfEmpty(store, cfg.seedFile);
+if (process.env.SEED_DEMO_DATA !== "false") {
+  try { await seedDemoData(store); } catch (e) { console.warn("Failed to seed demo data", e); }
+}
 const app = createApp({ cfg, store });
 const server = app.listen(cfg.port, () => console.log(`HaTikvah Care API on :${cfg.port} (${store.kind} store, ${cfg.prod ? "production" : "development"})`));
 // Scheduled automations (reminders, follow-ups, summaries). One run at a time; failures are logged, never fatal.
