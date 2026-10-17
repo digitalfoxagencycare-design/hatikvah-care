@@ -7,7 +7,7 @@ const now = () => new Date().toISOString();
 
 export async function seedDemoData(store, log = console) {
   if (process.env.NODE_ENV === "test") return;
-  if ((await store.customers.count()) >= 10 && (await store.quotes.count()) >= 5) return;
+  if ((await store.customers.count()) >= 10 && (await store.quotes.count()) >= 10 && (await store.invoices.count()) >= 10) return;
 
   log.info?.("[seedDemo] Seeding rich mock data (10+ records for all modules)...");
 
@@ -328,7 +328,146 @@ export async function seedDemoData(store, log = console) {
     }
   }
 
-  // 6. 10 Purchases / POs with auto-incremented stock (+qty)
+  // 6. Ensure total 10 Quotes and 10 Invoices
+  const allCusts = await store.customers.all();
+  const additionalItems = [
+    { sku: "BIO-SHW-380", name: "BIO Red Grapefruit Shower Gel 380ml", hsn: "3304", rate: 22500, unit: "NOS", gstRate: 18 },
+    { sku: "BIO-SHM-380", name: "BIO Red Grapefruit Hair Shampoo 380ml", hsn: "3401", rate: 22500, unit: "NOS", gstRate: 18 },
+    { sku: "BIO-HDW-380", name: "BIO Red Grapefruit Hand Wash 380ml", hsn: "34013019", rate: 22500, unit: "NOS", gstRate: 18 },
+    { sku: "BIO-BRK-001", name: "BIO Kopou Phul - Brackets", hsn: "39269099", rate: 21500, unit: "NOS", gstRate: 18 },
+  ];
+
+  if ((await store.quotes.count()) < 10) {
+    const quoteTemplates = [
+      { cust: allCusts[1] || cave, status: "sent", daysAgo: 2, items: [additionalItems[0], additionalItems[1]], notes: "Special clinic pricing applied" },
+      { cust: allCusts[2] || cave, status: "accepted", daysAgo: 3, items: [additionalItems[2], additionalItems[3]], notes: "Pediatric rehab wing requirement" },
+      { cust: allCusts[3] || cave, status: "draft", daysAgo: 1, items: [additionalItems[0], additionalItems[2]], notes: "Diagnostic instruments package" },
+      { cust: allCusts[4] || cave, status: "sent", daysAgo: 4, items: [additionalItems[1], additionalItems[3]], notes: "Elder care monthly supplies" },
+      { cust: allCusts[5] || cave, status: "draft", daysAgo: 2, items: [additionalItems[0], additionalItems[3]], notes: "Home healthcare patient setup" },
+      { cust: allCusts[6] || cave, status: "accepted", daysAgo: 5, items: [additionalItems[1], additionalItems[2]], notes: "Surgical and diagnostics supply" },
+      { cust: allCusts[7] || cave, status: "sent", daysAgo: 6, items: [additionalItems[0], additionalItems[1]], notes: "Assisted living routine replenishment" },
+      { cust: allCusts[8] || cave, status: "draft", daysAgo: 1, items: [additionalItems[2], additionalItems[3]], notes: "Retail pharmacy display order" },
+      { cust: allCusts[9] || cave, status: "accepted", daysAgo: 7, items: [additionalItems[0], additionalItems[2]], notes: "Non-profit charity discount applied" },
+    ];
+
+    for (let i = 0; i < quoteTemplates.length && (await store.quotes.count()) < 10; i++) {
+      const qt = quoteTemplates[i];
+      const qNum = await nextNumber(store, "Q");
+      const qDate = addDays(todayIST(), -qt.daysAgo);
+      const lines = qt.items.map((it) => ({
+        productId: it.sku,
+        sku: it.sku,
+        name: it.name,
+        hsn: it.hsn,
+        qty: Math.floor(Math.random() * 5) + 2,
+        unit: it.unit,
+        rate: it.rate,
+        discountPct: 5,
+        gstRate: it.gstRate,
+      }));
+      const doc = await priced(store, { items: lines, customer: qt.cust, placeOfSupply: qt.cust.stateCode || "36" });
+      await store.quotes.insert({
+        number: qNum,
+        token: token(),
+        customerId: qt.cust.id,
+        customer: customerSnapshot(qt.cust),
+        date: qDate,
+        validUntil: addDays(qDate, 15),
+        ...doc,
+        amountInWords: amountInWords(doc.totals.total),
+        status: qt.status,
+        version: 1,
+        notes: qt.notes,
+        terms: "1. Delivery within 7 days.\n2. GST applicable as per schedule.",
+        createdBy: "admin@hatikvah-care",
+        createdAt: new Date(qDate + "T10:00:00Z").toISOString(),
+        updatedAt: new Date(qDate + "T10:00:00Z").toISOString(),
+      });
+    }
+  }
+
+  if ((await store.invoices.count()) < 10) {
+    const invTemplates = [
+      { cust: allCusts[1] || cave, status: "paid", daysAgo: 5, payMode: "bank", items: [additionalItems[0], additionalItems[1]] },
+      { cust: allCusts[2] || cave, status: "partial", daysAgo: 7, payMode: "upi", items: [additionalItems[2], additionalItems[3]] },
+      { cust: allCusts[3] || cave, status: "issued", daysAgo: 2, payMode: null, items: [additionalItems[0], additionalItems[2]] },
+      { cust: allCusts[4] || cave, status: "paid", daysAgo: 10, payMode: "bank", items: [additionalItems[1], additionalItems[3]] },
+      { cust: allCusts[5] || cave, status: "overdue", daysAgo: 35, payMode: null, items: [additionalItems[2]] },
+      { cust: allCusts[6] || cave, status: "paid", daysAgo: 4, payMode: "bank", items: [additionalItems[0], additionalItems[3]] },
+      { cust: allCusts[7] || cave, status: "partial", daysAgo: 8, payMode: "upi", items: [additionalItems[1], additionalItems[2]] },
+      { cust: allCusts[8] || cave, status: "issued", daysAgo: 1, payMode: null, items: [additionalItems[0]] },
+      { cust: allCusts[9] || cave, status: "paid", daysAgo: 12, payMode: "bank", items: [additionalItems[2], additionalItems[3]] },
+    ];
+
+    for (let i = 0; i < invTemplates.length && (await store.invoices.count()) < 10; i++) {
+      const it = invTemplates[i];
+      const invNum = await nextNumber(store, "INV");
+      const invDate = addDays(todayIST(), -it.daysAgo);
+      const dueDate = addDays(invDate, 30);
+      const lines = it.items.map((l) => ({
+        productId: l.sku,
+        sku: l.sku,
+        name: l.name,
+        hsn: l.hsn,
+        qty: Math.floor(Math.random() * 4) + 2,
+        unit: l.unit,
+        rate: l.rate,
+        discountPct: 0,
+        gstRate: l.gstRate,
+      }));
+      const doc = await priced(store, { items: lines, customer: it.cust, placeOfSupply: it.cust.stateCode || "36" });
+      const inv = await store.invoices.insert({
+        number: invNum,
+        token: token(),
+        customerId: it.cust.id,
+        customer: customerSnapshot(it.cust),
+        date: invDate,
+        dueDate,
+        ...doc,
+        amountInWords: amountInWords(doc.totals.total),
+        status: it.status === "paid" ? "paid" : it.status === "partial" ? "partial" : "unpaid",
+        amountPaid: 0,
+        notes: "We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.",
+        createdBy: "admin@hatikvah-care",
+        createdAt: new Date(invDate + "T11:00:00Z").toISOString(),
+        updatedAt: new Date(invDate + "T11:00:00Z").toISOString(),
+      });
+
+      for (const line of lines) {
+        await moveStock(store, {
+          productId: line.productId,
+          sku: line.sku,
+          qty: -line.qty,
+          kind: "out",
+          ref: invNum,
+          note: `Tax Invoice ${invNum} to ${it.cust.name}`,
+          by: "admin@hatikvah-care",
+        });
+      }
+
+      if (it.status === "paid") {
+        await recordPayment(store, inv, {
+          amount: doc.totals.total,
+          date: invDate,
+          mode: it.payMode || "bank",
+          reference: `REF-${Math.floor(Math.random() * 899999 + 100000)}`,
+          notes: "Full payment settled",
+          by: "admin@hatikvah-care",
+        });
+      } else if (it.status === "partial") {
+        await recordPayment(store, inv, {
+          amount: Math.round(doc.totals.total / 2),
+          date: invDate,
+          mode: "upi",
+          reference: `UPI-${Math.floor(Math.random() * 899999 + 100000)}`,
+          notes: "50% advance payment received",
+          by: "admin@hatikvah-care",
+        });
+      }
+    }
+  }
+
+  // 7. 10 Purchases / POs with auto-incremented stock (+qty)
   const allSups = await store.suppliers.all();
   if ((await store.purchases.count()) < 10) {
     const poTemplates = [
