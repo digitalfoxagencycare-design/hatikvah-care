@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
 
-const COLLECTIONS = ["products", "categories", "enquiries", "admins", "audit", "settings"];
+const COLLECTIONS = ["products", "categories", "enquiries", "admins", "audit", "settings", "customers", "activities", "priceLists", "quotes", "orders", "invoices", "payments", "stockMoves", "suppliers", "purchases", "outbox"];
 
 /** Development / test store: one JSON file per collection, written atomically. Same interface as the Mongo store. */
 export async function createFileStore(dir) {
@@ -57,6 +57,19 @@ export async function createFileStore(dir) {
 
   const store = { kind: "file", async close() { await chain; } };
   for (const n of COLLECTIONS) store[n] = col(n);
+  // Sequence numbers (invoice, quote, order…): never hands out the same number twice, even under concurrent requests.
+  let counters = null, seqChain = Promise.resolve();
+  store.nextSeq = (key) => {
+    const run = seqChain.then(async () => {
+      if (!counters) { try { counters = JSON.parse(await fs.readFile(path.join(dir, "counters.json"), "utf8")); } catch { counters = {}; } }
+      counters[key] = (counters[key] || 0) + 1;
+      const tmp = path.join(dir, "counters.json.tmp");
+      await fs.writeFile(tmp, JSON.stringify(counters)); await fs.rename(tmp, path.join(dir, "counters.json"));
+      return counters[key];
+    });
+    seqChain = run.catch(() => {});
+    return run;
+  };
   store.saveMedia = async (buf, contentType) => {
     const id = crypto.randomUUID();
     await fs.writeFile(path.join(dir, "media", id), buf);

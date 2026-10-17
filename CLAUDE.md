@@ -7,4 +7,8 @@
 * Seeding runs only on an empty database (`src/seed.js`). Never overwrite live data from `data/catalog.json`.
 * Secrets only via environment (`JWT_SECRET`, `MONGODB_URI`). The server refuses unsafe production config (`src/config.js`).
 * Before pushing: `npm test` and `npm run build`.
-* Known gaps: no email/WhatsApp alert for new enquiries; no orders/checkout (this is a quote-based B2B catalogue); product images shown from the PDF are the supplier's catalogue photos.
+* Business flow: enquiry → customer → quote (`/doc/quote/:token`, accepted online) → sales order → dispatch (challan) → GST invoice → payments. GST maths lives only in `src/lib/gst.js` (the web editor mirrors it for display; the server's totals are saved). Document numbers come from `store.nextSeq` per financial year.
+* Permissions: `src/lib/permissions.js` (roles → modules); guard new admin routes with `requirePerm`.
+* All outgoing messages go through `src/lib/notify.js` (outbox). Rules and scheduled jobs: `src/lib/automation.js`. Integrations are env-only and optional (docs/INTEGRATIONS.md).
+* `npm run seed-demo` fills a dev database with sample data for previews (refuses production).
+* Known gaps: no credit notes, no e-invoice/e-way bill, no direct Tally/Zoho sync; product images are the supplier's catalogue photos.

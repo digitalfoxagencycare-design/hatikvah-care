@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api.js";
 import { Loader, useLoad } from "./hooks.jsx";
 
-const EMPTY = { name: "", sku: "", category: "", collection: "", pack: "", variants: [], description: "", images: [], price: null, priceUnit: "", minOrder: "", active: true, featured: false };
+const EMPTY = { name: "", sku: "", category: "", collection: "", pack: "", variants: [], description: "", images: [], price: null, priceUnit: "", minOrder: "", active: true, featured: false, hsn: "", gstRate: 18, unit: "pcs" };
 
 export default function ProductForm() {
   const { id } = useParams();
@@ -38,7 +38,8 @@ export default function ProductForm() {
     const n = price.trim() === "" ? null : Number(price.replace(/,/g, ""));
     if (n !== null && (!Number.isFinite(n) || n < 0 || n > 1_000_000)) return setSt({ busy: false, error: "Price must be a number in rupees, like 125 or 12.50", saved: false, field: "price" });
     const body = { name: f.name, sku: f.sku || undefined, category: f.category, collection: f.collection, pack: f.pack, variants: f.variants, description: f.description,
-      images: f.images, price: n === null ? null : Math.round(n * 100), priceUnit: f.priceUnit, minOrder: f.minOrder, active: f.active, featured: f.featured };
+      images: f.images, price: n === null ? null : Math.round(n * 100), priceUnit: f.priceUnit, minOrder: f.minOrder, active: f.active, featured: f.featured,
+      hsn: f.hsn || "", gstRate: Number(f.gstRate ?? 18), unit: f.unit || "pcs" };
     setSt({ busy: true, error: null, saved: false, field: null });
     try {
       if (id) { await api(`/api/admin/products/${id}`, { method: "PATCH", body }); setSt({ busy: false, error: null, saved: true, field: null }); all.reload(); }
@@ -66,6 +67,11 @@ export default function ProductForm() {
               <label className="field"><span>Minimum order</span><input maxLength={60} value={f.minOrder} onChange={(e) => set("minOrder", e.target.value)} placeholder="e.g. 50 packs" /></label>
               <label className={"field" + (st.field === "price" ? " bad" : "")}><span>Price (₹) — leave blank for “Price on request”</span><input inputMode="decimal" value={price} onChange={(e) => { setPrice(e.target.value); setSt((s) => ({ ...s, saved: false })); }} placeholder="e.g. 125 or 12.50" /></label>
               <label className="field"><span>Price unit</span><input maxLength={40} value={f.priceUnit} onChange={(e) => set("priceUnit", e.target.value)} placeholder="per piece / per pack / per kg" /></label>
+            </div>
+            <div className="grid3">
+              <label className="field"><span>HSN code (for GST invoices)</span><input inputMode="numeric" maxLength={8} value={f.hsn || ""} onChange={(e) => set("hsn", e.target.value.replace(/\D/g, ""))} placeholder="e.g. 3305" /></label>
+              <label className="field"><span>GST rate</span><select value={f.gstRate ?? 18} onChange={(e) => set("gstRate", Number(e.target.value))}>{[0, 5, 12, 18, 28].map((g) => <option key={g} value={g}>{g}%</option>)}</select></label>
+              <label className="field"><span>Unit (on documents)</span><input maxLength={20} value={f.unit || "pcs"} onChange={(e) => set("unit", e.target.value)} placeholder="pcs / pack / kg" /></label>
             </div>
             <label className="field"><span>Description</span><textarea rows="4" maxLength={2000} value={f.description} onChange={(e) => set("description", e.target.value)} /></label>
             <div className="field"><span>Options available (shampoo, conditioner…)</span>

@@ -11,6 +11,7 @@
     "build": "npm run build -w apps/web",
     "start": "npm run start -w apps/api",
     "test": "npm test -w apps/api",
-    "create-admin": "npm run create-admin -w apps/api --"
+    "create-admin": "npm run create-admin -w apps/api --",
+    "seed-demo": "npm run seed-demo -w apps/api"
   }
 }

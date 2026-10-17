@@ -26,6 +26,14 @@ export const productInput = z.object({
   active: z.boolean().default(true),
   featured: z.boolean().default(false),
   order: z.number().int().min(0).max(100000).optional(),
+  hsn: z.string().trim().regex(/^\d{0,8}$/, "HSN code: up to 8 digits").default(""),
+  gstRate: z.number().refine((v) => [0, 5, 12, 18, 28].includes(v), "GST rate must be 0, 5, 12, 18 or 28").default(18),
+  unit: text(20).default("pcs"),
+  costPrice: paise.default(null),
+  stockTracked: z.boolean().default(false),
+  reorderLevel: z.number().min(0).max(10_000_000).default(0),
+  reorderQty: z.number().min(0).max(10_000_000).default(0),
+  supplierId: z.string().max(60).default(""),
 }).strict();
 export const productPatch = productInput.partial().strict();
 
@@ -41,6 +49,7 @@ export const enquiryInput = z.object({
   message: text(2000).default(""),
   items: z.array(z.object({ productId: z.string().max(60), qty: z.number().int().min(1).max(1_000_000) })).max(60).default([]),
   website: z.string().max(200).optional(), // honeypot: real people leave it empty
+  source: z.object({ utm_source: text(100).optional(), utm_medium: text(100).optional(), utm_campaign: text(100).optional(), referrer: text(200).optional(), page: text(200).optional() }).strict().optional(),
 }).strict();
 
 export const settingsInput = z.object({
@@ -49,6 +58,14 @@ export const settingsInput = z.object({
   email: z.union([z.literal(""), z.string().trim().email().max(160)]).default(""),
   website: text(160).default(""), address: text(400).default(""), hours: text(200).default(""),
   showPrices: z.boolean().default(true),
+  gstin: z.union([z.literal(""), z.string().trim().toUpperCase().regex(/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/, "GSTIN should look like 36ABCDE1234F1Z5")]).default(""),
+  stateCode: z.string().regex(/^\d{2}$/, "Choose the company's state").default("36"),
+  bankDetails: text(500).default(""), upiId: text(80).default(""),
+  quoteTerms: text(3000).default(""), invoiceTerms: text(3000).default(""),
+  quoteValidityDays: z.number().int().min(1).max(365).default(15), paymentTermsDays: z.number().int().min(0).max(365).default(30),
+  ga4Id: z.union([z.literal(""), z.string().trim().regex(/^G-[A-Z0-9]{4,15}$/, "Google Analytics ID looks like G-XXXXXXX")]).default(""),
+  metaPixelId: z.union([z.literal(""), z.string().trim().regex(/^\d{5,20}$/, "Meta Pixel ID is digits only")]).default(""),
+  brochureUrl: z.union([z.literal(""), z.string().regex(/^\/media\/[0-9a-f-]{36}$/)]).default(""),
 }).strict();
 
 export const DEFAULT_SETTINGS = {
@@ -59,7 +76,16 @@ export const DEFAULT_SETTINGS = {
   phone: "+91 79954 44434", whatsapp: "917995444434", email: "exlhygiene@gmail.com", website: "www.hatikvahcare.com",
   address: "Eshwar Nilayam, Plot No. 4-1447, Kondapur Golden Tulip Estate, JV Hills, Gachibowli, Hyderabad, Telangana – 500084",
   hours: "", showPrices: true,
+  gstin: "", stateCode: "36", bankDetails: "", upiId: "",
+  quoteTerms: "1. Prices are exclusive of freight unless stated.\n2. Delivery within 7–10 working days of order confirmation.\n3. Custom branding requires artwork approval.",
+  invoiceTerms: "Goods once sold will not be taken back. Subject to Hyderabad jurisdiction.",
+  quoteValidityDays: 15, paymentTermsDays: 30, ga4Id: "", metaPixelId: "", brochureUrl: "",
 };
+/** Company settings with defaults filled in for fields added after the database was created. */
+export async function getSettings(store) {
+  const s = await store.settings.findBy("key", "company");
+  return { ...DEFAULT_SETTINGS, ...(s || {}) };
+}
 
 /** What a visitor may see. Prices only when the owner has them switched on and a price exists. */
 export function publicProduct(p, settings) {

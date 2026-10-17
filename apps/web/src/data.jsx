@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { api, storeGet, storeSet } from "./api.js";
+import { captureSource, loadAnalytics } from "./track.js";
 
 const Ctx = createContext(null);
 export const useSite = () => useContext(Ctx);
@@ -11,10 +12,11 @@ export function SiteProvider({ children }) {
   const load = useCallback(() => {
     setState((s) => ({ ...s, loading: true, error: null }));
     Promise.all([api("/api/public/catalog"), api("/api/public/settings")])
-      .then(([catalog, settings]) => setState({ loading: false, error: null, catalog, settings }))
+      .then(([catalog, settings]) => { setState({ loading: false, error: null, catalog, settings }); loadAnalytics(settings); })
       .catch((e) => setState({ loading: false, error: e.message, catalog: null, settings: null }));
   }, []);
   useEffect(load, [load]);
+  useEffect(captureSource, []);
   useEffect(() => storeSet("hc_basket", basket), [basket]);
 
   const value = useMemo(() => ({

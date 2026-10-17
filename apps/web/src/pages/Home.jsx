@@ -5,19 +5,10 @@ import ProductCard from "../components/ProductCard.jsx";
 import Seo from "../components/Seo.jsx";
 import { useSite } from "../data.jsx";
 
-const WHY = [
-  ["20+ years of industry experience", "Supplying the hospitality & tourism industry since 2002."],
-  ["One-stop procurement", "Amenities, disposables, housekeeping and linen from a single supplier."],
-  ["Made to reflect your brand", "Tailor-made and branded solutions for your property."],
-  ["Cost-effective import substitution", "Quality alternatives without import lead times."],
-  ["Reliable supply, timely deliveries", "Consistent quality and dependable delivery schedules."],
-  ["Trusted across institutions", "Hotels, resorts, spas, hospitals and corporate institutions."],
-];
-const SERVE = ["Hotels", "Resorts", "Spas", "Serviced apartments", "Hospitals", "Corporate institutions", "Large-scale events"];
-
 export default function Home() {
   const { catalog, settings } = useSite();
   const [sent, setSent] = useState(null);
+  const h = settings.home;
   const featured = catalog.products.filter((p) => p.featured).slice(0, 8);
   const cats = catalog.categories.filter((c) => c.count > 0).map((c) => ({ ...c, img: catalog.products.find((p) => p.category === c.slug)?.images[0] }));
   const ld = { "@context": "https://schema.org", "@type": "Organization", name: "HaTikvah Care", legalName: "EXL Marketing", url: "https://www.hatikvahcare.com", logo: "/brand/hatikvah-logo.png",
@@ -28,26 +19,24 @@ export default function Home() {
       <section className="hero">
         <div className="wrap hero-grid">
           <div>
-            <p className="eyebrow">Hospitality · Hygiene · Wellness Supplies</p>
-            <h1>Everything your property needs, under one roof.</h1>
-            <p className="lead">Guest amenities, F&B disposables, housekeeping and hygiene products, hotel linen and healthcare supplies for hotels, resorts, spas and hospitals across India since 2002.</p>
+            {h.hero.eyebrow && <p className="eyebrow">{h.hero.eyebrow}</p>}
+            <h1>{h.hero.title}</h1>
+            {h.hero.lead && <p className="lead">{h.hero.lead}</p>}
             <div className="cta-row">
-              <Link className="btn" to="/catalog">Browse the catalogue</Link>
-              <Link className="btn ghost" to="/quote">Request a quote</Link>
+              <Link className="btn" to="/catalog">{h.hero.cta || "Browse the catalogue"}</Link>
+              <Link className="btn ghost" to="/quote">{h.hero.cta2 || "Request a quote"}</Link>
+              {settings.brochureUrl && <a className="btn ghost" href={settings.brochureUrl} target="_blank" rel="noopener noreferrer">Download brochure</a>}
             </div>
           </div>
-          <img className="hero-img" src="/brand/hero-travel-kit.jpg" alt="Biotique luxury travel kit amenities" width="700" height="302" fetchPriority="high" />
+          {h.hero.image && <img className="hero-img" src={h.hero.image} alt="" width="700" height="302" fetchPriority="high" />}
         </div>
       </section>
 
-      <section className="stats">
-        <div className="wrap stat-row">
-          <div><strong>Since 2002</strong><span>Trusted hospitality supplier</span></div>
-          <div><strong>{catalog.products.length}+</strong><span>Products in the catalogue</span></div>
-          <div><strong>{cats.length}</strong><span>Product categories</span></div>
-          <div><strong>Pan-India</strong><span>Supply and delivery</span></div>
-        </div>
-      </section>
+      {h.stats.length > 0 && (
+        <section className="stats">
+          <div className="wrap stat-row">{h.stats.map((x, i) => <div key={i}><strong>{x.value}</strong><span>{x.label}</span></div>)}</div>
+        </section>
+      )}
 
       <section className="section">
         <div className="wrap">
@@ -78,14 +67,38 @@ export default function Home() {
             <h2>About HaTikvah Care</h2>
             <p>{settings.about}</p>
             <h3 className="mt">We serve</h3>
-            <ul className="chips">{SERVE.map((s) => <li key={s}>{s}</li>)}</ul>
+            <ul className="chips">{h.serve.map((s) => <li key={s}>{s}</li>)}</ul>
           </div>
           <div>
             <h3>Why choose HaTikvah Care?</h3>
-            <ul className="why">{WHY.map(([t, d]) => <li key={t}><strong>{t}</strong><span>{d}</span></li>)}</ul>
+            <ul className="why">{h.why.map((w) => <li key={w.title}><strong>{w.title}</strong><span>{w.text}</span></li>)}</ul>
           </div>
         </div>
       </section>
+
+      {h.clients.length > 0 && (
+        <section className="section tint">
+          <div className="wrap"><h2>Trusted by</h2>
+            <ul className="clients">{h.clients.map((c) => <li key={c.name}>{c.logo ? <img src={c.logo} alt={c.name} loading="lazy" width="140" height="70" /> : <span>{c.name}</span>}</li>)}</ul>
+          </div>
+        </section>
+      )}
+
+      {h.testimonials.length > 0 && (
+        <section className="section">
+          <div className="wrap"><h2>What our clients say</h2>
+            <div className="testimonials">{h.testimonials.map((t, i) => <figure key={i} className="panel"><blockquote>“{t.quote}”</blockquote><figcaption><strong>{t.name}</strong>{t.role && <span> · {t.role}</span>}</figcaption></figure>)}</div>
+          </div>
+        </section>
+      )}
+
+      {h.faq.length > 0 && (
+        <section className="section tint" id="faq">
+          <div className="wrap narrow"><h2>Frequently asked questions</h2>
+            {h.faq.map((f, i) => <details key={i} className="faq"><summary>{f.q}</summary><p>{f.a}</p></details>)}
+          </div>
+        </section>
+      )}
 
       <section className="section dark" id="contact">
         <div className="wrap contact-grid">

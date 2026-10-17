@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api } from "../api.js";
+import { getSource, trackLead } from "../track.js";
 
 /** Used on the home page (general enquiry) and on the quote page (with the basket items). */
 export default function EnquiryForm({ items = [], onDone, cta = "Send enquiry" }) {
@@ -13,7 +14,8 @@ export default function EnquiryForm({ items = [], onDone, cta = "Send enquiry" }
     if (!f.name.trim() || !f.phone.trim()) return setState({ busy: false, error: "Please enter your name and phone number.", field: !f.name.trim() ? "name" : "phone" });
     setState({ busy: true, error: null, field: null });
     try {
-      const r = await api("/api/public/enquiries", { method: "POST", body: { ...f, items: items.map(({ productId, qty }) => ({ productId, qty })) } });
+      const r = await api("/api/public/enquiries", { method: "POST", body: { ...f, items: items.map(({ productId, qty }) => ({ productId, qty })), source: getSource() } });
+      trackLead();
       onDone?.(r.ref, f);
       setF({ name: "", company: "", phone: "", email: "", message: "", website: "" });
       setState({ busy: false, error: null, field: null });

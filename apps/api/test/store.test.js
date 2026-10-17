@@ -24,6 +24,10 @@ async function contract(store) {
   assert.equal(await store.products.remove(a.id), false);
   await store.products.replaceAll([{ slug: "z", sku: "Z" }]);
   assert.equal(await store.products.count(), 1);
+  const seqs = await Promise.all([1, 2, 3, 4, 5].map(() => store.nextSeq("t")));
+  assert.deepEqual(seqs.sort(), [1, 2, 3, 4, 5], "sequence numbers are unique under concurrency");
+  assert.equal(await store.nextSeq("other"), 1);
+  for (const n of ["customers", "quotes", "orders", "invoices", "payments", "stockMoves", "suppliers", "purchases", "outbox", "activities", "priceLists"]) assert.equal(typeof store[n].insert, "function", n);
   const id = await store.saveMedia(Buffer.from([1, 2, 3, 4]), "image/png");
   const m = await store.getMedia(id);
   assert.deepEqual([...m.data], [1, 2, 3, 4]); assert.equal(m.contentType, "image/png");
@@ -37,6 +41,7 @@ describe("stores", () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "hc-store-"));
     const s = await createFileStore(dir); await contract(s); await s.close();
     const again = await createFileStore(dir); assert.equal(await again.products.count(), 1, "data survives a restart");
+    assert.equal(await again.nextSeq("t"), 6, "counters survive a restart");
     await fs.rm(dir, { recursive: true, force: true });
   });
   it("mongo store follows the contract", { skip: !process.env.MONGODB_TEST_URI }, async () => {

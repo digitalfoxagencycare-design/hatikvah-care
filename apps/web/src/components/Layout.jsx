@@ -13,6 +13,9 @@ export default function Layout() {
   return (
     <>
       <a className="skip" href="#main">Skip to content</a>
+      {settings?.home?.banner?.active && settings.home.banner.text && (
+        <div className="banner">{settings.home.banner.link ? (settings.home.banner.link.startsWith("/") ? <Link to={settings.home.banner.link}>{settings.home.banner.text} →</Link> : <a href={settings.home.banner.link} target="_blank" rel="noopener noreferrer">{settings.home.banner.text} →</a>) : settings.home.banner.text}</div>
+      )}
       <header className="site-head">
         <div className="wrap head-row">
           <Link to="/" className="brand" aria-label="HaTikvah Care home"><img src="/brand/hatikvah-logo.png" alt="HaTikvah Care" width="100" height="56" /></Link>
@@ -21,6 +24,7 @@ export default function Layout() {
             <NavLink to="/" end>Home</NavLink>
             <NavLink to="/catalog">Catalogue</NavLink>
             <a href="/#about">About</a>
+            {settings?.home?.faq?.length > 0 && <a href="/#faq">FAQ</a>}
             <a href="/#contact">Contact</a>
             <Link to="/quote" className="btn small quote-btn">Quote list{count > 0 && <span className="badge">{count}</span>}</Link>
           </nav>
@@ -50,8 +54,10 @@ export default function Layout() {
             <p><Link to="/catalog">Full catalogue</Link></p>
             <p><Link to="/quote">Request a quote</Link></p>
             <p><a href="/#about">About us</a></p>
+            {settings?.brochureUrl && <p><a href={settings.brochureUrl} target="_blank" rel="noopener noreferrer">Download brochure (PDF)</a></p>}
           </div>
         </div>
+        {wa && <a className="wa-float" href={wa} target="_blank" rel="noopener noreferrer" aria-label="Chat with us on WhatsApp"><svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true"><path fill="currentColor" d="M16 3a13 13 0 0 0-11.2 19.6L3 29l6.6-1.7A13 13 0 1 0 16 3Zm0 23.7c-2 0-4-.6-5.7-1.6l-.4-.2-3.9 1 1-3.8-.3-.4A10.7 10.7 0 1 1 16 26.7Zm5.9-8c-.3-.2-1.9-.9-2.2-1s-.5-.2-.7.2-.8 1-1 1.2-.4.2-.7.1a8.8 8.8 0 0 1-4.4-3.8c-.3-.6.3-.5 1-1.7.1-.2 0-.4 0-.5l-1-2.4c-.3-.6-.5-.5-.7-.5h-.6a1.2 1.2 0 0 0-.9.4 3.7 3.7 0 0 0-1.1 2.7 6.4 6.4 0 0 0 1.3 3.4 14.7 14.7 0 0 0 5.6 5c2.1.9 2.9 1 4 .8.6-.1 1.9-.8 2.2-1.5s.3-1.4.2-1.5-.3-.2-.6-.3Z"/></svg></a>}
         <div className="wrap legal">© {new Date().getFullYear()} HaTikvah Care by EXL Marketing. All brand names shown on products belong to their owners.</div>
       </footer>
     </>

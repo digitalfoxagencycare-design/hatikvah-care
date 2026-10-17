@@ -1,10 +1,11 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
-import { enquiryInput, publicProduct } from "../model.js";
+import { enquiryInput, getSettings, publicProduct } from "../model.js";
+import { DEFAULT_HOME } from "../schemas.js";
 
 export const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
-export function publicRoutes({ store }) {
+export function publicRoutes({ store, automation }) {
   const r = Router();
   const settings = async () => (await store.settings.findBy("key", "company")) || {};
 
@@ -27,9 +28,10 @@ export function publicRoutes({ store }) {
   }));
 
   r.get("/settings", wrap(async (_req, res) => {
-    const { id, key, ...pub } = await settings();
+    const s = await getSettings(store), home = await store.settings.findBy("key", "home");
+    const { name, legalName, tagline, about, phone, whatsapp, email, website, address, hours, showPrices, ga4Id, metaPixelId, brochureUrl, gstin } = s;
     res.set("Cache-Control", "public, max-age=60");
-    res.json(pub);
+    res.json({ name, legalName, tagline, about, phone, whatsapp, email, website, address, hours, showPrices, ga4Id, metaPixelId, brochureUrl, gstin, home: home ? { ...DEFAULT_HOME, ...home.value } : DEFAULT_HOME });
   }));
 
   const limiter = rateLimit({
@@ -49,10 +51,13 @@ export function publicRoutes({ store }) {
       if (!p) return res.status(400).json({ error: "INVALID", message: "A product in your list is no longer available. Please refresh." });
       items.push({ productId: p.id, sku: p.sku, name: p.name, qty: it.qty });
     }
-    const n = (await store.enquiries.count()) + 1;
-    const ref = `HC-${new Date().getFullYear().toString().slice(2)}${String(n).padStart(4, "0")}`;
-    await store.enquiries.insert({ ref, name: d.name, company: d.company, phone: d.phone, email: d.email, message: d.message, items, status: "new", notes: "", createdAt: new Date().toISOString() });
+    const yy = new Date().getFullYear().toString().slice(2);
+    let ref; // skip numbers already used (databases created before the counter existed)
+    do ref = `HC-${yy}${String(await store.nextSeq("enquiry:" + yy)).padStart(4, "0")}`; while (await store.enquiries.findBy("ref", ref));
+    const enq = await store.enquiries.insert({ ref, name: d.name, company: d.company, phone: d.phone, email: d.email, message: d.message, items, source: d.source || {}, status: "new", notes: "",
+      assignedTo: "", customerId: "", followUpAt: "", createdAt: new Date().toISOString() });
     res.status(201).json({ ok: true, ref });
+    automation?.on.enquiryCreated(enq); // alerts, auto-reply and assignment run after the visitor gets their answer
   }));
 
   return r;

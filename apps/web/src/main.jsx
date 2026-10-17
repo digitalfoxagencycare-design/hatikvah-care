@@ -11,10 +11,12 @@ import NotFound from "./pages/NotFound.jsx";
 import "./styles.css";
 
 const Admin = lazy(() => import("./admin/AdminApp.jsx"));
+const DocPage = lazy(() => import("./pages/DocPage.jsx"));
 
 createRoot(document.getElementById("root")).render(
   <BrowserRouter>
     <Routes>
+      <Route path="/doc/:kind/:token" element={<Suspense fallback={<div className="center-note">Loading…</div>}><DocPage /></Suspense>} />
       <Route path="/admin/*" element={<Suspense fallback={<div className="center-note">Loading…</div>}><Admin /></Suspense>} />
       <Route element={<SiteProvider><Layout /></SiteProvider>}>
         <Route index element={<Home />} />

@@ -1,20 +1,27 @@
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
 import { Loader, useLoad } from "./hooks.jsx";
+import { StateSelect } from "./ui.jsx";
 
 export default function Settings() {
   const s = useLoad("/api/admin/settings");
   const [f, setF] = useState(null);
   const [st, setSt] = useState({ busy: false, error: null, saved: false });
   useEffect(() => { if (s.data) setF(s.data); }, [s.data]);
-  const set = (k) => (e) => { setF({ ...f, [k]: e.target.value }); setSt({ busy: false, error: null, saved: false }); };
+  const set = (k) => (e) => { setF({ ...f, [k]: e?.target ? e.target.value : e }); setSt({ busy: false, error: null, saved: false }); };
+  const num = (k) => (e) => set(k)(Number(e.target.value) || 0);
+  async function brochure(e) {
+    const file = e.target.files[0]; e.target.value = "";
+    if (!file) return; if (file.size > 2_000_000) return setSt({ busy: false, error: "Brochure is too large (max 2 MB). Compress the PDF first.", saved: false });
+    try { const r = await api("/api/admin/media", { method: "POST", raw: { body: file, type: "application/pdf" } }); set("brochureUrl")(r.url); } catch (err) { setSt({ busy: false, error: err.message, saved: false }); }
+  }
   async function save(e) {
     e.preventDefault(); setSt({ busy: true, error: null, saved: false });
     try { await api("/api/admin/settings", { method: "PUT", body: f }); setSt({ busy: false, error: null, saved: true }); } catch (err) { setSt({ busy: false, error: err.message, saved: false }); }
   }
   return (
     <>
-      <h1>Company details & prices</h1>
+      <h1>Company, GST & website settings</h1>
       <Loader s={s}>{f && (
         <form className="panel form" onSubmit={save}>
           <label className="check-row"><input type="checkbox" checked={f.showPrices} onChange={(e) => { setF({ ...f, showPrices: e.target.checked }); setSt({ busy: false, error: null, saved: false }); }} /> <span><strong>Show prices on the website</strong><small>Turn off to show “Price on request” everywhere (prices stay saved).</small></span></label>
@@ -29,6 +36,24 @@ export default function Settings() {
           <label className="field"><span>Tagline</span><input value={f.tagline} onChange={set("tagline")} /></label>
           <label className="field"><span>Address</span><textarea rows="2" value={f.address} onChange={set("address")} /></label>
           <label className="field"><span>About us (home page)</span><textarea rows="5" value={f.about} onChange={set("about")} /></label>
+          <h2>GST & documents</h2>
+          <div className="grid2">
+            <label className="field"><span>Company GSTIN (printed on quotes and invoices)</span><input maxLength={15} value={f.gstin} onChange={(e) => set("gstin")(e.target.value.toUpperCase())} placeholder="36ABCDE1234F1Z5" /></label>
+            <StateSelect value={f.stateCode} onChange={set("stateCode")} allowEmpty={false} label="Company state (same state = CGST + SGST, other = IGST)" />
+            <label className="field"><span>Quotes valid for (days)</span><input type="number" min="1" max="365" value={f.quoteValidityDays} onChange={num("quoteValidityDays")} /></label>
+            <label className="field"><span>Default payment terms (days)</span><input type="number" min="0" max="365" value={f.paymentTermsDays} onChange={num("paymentTermsDays")} /></label>
+            <label className="field"><span>UPI ID (shown on invoices)</span><input maxLength={80} value={f.upiId} onChange={set("upiId")} placeholder="exlmarketing@okicici" /></label>
+          </div>
+          <label className="field"><span>Bank details (printed on invoices)</span><textarea rows="3" maxLength={500} value={f.bankDetails} onChange={set("bankDetails")} placeholder={"Bank: …\nA/c no: …\nIFSC: …"} /></label>
+          <label className="field"><span>Standard quotation terms</span><textarea rows="4" maxLength={3000} value={f.quoteTerms} onChange={set("quoteTerms")} /></label>
+          <label className="field"><span>Invoice terms / declaration</span><textarea rows="2" maxLength={3000} value={f.invoiceTerms} onChange={set("invoiceTerms")} /></label>
+          <h2>Website extras</h2>
+          <div className="grid2">
+            <label className="field"><span>Google Analytics 4 ID</span><input value={f.ga4Id} onChange={set("ga4Id")} placeholder="G-XXXXXXXXXX" /></label>
+            <label className="field"><span>Meta (Facebook/Instagram) Pixel ID</span><input inputMode="numeric" value={f.metaPixelId} onChange={set("metaPixelId")} placeholder="digits only" /></label>
+          </div>
+          <div className="field"><span>Brochure PDF (download button on the website)</span>
+            <div className="btn-row">{f.brochureUrl ? <><a href={f.brochureUrl} target="_blank" rel="noopener noreferrer">Current brochure</a><button type="button" className="link danger" onClick={() => set("brochureUrl")("")}>Remove</button></> : <span className="muted">None</span>}<input type="file" accept="application/pdf" onChange={brochure} /></div></div>
           {st.error && <p className="alert" role="alert">{st.error}</p>}{st.saved && <p className="notice" role="status">Saved ✓ (visitors see changes within a minute)</p>}
           <button className="btn" disabled={st.busy}>{st.busy ? "Saving…" : "Save"}</button>
         </form>

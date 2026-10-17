@@ -10,12 +10,12 @@ import { createStore } from "../src/store/index.js";
 export const PW = "Correct-Horse-91";
 
 /** A real server on a random port with a throw-away file store seeded from the real catalogue. */
-export async function boot({ seed = true } = {}) {
+export async function boot({ seed = true, owner = true, env = {} } = {}) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "hc-test-"));
-  const cfg = loadConfig({ NODE_ENV: "test", DATA_DIR: dir, JWT_SECRET: "t".repeat(48), WEB_DIST: path.join(dir, "no-web") });
+  const cfg = loadConfig({ NODE_ENV: "test", DATA_DIR: dir, JWT_SECRET: "t".repeat(48), WEB_DIST: path.join(dir, "no-web"), ...env });
   const store = await createStore(cfg);
   if (seed) await seedIfEmpty(store, path.join(REPO_ROOT, "data", "catalog.json"), { info() {}, warn() {} });
-  await store.admins.insert({ email: "owner@example.com", name: "Owner", role: "owner", passwordHash: await hashPassword(PW), active: true, tokenVersion: 0, createdAt: "x" });
+  if (owner) await store.admins.insert({ email: "owner@example.com", name: "Owner", role: "owner", passwordHash: await hashPassword(PW), active: true, tokenVersion: 0, createdAt: "x" });
   const app = createApp({ cfg, store, log: { error() {} } });
   const server = await new Promise((r) => { const s = app.listen(0, "127.0.0.1", () => r(s)); });
   const base = `http://127.0.0.1:${server.address().port}`;

@@ -2,18 +2,29 @@ import express, { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { authenticate, checkPassword, hashPassword, passwordProblem, requireOwner, setSessionCookie, signSession, COOKIE } from "../auth.js";
 import { parseCsv, toCsv } from "../csv.js";
-import { categoryInput, productInput, productPatch, settingsInput, slugify, uniqueSlug } from "../model.js";
+import { categoryInput, getSettings, productInput, productPatch, settingsInput, slugify, uniqueSlug } from "../model.js";
 import { z } from "zod";
+import { can, requirePerm, ROLES } from "../lib/permissions.js";
+import { newSecret, otpauthUrl, verifyCode } from "../lib/totp.js";
+import { balance, stockLevels } from "../lib/sales.js";
+import { todayIST } from "../lib/gst.js";
+import { userInput, userPatch } from "../schemas.js";
 import { wrap } from "./public.js";
+import { crmRoutes } from "./crm.js";
+import { opsRoutes } from "./ops.js";
+import { reportRoutes } from "./reports.js";
+import { salesRoutes } from "./sales.js";
+import { stockRoutes } from "./stock.js";
 
 const bad = (res, issue, status = 400) => res.status(status).json({ error: "INVALID", message: typeof issue === "string" ? issue : `${issue.path.join(".") || "request"}: ${issue.message}`, field: issue.path?.join(".") });
 const now = () => new Date().toISOString();
+const me = (a) => ({ id: a.id, email: a.email, name: a.name, role: a.role, permissions: ROLES[a.role] || [], twoFactor: !!a.totpEnabled });
 const rupees = (p) => (p == null ? "" : (p / 100).toFixed(2));
 const toPaise = (s) => { if (s === "" || s == null) return null; const n = Number(String(s).replace(/,/g, "")); return Number.isFinite(n) && n >= 0 && n <= 1_000_000 ? Math.round(n * 100) : NaN; };
-const IMG_TYPES = { "image/jpeg": [[0xff, 0xd8, 0xff]], "image/png": [[0x89, 0x50, 0x4e, 0x47]], "image/webp": [[0x52, 0x49, 0x46, 0x46]] };
+const IMG_TYPES = { "image/jpeg": [[0xff, 0xd8, 0xff]], "image/png": [[0x89, 0x50, 0x4e, 0x47]], "image/webp": [[0x52, 0x49, 0x46, 0x46]], "application/pdf": [[0x25, 0x50, 0x44, 0x46, 0x2d]] };
 const sniff = (buf) => Object.entries(IMG_TYPES).find(([, sigs]) => sigs.some((s) => s.every((b, i) => buf[i] === b)))?.[0];
 
-export function adminRoutes({ cfg, store }) {
+export function adminRoutes({ cfg, store, automation, notifier }) {
   const r = Router();
   const audit = (req, action, target, detail) => store.audit.insert({ at: now(), by: req.admin?.email || "system", action, target, detail: detail ?? null });
 
@@ -30,15 +41,42 @@ export function adminRoutes({ cfg, store }) {
       await store.admins.update(admin.id, { failedLogins: fails % 5 === 0 ? 0 : fails, lockedUntil: fails % 5 === 0 ? new Date(Date.now() + 15 * 60_000).toISOString() : null });
       return fail();
     }
+    if (admin.totpEnabled) {
+      const code = String(req.body?.code || "");
+      if (!code) return res.status(401).json({ error: "CODE_REQUIRED", message: "Enter the 6-digit code from your authenticator app" });
+      if (!verifyCode(admin.totpSecret, code)) {
+        const fails = (admin.failedLogins || 0) + 1;
+        await store.admins.update(admin.id, { failedLogins: fails % 5 === 0 ? 0 : fails, lockedUntil: fails % 5 === 0 ? new Date(Date.now() + 15 * 60_000).toISOString() : null });
+        return res.status(401).json({ error: "BAD_CODE", message: "That code is not right. Check the time on your phone and try again." });
+      }
+    }
     await store.admins.update(admin.id, { failedLogins: 0, lockedUntil: null, lastLoginAt: now() });
     setSessionCookie(cfg, res, signSession(cfg, admin));
-    res.json({ email: admin.email, name: admin.name, role: admin.role });
+    res.json(me(admin));
   }));
   r.post("/logout", (_req, res) => { res.clearCookie(COOKIE, { path: "/" }); res.status(204).end(); });
 
   const auth = authenticate(cfg, store);
   r.use(auth);
-  r.get("/me", (req, res) => res.json({ email: req.admin.email, name: req.admin.name, role: req.admin.role }));
+  r.get("/me", (req, res) => res.json(me(req.admin)));
+
+  // ---------- two-step sign-in (authenticator app)
+  r.post("/me/2fa/setup", wrap(async (req, res) => {
+    if (req.admin.totpEnabled) return bad(res, "Two-step sign-in is already on", 409);
+    const secret = newSecret();
+    await store.admins.update(req.admin.id, { totpPending: secret });
+    res.json({ secret, otpauth: otpauthUrl(secret, req.admin.email) });
+  }));
+  r.post("/me/2fa/enable", wrap(async (req, res) => {
+    if (!req.admin.totpPending || !verifyCode(req.admin.totpPending, req.body?.code)) return bad(res, "That code is not right. Type the current 6-digit code from the app.");
+    await store.admins.update(req.admin.id, { totpEnabled: true, totpSecret: req.admin.totpPending, totpPending: null });
+    await audit(req, "2fa.enable", req.admin.email); res.json(me({ ...req.admin, totpEnabled: true }));
+  }));
+  r.post("/me/2fa/disable", wrap(async (req, res) => {
+    if (!(await checkPassword(String(req.body?.password || ""), req.admin.passwordHash))) return bad(res, "Password is wrong");
+    await store.admins.update(req.admin.id, { totpEnabled: false, totpSecret: null, totpPending: null });
+    await audit(req, "2fa.disable", req.admin.email); res.json(me({ ...req.admin, totpEnabled: false }));
+  }));
 
   r.post("/me/password", wrap(async (req, res) => {
     const { current = "", next = "" } = req.body || {};
@@ -53,16 +91,30 @@ export function adminRoutes({ cfg, store }) {
   }));
 
   // ---------- dashboard
-  r.get("/dashboard", wrap(async (_req, res) => {
-    const [products, cats, enquiries] = await Promise.all([store.products.all(), store.categories.all(), store.enquiries.all({ sort: { createdAt: -1 } })]);
-    res.json({
+  r.get("/dashboard", wrap(async (req, res) => {
+    const [products, cats, enquiries, quotes, orders, invoices, payments, lv] = await Promise.all([store.products.all(), store.categories.all(), store.enquiries.all({ sort: { createdAt: -1 } }),
+      store.quotes.all(), store.orders.all(), store.invoices.all(), store.payments.all(), stockLevels(store)]);
+    const today = todayIST(), month = today.slice(0, 7), mine = (e) => !e.assignedTo || e.assignedTo === req.admin.id || req.admin.role === "owner";
+    const open = invoices.filter((i) => ["unpaid", "partial"].includes(i.status));
+    const out = {
       products: products.length, active: products.filter((p) => p.active).length, withoutPrice: products.filter((p) => p.active && p.price == null).length,
       withoutImage: products.filter((p) => !p.images.length).length, categories: cats.length,
       newEnquiries: enquiries.filter((e) => e.status === "new").length, totalEnquiries: enquiries.length, recentEnquiries: enquiries.slice(0, 5),
+      followUps: enquiries.filter((e) => e.followUpAt && e.followUpAt <= today && !["won", "closed"].includes(e.status) && mine(e)).slice(0, 10),
+    };
+    if (can(req.admin, "quotes")) Object.assign(out, { openQuotes: quotes.filter((q) => q.status === "sent").length, openQuoteValue: quotes.filter((q) => q.status === "sent").reduce((n, q) => n + q.totals.total, 0) });
+    if (can(req.admin, "orders")) Object.assign(out, { toDispatch: orders.filter((o) => ["confirmed", "packed"].includes(o.status)).length });
+    if (can(req.admin, "invoices")) Object.assign(out, {
+      salesThisMonth: invoices.filter((i) => i.status !== "void" && i.date.startsWith(month)).reduce((n, i) => n + i.totals.total, 0),
+      receivedThisMonth: payments.filter((p) => p.date.startsWith(month)).reduce((n, p) => n + p.amount, 0),
+      outstanding: open.reduce((n, i) => n + balance(i), 0), overdue: open.filter((i) => i.dueDate < today).reduce((n, i) => n + balance(i), 0), overdueCount: open.filter((i) => i.dueDate < today).length,
     });
+    if (can(req.admin, "stock")) out.lowStock = products.filter((p) => p.stockTracked && (lv[p.id] || 0) <= (p.reorderLevel || 0)).length;
+    res.json(out);
   }));
 
   // ---------- categories
+  r.use(["/categories", "/products"], requirePerm("catalog"));
   r.get("/categories", wrap(async (_req, res) => {
     const [cats, prods] = await Promise.all([store.categories.all(), store.products.all()]);
     res.json(cats.sort((a, b) => a.order - b.order).map((c) => ({ ...c, products: prods.filter((p) => p.category === c.slug).length })));
@@ -158,17 +210,18 @@ export function adminRoutes({ cfg, store }) {
   }));
 
   // ---------- images (raw body, type checked by file signature, not by what the browser claims)
-  r.post("/media", express.raw({ type: () => true, limit: "2mb" }), wrap(async (req, res) => {
+  r.post("/media", requirePerm("catalog", "content", "settings"), express.raw({ type: () => true, limit: "2mb" }), wrap(async (req, res) => {
     const buf = req.body;
     if (!Buffer.isBuffer(buf) || buf.length < 100) return bad(res, "No image received");
     const type = sniff(buf);
-    if (!type) return bad(res, "Only JPG, PNG or WebP images are allowed");
+    if (!type) return bad(res, "Only JPG, PNG or WebP images (or a PDF brochure) are allowed");
     const id = await store.saveMedia(buf, type);
     await audit(req, "media.upload", id, { bytes: buf.length });
     res.status(201).json({ url: `/media/${id}` });
   }));
 
   // ---------- enquiries
+  r.use("/enquiries", requirePerm("enquiries"));
   r.get("/enquiries", wrap(async (req, res) => {
     let rows = await store.enquiries.all({ sort: { createdAt: -1 } });
     if (req.query.status) rows = rows.filter((e) => e.status === req.query.status);
@@ -182,10 +235,15 @@ export function adminRoutes({ cfg, store }) {
     res.set({ "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": 'attachment; filename="hatikvah-enquiries.csv"' });
     res.send(toCsv(["ref", "date", "status", "name", "company", "phone", "email", "items", "message", "notes"], rows));
   }));
-  const enquiryPatch = z.object({ status: z.enum(["new", "contacted", "quoted", "won", "closed"]).optional(), notes: z.string().max(2000).optional() }).strict();
+  const enquiryPatch = z.object({
+    status: z.enum(["new", "contacted", "quoted", "won", "closed"]).optional(), notes: z.string().max(2000).optional(),
+    assignedTo: z.string().max(60).optional(), followUpAt: z.union([z.literal(""), z.string().regex(/^\d{4}-\d{2}-\d{2}$/)]).optional(), customerId: z.string().max(60).optional(),
+  }).strict();
   r.patch("/enquiries/:id", wrap(async (req, res) => {
     const p = enquiryPatch.safeParse(req.body); if (!p.success) return bad(res, p.error.issues[0]);
-    const e = await store.enquiries.update(req.params.id, p.data); if (!e) return res.status(404).json({ error: "NOT_FOUND", message: "Enquiry not found" });
+    if (p.data.assignedTo && !(await store.admins.get(p.data.assignedTo))) return bad(res, "Unknown team member");
+    if (p.data.customerId && !(await store.customers.get(p.data.customerId))) return bad(res, "Unknown customer");
+    const e = await store.enquiries.update(req.params.id, { ...p.data, lastActivityAt: now() }); if (!e) return res.status(404).json({ error: "NOT_FOUND", message: "Enquiry not found" });
     await audit(req, "enquiry.update", e.ref, p.data); res.json(e);
   }));
   r.delete("/enquiries/:id", requireOwner, wrap(async (req, res) => {
@@ -194,18 +252,19 @@ export function adminRoutes({ cfg, store }) {
   }));
 
   // ---------- settings
-  r.get("/settings", wrap(async (_req, res) => { const { id, key, ...s } = (await store.settings.findBy("key", "company")) || {}; res.json(s); }));
+  r.get("/settings", wrap(async (_req, res) => { const { id, key, ...s } = await getSettings(store); res.json(s); }));
   r.put("/settings", requireOwner, wrap(async (req, res) => {
     const p = settingsInput.safeParse(req.body); if (!p.success) return bad(res, p.error.issues[0]);
     const cur = await store.settings.findBy("key", "company");
-    await store.settings.update(cur.id, p.data); await audit(req, "settings.update", "company", { showPrices: p.data.showPrices });
+    await store.settings.update(cur.id, p.data); await audit(req, "settings.update", "company", { showPrices: p.data.showPrices, gstin: p.data.gstin, stateCode: p.data.stateCode });
     res.json(p.data);
   }));
 
   // ---------- team (owner only)
-  const view = ({ id, email, name, role, active, lastLoginAt, createdAt }) => ({ id, email, name, role, active, lastLoginAt, createdAt });
+  const view = ({ id, email, name, role, active, lastLoginAt, createdAt, phone, receivesLeads, totpEnabled }) => ({ id, email, name, role, active, lastLoginAt, createdAt, phone: phone || "", receivesLeads: !!receivesLeads, twoFactor: !!totpEnabled });
   r.get("/users", requireOwner, wrap(async (_req, res) => res.json((await store.admins.all()).map(view))));
-  const userInput = z.object({ email: z.string().trim().toLowerCase().email().max(160), name: z.string().trim().min(2).max(80), role: z.enum(["owner", "staff"]).default("staff"), password: z.string() }).strict();
+  // Everyone signed in can see who is on the team (to assign enquiries and customers); only names and roles.
+  r.get("/team", wrap(async (_req, res) => res.json((await store.admins.all()).filter((a) => a.active).map(({ id, name, role }) => ({ id, name, role })))));
   r.post("/users", requireOwner, wrap(async (req, res) => {
     const p = userInput.safeParse(req.body); if (!p.success) return bad(res, p.error.issues[0]);
     const problem = passwordProblem(p.data.password, p.data.email); if (problem) return bad(res, problem);
@@ -214,7 +273,6 @@ export function adminRoutes({ cfg, store }) {
     const u = await store.admins.insert({ ...rest, passwordHash: await hashPassword(password), active: true, tokenVersion: 0, createdAt: now() });
     await audit(req, "user.create", u.email, { role: u.role }); res.status(201).json(view(u));
   }));
-  const userPatch = z.object({ active: z.boolean().optional(), role: z.enum(["owner", "staff"]).optional(), password: z.string().optional() }).strict();
   r.patch("/users/:id", requireOwner, wrap(async (req, res) => {
     const p = userPatch.safeParse(req.body); if (!p.success) return bad(res, p.error.issues[0]);
     const u = await store.admins.get(req.params.id); if (!u) return res.status(404).json({ error: "NOT_FOUND", message: "User not found" });
@@ -222,12 +280,16 @@ export function adminRoutes({ cfg, store }) {
     const patch = {};
     if (p.data.active !== undefined) patch.active = p.data.active;
     if (p.data.role) patch.role = p.data.role;
+    for (const k of ["name", "phone", "receivesLeads"]) if (p.data[k] !== undefined) patch[k] = p.data[k];
     if (p.data.password) { const pr = passwordProblem(p.data.password, u.email); if (pr) return bad(res, pr); patch.passwordHash = await hashPassword(p.data.password); }
-    patch.tokenVersion = (u.tokenVersion || 0) + 1; // ends that person's current sessions
+    if (p.data.active !== undefined || p.data.role || p.data.password) patch.tokenVersion = (u.tokenVersion || 0) + 1; // ends that person's current sessions
     await store.admins.update(u.id, patch); await audit(req, "user.update", u.email, { ...p.data, password: p.data.password ? "reset" : undefined });
     res.json(view(await store.admins.get(u.id)));
   }));
 
   r.get("/audit", requireOwner, wrap(async (_req, res) => res.json(await store.audit.all({ sort: { at: -1 }, limit: 300 }))));
+
+  const ctx = { cfg, store, audit, automation, notifier };
+  r.use(crmRoutes(ctx)); r.use(salesRoutes(ctx)); r.use(stockRoutes(ctx)); r.use(reportRoutes(ctx)); r.use(opsRoutes(ctx));
   return r;
 }

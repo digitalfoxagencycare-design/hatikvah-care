@@ -7,7 +7,8 @@
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
     "test": "node --test --test-concurrency=1 test/*.test.js",
-    "create-admin": "node src/cli.js create-admin"
+    "create-admin": "node src/cli.js create-admin",
+    "seed-demo": "node src/demo.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

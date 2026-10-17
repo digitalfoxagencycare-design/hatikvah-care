@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { MongoClient, Binary } from "mongodb";
 
-const COLLECTIONS = ["products", "categories", "enquiries", "admins", "audit", "settings"];
+const COLLECTIONS = ["products", "categories", "enquiries", "admins", "audit", "settings", "customers", "activities", "priceLists", "quotes", "orders", "invoices", "payments", "stockMoves", "suppliers", "purchases", "outbox"];
 
 /** Production store (MongoDB Atlas). Same interface as the file store; documents use a string `id` as `_id`. */
 export async function createMongoStore(uri, dbName) {
@@ -35,6 +35,8 @@ export async function createMongoStore(uri, dbName) {
   };
   const store = { kind: "mongo", async close() { await client.close(); } };
   for (const n of COLLECTIONS) store[n] = col(n);
+  const counters = db.collection("counters");
+  store.nextSeq = async (key) => (await counters.findOneAndUpdate({ _id: key }, { $inc: { seq: 1 } }, { upsert: true, returnDocument: "after" })).seq;
   const media = db.collection("media");
   store.saveMedia = async (buf, contentType) => {
     const id = crypto.randomUUID();
@@ -52,6 +54,12 @@ export async function createMongoStore(uri, dbName) {
     db.collection("admins").createIndex({ email: 1 }, { unique: true }),
     db.collection("enquiries").createIndex({ createdAt: -1 }),
     db.collection("audit").createIndex({ at: -1 }),
+    ...["quotes", "orders", "invoices", "purchases"].map((n) => db.collection(n).createIndex({ number: 1 }, { unique: true })),
+    ...["quotes", "invoices", "orders"].map((n) => db.collection(n).createIndex({ token: 1 })),
+    db.collection("activities").createIndex({ entityId: 1, at: -1 }),
+    db.collection("stockMoves").createIndex({ productId: 1 }),
+    db.collection("payments").createIndex({ invoiceId: 1 }),
+    db.collection("outbox").createIndex({ status: 1, createdAt: -1 }),
   ]);
   return store;
 }

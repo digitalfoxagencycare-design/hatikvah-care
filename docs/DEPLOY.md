@@ -19,7 +19,7 @@ Store `JWT_SECRET` and `MONGODB_URI` in Google Secret Manager (never in the repo
 ```bash
 gcloud run deploy hatikvah-care --source . --region asia-south1 --allow-unauthenticated \
   --set-env-vars NODE_ENV=production,MONGODB_DB=hatikvah_care,PUBLIC_URL=https://www.hatikvahcare.com \
-  --set-secrets JWT_SECRET=hc-jwt-secret:latest,MONGODB_URI=hc-mongo-uri:latest
+  --set-secrets JWT_SECRET=hc-jwt-secret:latest,MONGODB_URI=hc-mongo-uri:latest,CRON_SECRET=hc-cron-secret:latest
 ```
 The first start loads the 149 catalogue products into an empty database. Roll back at any time from the Cloud Run "Revisions" tab (send 100% traffic to the previous revision).
 
@@ -36,5 +36,6 @@ Map the domain in Cloud Run (Domain mappings) and add the DNS records it shows. 
 ## Operations
 * **Backups:** M10+ has continuous backups; confirm they are on. Enquiries and prices live only in the database.
 * **Uploads:** photos uploaded in the admin are stored in MongoDB (max 2 MB each).
-* **Enquiry notifications:** enquiries appear in the admin dashboard. Email/WhatsApp alerts are not built in yet.
+* **Automations and messages:** set `CRON_SECRET` and add a Cloud Scheduler job (every 15 min, `POST /api/internal/cron` with header `X-Cron-Secret`). Email, WhatsApp and Razorpay are switched on with environment variables: see [INTEGRATIONS.md](INTEGRATIONS.md).
+* **Backups of business data:** quotes, invoices and payments live in MongoDB; keep Atlas backups on. The owner can also download a JSON export at `/api/admin/backup`.
 * **Rotate the JWT secret:** change the secret and redeploy; everyone has to sign in again.
