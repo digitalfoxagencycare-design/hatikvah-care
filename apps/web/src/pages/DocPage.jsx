@@ -108,9 +108,9 @@ export default function DocPage() {
           <div className="bill-company-info">
             <h2 className="bill-company-name">{c.legalName || "M/s. EXL MARKETING"}</h2>
             <p className="bill-company-gstin"><strong>GSTIN {c.gstin || "36ADDPC0083H1Z0"}</strong></p>
-            <p className="bill-company-address">{c.address}</p>
+            <p className="bill-company-address">{c.billingAddress || c.address || "Door No.12-7-134/BITNO.2/C/103, Flat No 103, C Block, R V Advaita, Road No.6, Sri Raghavendra Nagar, Habeeb Nagar, Hyderabad, Medchal Malkajgiri, TELANGANA, 500072"}</p>
             <p className="bill-company-contact">
-              Mobile {c.phone} &nbsp; Email {c.email}
+              Mobile {c.phone || "+91 79954 44434"} &nbsp; Email {c.email || "hatvikcare@gmail.com"}
             </p>
           </div>
 

@@ -29,7 +29,7 @@ describe("public site API", () => {
   it("exposes company settings and the sitemap/robots", async () => {
     const c = client(t.base);
     const s = (await c.get("/api/public/settings")).data;
-    assert.equal(s.name, "HaTikvah Care"); assert.equal(s.email, "exlhygiene@gmail.com");
+    assert.equal(s.name, "HaTikvah Care"); assert.equal(s.email, "hatvikcare@gmail.com");
     const sm = await c.get("/sitemap.xml");
     assert.match(sm.data, /<loc>.*\/product\//); assert.ok(sm.data.split("<url>").length > 150);
     assert.match((await c.get("/robots.txt")).data, /Disallow: \/admin/);

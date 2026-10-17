@@ -7,7 +7,7 @@ import { balance, logActivity, now, recordPayment } from "../lib/sales.js";
 import { getSettings } from "../model.js";
 import { wrap } from "./public.js";
 
-const company = (s) => ({ name: s.name, legalName: s.legalName, address: s.address, phone: s.phone, email: s.email, website: s.website, gstin: s.gstin, stateCode: s.stateCode, state: stateName(s.stateCode), bankDetails: s.bankDetails, upiId: s.upiId, invoiceTerms: s.invoiceTerms, whatsapp: s.whatsapp });
+const company = (s) => ({ name: s.name, legalName: s.legalName, address: s.billingAddress || "Door No.12-7-134/BITNO.2/C/103, Flat No 103, C Block, R V Advaita, Road No.6, Sri Raghavendra Nagar, Habeeb Nagar, Hyderabad, Medchal Malkajgiri, TELANGANA, 500072", phone: s.phone, email: s.email, website: s.website, gstin: s.gstin, stateCode: s.stateCode, state: stateName(s.stateCode), bankDetails: s.bankDetails, upiId: s.upiId, invoiceTerms: s.invoiceTerms, whatsapp: s.whatsapp });
 const strip = ({ token, createdBy, remindersSent, activities, ...d }) => d;
 
 /** Customer-facing documents by secret link (quote, invoice, delivery challan), online quote acceptance, payment webhooks, scheduler trigger. */
