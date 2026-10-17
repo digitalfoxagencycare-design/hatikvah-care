@@ -13,7 +13,7 @@ export function loadConfig(env = process.env) {
     jwtSecret: env.JWT_SECRET || "",
     mongoUri: env.MONGODB_URI || "",
     dbName: env.MONGODB_DB || "hatikvah_care",
-    dataDir: env.DATA_DIR || path.join(REPO_ROOT, ".data"),
+    dataDir: env.DATA_DIR || (prod && process.platform !== "win32" ? "/tmp/data" : path.join(REPO_ROOT, ".data")),
     seedFile: env.SEED_FILE || path.join(REPO_ROOT, "data", "catalog.json"),
     webDist: env.WEB_DIST || path.join(REPO_ROOT, "apps", "web", "dist"),
     publicUrl: (env.PUBLIC_URL || "").replace(/\/$/, ""),
