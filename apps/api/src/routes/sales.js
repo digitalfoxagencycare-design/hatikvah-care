@@ -93,6 +93,25 @@ export function salesRoutes({ cfg, store, audit, automation }) {
     if (q.enquiryId) await store.enquiries.update(q.enquiryId, { status: "won" });
     await audit(req, "order.create", o.number, { from: q.number }); res.status(201).json(o);
   }));
+  r.post("/quotes/:id/invoice", requirePerm("invoices"), wrap(async (req, res) => {
+    const q = await store.quotes.get(req.params.id); if (!q) return notFound(res, "Quote");
+    if (q.invoiceId) return bad(res, "This quote already has an invoice", 409);
+    const c = await customerOr404(q.customerId, res); if (!c) return;
+    const inv = await createInvoice(store, {
+      customer: c,
+      items: q.items.map(({ amount, tax, total, ...l }) => l),
+      placeOfSupply: q.placeOfSupply,
+      notes: q.notes,
+      poNumber: "",
+      orderId: q.orderId || "",
+      orderNumber: q.orderNumber || "",
+      by: by(req),
+    });
+    await store.quotes.update(q.id, { invoiceId: inv.id, invoiceNumber: inv.number, status: "accepted", updatedAt: now() });
+    if (q.enquiryId) await store.enquiries.update(q.enquiryId, { status: "won" });
+    await logActivity(store, { entity: "quote", entityId: q.id, text: `Converted directly to Tax Invoice ${inv.number}`, by: by(req) });
+    res.status(201).json(await afterInvoice(req, inv));
+  }));
   r.post("/quotes/:id/duplicate", requirePerm("quotes"), wrap(async (req, res) => {
     const q = await store.quotes.get(req.params.id); if (!q) return notFound(res, "Quote");
     req.body = { customerId: q.customerId, items: q.items.map(({ amount, tax, total, ...l }) => l), notes: q.notes, terms: q.terms, placeOfSupply: q.placeOfSupply };
@@ -144,9 +163,12 @@ export function salesRoutes({ cfg, store, audit, automation }) {
     if (!["confirmed", "packed"].includes(o.status)) return bad(res, `An order that is ${o.status} cannot be dispatched`, 409);
     const d = parse(dispatchInput, req.body || {}, res); if (!d) return;
     const challanNumber = await nextNumber(store, "DC");
-    for (const it of o.items) {
-      const p = it.productId ? await store.products.get(it.productId) : null;
-      if (p?.stockTracked) await moveStock(store, { productId: p.id, sku: p.sku, qty: -it.qty, kind: "out", ref: o.number, note: "Dispatched", by: by(req) });
+    // If not already deducted by an earlier invoice, deduct on dispatch
+    if (!o.invoiceId) {
+      for (const it of o.items) {
+        const p = it.productId ? await store.products.get(it.productId) : null;
+        if (p?.stockTracked) await moveStock(store, { productId: p.id, sku: p.sku, qty: -it.qty, kind: "out", ref: o.number, note: "Dispatched", by: by(req) });
+      }
     }
     const upd = await store.orders.update(o.id, { status: "dispatched", dispatch: { ...d, date: d.date || todayIST() }, challanNumber, dispatchedAt: now(), updatedAt: now() });
     await logActivity(store, { entity: "order", entityId: o.id, text: `Dispatched (challan ${challanNumber})${d.transporter ? " via " + d.transporter : ""}`, by: by(req) });
@@ -164,6 +186,23 @@ export function salesRoutes({ cfg, store, audit, automation }) {
   // ---------- invoices and payments
   async function afterInvoice(req, inv) {
     let out = inv;
+    // Auto-minus stock on invoice creation if not already dispatched
+    let alreadyDispatched = false;
+    if (inv.orderId) {
+      const ord = await store.orders.get(inv.orderId);
+      if (ord && ord.status === "dispatched") alreadyDispatched = true;
+    }
+    if (!alreadyDispatched) {
+      for (const it of inv.items || []) {
+        if (it.productId) {
+          const p = await store.products.get(it.productId);
+          if (p) {
+            if (!p.stockTracked) await store.products.update(p.id, { stockTracked: true });
+            await moveStock(store, { productId: p.id, sku: p.sku, qty: -Math.abs(it.qty), kind: "out", ref: inv.number, note: `Sale invoice ${inv.number}`, by: by(req) });
+          }
+        }
+      }
+    }
     if (channels(cfg).payments !== "off") { try { out = await store.invoices.update(inv.id, { payLink: await createPaymentLink(cfg, inv) }); } catch (e) { await logActivity(store, { entity: "invoice", entityId: inv.id, text: `Payment link not created: ${e.message}` }); } }
     await logActivity(store, { entity: "customer", entityId: inv.customerId, text: `Invoice ${inv.number} raised`, by: by(req) });
     await automation.on.invoiceCreated(out); await audit(req, "invoice.create", inv.number, { total: inv.totals.total });
@@ -191,6 +230,20 @@ export function salesRoutes({ cfg, store, audit, automation }) {
     const reason = String(req.body?.reason || "").slice(0, 300);
     const upd = await store.invoices.update(i.id, { status: "void", voidReason: reason, voidedAt: now(), updatedAt: now() });
     if (i.orderId) await store.orders.update(i.orderId, { invoiceId: "", invoiceNumber: "" });
+    // Restore stock if it was deducted by this invoice
+    let dispatched = false;
+    if (i.orderId) {
+      const ord = await store.orders.get(i.orderId);
+      if (ord && ord.status === "dispatched") dispatched = true;
+    }
+    if (!dispatched) {
+      for (const it of i.items || []) {
+        if (it.productId) {
+          const p = await store.products.get(it.productId);
+          if (p) await moveStock(store, { productId: p.id, sku: p.sku, qty: Math.abs(it.qty), kind: "in", ref: i.number, note: `Voided invoice ${i.number}`, by: by(req) });
+        }
+      }
+    }
     await logActivity(store, { entity: "invoice", entityId: i.id, text: `Voided${reason ? ": " + reason : ""}`, by: by(req) });
     await audit(req, "invoice.void", i.number, { reason }); res.json(upd);
   }));

@@ -151,6 +151,8 @@ export function adminRoutes({ cfg, store, automation, notifier }) {
   const checkSku = async (sku, selfId) => !sku || !(await store.products.all()).some((p) => p.sku === sku && p.id !== selfId);
 
   r.post("/products", wrap(async (req, res) => {
+    const allCats = await store.categories.all();
+    if (!req.body?.category && allCats[0]) req.body = { ...req.body, category: allCats[0].slug };
     const p = productInput.safeParse(req.body); if (!p.success) return bad(res, p.error.issues[0]);
     if (!(await checkCategory(p.data.category))) return bad(res, "Unknown category");
     if (!(await checkSku(p.data.sku))) return bad(res, "That SKU is already used");

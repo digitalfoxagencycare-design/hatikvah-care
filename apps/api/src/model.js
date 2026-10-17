@@ -14,7 +14,7 @@ const text = (max) => z.string().trim().max(max);
 export const productInput = z.object({
   name: text(160).min(2),
   sku: text(30).regex(/^[A-Za-z0-9._-]*$/, "SKU may use letters, numbers . _ -").optional(),
-  category: text(60).min(1),
+  category: text(60).default("general"),
   collection: text(80).default(""),
   pack: text(120).default(""),
   variants: z.array(text(60).min(1)).max(20).default([]),

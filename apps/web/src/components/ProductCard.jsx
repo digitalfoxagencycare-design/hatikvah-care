@@ -19,6 +19,7 @@ export default function ProductCard({ p }) {
         <div className="card-coll">{p.collection}</div>
         <h3><Link to={`/product/${p.slug}`}>{p.name}</Link></h3>
         {p.pack && <div className="card-pack">{p.pack}</div>}
+        {p.description && <p className="card-desc" style={{ fontSize: "0.85rem", color: "var(--muted)", margin: "4px 0 6px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{p.description}</p>}
         <div className="card-foot">
           <Price p={p} />
           <button className={"btn small" + (inBasket ? " ghost" : "")} onClick={() => add(p.id)}>{inBasket ? "Added ✓" : "Add to quote"}</button>

@@ -66,7 +66,7 @@ export const supplierInput = z.object({
 }).strict();
 
 export const purchaseInput = z.object({
-  supplierId: id.min(1, "Choose a supplier"), expectedDate: optDate, notes: text(1000).default(""),
+  supplierId: id.min(1, "Choose a supplier"), expectedDate: optDate, notes: text(1000).default(""), billNumber: text(80).default(""), receiveNow: z.boolean().default(false),
   items: z.array(z.object({ productId: id.min(1), qty: z.number().positive().max(10_000_000), rate: paise.default(0) }).strict()).min(1, "Add at least one item").max(150),
 }).strict();
 export const receiveInput = z.object({ lines: z.array(z.object({ productId: id.min(1), qty: z.number().positive().max(10_000_000) }).strict()).min(1) }).strict();

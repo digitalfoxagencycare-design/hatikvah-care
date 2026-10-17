@@ -26,8 +26,7 @@ export default function CustomerForm({ customer, onSaved }) {
         <label className="field"><span>Email</span><input type="email" maxLength={160} value={f.email} onChange={set("email")} /></label>
         <label className="field"><span>GSTIN</span><input maxLength={15} value={f.gstin} onChange={(e) => setF({ ...f, gstin: e.target.value.toUpperCase(), stateCode: f.stateCode || (/^\d{2}/.test(e.target.value) ? e.target.value.slice(0, 2) : "") })} placeholder="36ABCDE1234F1Z5" /></label>
         <StateSelect value={f.stateCode} onChange={set("stateCode")} label="State (decides CGST+SGST or IGST)" />
-        <label className="field"><span>City</span><input maxLength={80} value={f.city} onChange={set("city")} /></label>
-        <label className="field"><span>Price list</span><select value={f.priceListId} onChange={set("priceListId")}><option value="">Standard prices</option>{lists.data?.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
+        <label className="field"><span>Applied Offer / Discount</span><select value={f.priceListId} onChange={set("priceListId")}><option value="">Standard prices (no offer)</option>{lists.data?.map((l) => <option key={l.id} value={l.id}>{l.name} ({l.discountPct}% off)</option>)}</select></label>
       </div>
       <div className="grid2">
         <label className="field"><span>Billing address</span><textarea rows="2" maxLength={400} value={f.billingAddress} onChange={set("billingAddress")} /></label>

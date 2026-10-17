@@ -22,10 +22,17 @@ export default function PurchaseDetail() {
       <Loader s={s}>{po && (
         <>
           <div className="row-between"><h1>{po.number} <Pill s={po.status} /></h1>
-            <div className="btn-row">{po.status === "draft" && <><button className="btn ghost" onClick={() => setEditing(true)}>Edit</button><button className="btn" onClick={() => status("sent")}>Mark sent to supplier</button></>}
+            <div className="btn-row">
+              {["draft", "sent", "partial"].includes(po.status) && (
+                <button className="btn" disabled={st.busy} onClick={() => {
+                  const billNumber = window.prompt("Supplier Invoice / Bill number (optional):", po.billNumber || "") || "";
+                  run(async () => { await api(`/api/admin/purchases/${id}/receive-all`, { method: "POST", body: { billNumber } }); s.reload(); }, "All goods received & stock auto-increased! (Auto +)");
+                }}>Receive All to Stock (Auto +)</button>
+              )}
+              {po.status === "draft" && <><button className="btn ghost" onClick={() => setEditing(true)}>Edit</button><button className="btn ghost" onClick={() => status("sent")}>Mark sent to supplier</button></>}
               {["draft", "sent"].includes(po.status) && <button className="link danger" onClick={() => window.confirm("Cancel this purchase order?") && status("cancelled")}>Cancel</button>}
               {po.status === "partial" && <button className="btn ghost" onClick={() => status("received")}>Close (rest not coming)</button>}</div></div>
-          <p className="muted">{po.supplierName} · {po.expectedDate ? `expected ${fmtDate(po.expectedDate)}` : "no date"} {po.notes && `· ${po.notes}`}</p>
+          <p className="muted">{po.supplierName} · {po.billNumber ? `Supplier Bill #${po.billNumber} · ` : ""}{po.expectedDate ? `expected ${fmtDate(po.expectedDate)}` : "no date"} {po.notes && `· ${po.notes}`}</p>
           <Msg st={st} />
           <div className="tbl-wrap"><table className="tbl"><thead><tr><th>Product</th><th className="num">Ordered</th><th className="num">Received</th><th>Rate</th><th className="num">Amount</th>{["sent", "partial", "draft"].includes(po.status) && <th>Receive now</th>}</tr></thead><tbody>
             {po.items.map((i) => <tr key={i.productId}><td>{i.name}<small>{i.sku}</small></td><td className="num">{i.qty}</td><td className="num">{i.received || 0}</td><td>{rs(i.rate)}</td><td className="num">{rs(Math.round(i.qty * i.rate))}</td>
@@ -41,7 +48,7 @@ export default function PurchaseDetail() {
 
 function Editor({ po, st, onSave }) {
   const suppliers = useAsync("/api/admin/suppliers"), stock = useAsync("/api/admin/stock");
-  const [f, setF] = useState({ supplierId: po?.supplierId || "", expectedDate: po?.expectedDate || "", notes: po?.notes || "", items: po?.items.map((i) => ({ productId: i.productId, qty: i.qty, rate: i.rate })) || [] });
+  const [f, setF] = useState({ supplierId: po?.supplierId || "", billNumber: po?.billNumber || "", receiveNow: !po?.id, expectedDate: po?.expectedDate || "", notes: po?.notes || "", items: po?.items.map((i) => ({ productId: i.productId, qty: i.qty, rate: i.rate })) || [] });
   const [pick, setPick] = useState("");
   const name = (pid) => stock.data?.find((p) => p.id === pid)?.name || pid;
   useEffect(() => { if (!f.supplierId && suppliers.data?.length === 1) setF((x) => ({ ...x, supplierId: suppliers.data[0].id })); }, [suppliers.data]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -50,9 +57,18 @@ function Editor({ po, st, onSave }) {
     <form className="panel form" onSubmit={(e) => { e.preventDefault(); onSave({ ...f, items: f.items.map((i) => ({ ...i, qty: Number(i.qty) })) }); }}>
       <div className="grid3">
         <label className="field"><span>Supplier *</span><select required value={f.supplierId} onChange={(e) => setF({ ...f, supplierId: e.target.value })}><option value="">Choose…</option>{suppliers.data?.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select><small><Link to="/admin/suppliers">Manage suppliers</Link></small></label>
+        <label className="field"><span>Supplier Bill / Invoice No (optional)</span><input maxLength={80} value={f.billNumber} onChange={(e) => setF({ ...f, billNumber: e.target.value })} placeholder="e.g. INV-8821" /></label>
         <label className="field"><span>Expected date</span><input type="date" value={f.expectedDate} onChange={(e) => setF({ ...f, expectedDate: e.target.value })} /></label>
-        <label className="field"><span>Notes</span><input maxLength={1000} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></label>
       </div>
+      <label className="field"><span>Notes</span><input maxLength={1000} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></label>
+      {!po && (
+        <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "10px 14px", borderRadius: "8px" }}>
+          <label className="check-inline" style={{ display: "flex", gap: "8px", alignItems: "center", cursor: "pointer", fontWeight: "600", color: "#166534" }}>
+            <input type="checkbox" checked={f.receiveNow} onChange={(e) => setF({ ...f, receiveNow: e.target.checked })} />
+            Auto-add to Stock immediately (Auto +) — goods already arrived / received
+          </label>
+        </div>
+      )}
       <table className="tbl"><thead><tr><th>Product</th><th>Qty</th><th>Cost rate ₹</th><th></th></tr></thead><tbody>
         {f.items.map((i, n) => <tr key={n}><td>{name(i.productId)}</td><td><input className="w-sm" type="number" min="0.001" step="any" required value={i.qty} onChange={(e) => setF({ ...f, items: f.items.map((x, j) => (j === n ? { ...x, qty: e.target.value } : x)) })} aria-label="Quantity" /></td>
           <td><input className="w-sm" inputMode="decimal" defaultValue={i.rate ? i.rate / 100 : ""} onBlur={(e) => { const v = toPaise(e.target.value); setF({ ...f, items: f.items.map((x, j) => (j === n ? { ...x, rate: Number.isNaN(v) || v == null ? 0 : v } : x)) }); }} aria-label="Rate" /></td>
@@ -60,7 +76,7 @@ function Editor({ po, st, onSave }) {
       </tbody></table>
       <input list="po-products" value={pick} placeholder="Search a product to add…" onChange={(e) => { setPick(e.target.value); add(e.target.value); }} aria-label="Add product" />
       <datalist id="po-products">{stock.data?.map((p) => <option key={p.id} value={`${p.sku} · ${p.name}`} />)}</datalist>
-      <Msg st={st} /><button className="btn" disabled={st.busy || !f.items.length}>Save purchase order</button>
+      <Msg st={st} /><button className="btn" disabled={st.busy || !f.items.length}>{f.receiveNow ? "Save & Add to Stock (Auto +)" : "Save purchase order"}</button>
     </form>
   );
 }

@@ -22,9 +22,9 @@ const P = {
 };
 // [path, label, permission, component, extra routes]
 const NAV = [
-  ["Sell", [["enquiries", "Enquiries", "enquiries", "Enquiries"], ["customers", "Customers", "customers", "Customers"], ["quotes", "Quotations", "quotes", "Quotes"], ["orders", "Sales orders", "orders", "Orders"], ["invoices", "Invoices & payments", "invoices", "Invoices"]]],
-  ["Catalogue", [["products", "Products", "catalog", "Products"], ["categories", "Categories", "catalog", "Categories"], ["price-lists", "Price lists", "customers", "PriceLists"]]],
-  ["Stock", [["stock", "Stock", "stock", "Stock"], ["purchases", "Purchase orders", "stock", "Purchases"], ["suppliers", "Suppliers", "stock", "Suppliers"]]],
+  ["Sell", [["enquiries", "Enquiries", "enquiries", "Enquiries"], ["customers", "Customers", "customers", "Customers"], ["quotes", "Quotations", "quotes", "Quotes"], ["invoices", "Invoices & Payments", "invoices", "Invoices"], ["orders", "Sales orders", "orders", "Orders"]]],
+  ["Catalogue", [["products", "Products", "catalog", "Products"], ["price-lists", "Offers & Discounts", "customers", "PriceLists"]]],
+  ["Stock", [["stock", "Stock Levels", "stock", "Stock"], ["purchases", "Purchase Orders / Bills", "stock", "Purchases"], ["suppliers", "Suppliers", "stock", "Suppliers"]]],
   ["Business", [["reports", "Reports", "reports", "Reports"], ["automation", "Automation & messages", "automation", "Automation"], ["content", "Website content", "content", "Content"]]],
   ["Admin", [["settings", "Company & GST", "settings", "Settings"], ["team", "Team", "team", "Team"], ["audit", "Activity log", "audit", "Audit"]]],
 ];

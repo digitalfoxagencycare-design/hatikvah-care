@@ -67,9 +67,9 @@ export function stockRoutes({ store, audit }) {
     const items = [];
     for (const it of d.items) {
       const p = await store.products.get(it.productId); if (!p) { bad(res, "A product in this purchase order no longer exists"); return null; }
-      items.push({ productId: p.id, sku: p.sku, name: p.name, unit: p.unit || "pcs", qty: it.qty, rate: it.rate || p.costPrice || 0, received: 0 });
+      items.push({ productId: p.id, sku: p.sku, name: p.name, unit: p.unit || "pcs", qty: it.qty, rate: it.rate || p.costPrice || 0, received: d.receiveNow ? it.qty : 0 });
     }
-    return { supplierId: sup.id, supplierName: sup.name, items, total: items.reduce((n, i) => n + Math.round(i.qty * i.rate), 0), expectedDate: d.expectedDate, notes: d.notes };
+    return { supplierId: sup.id, supplierName: sup.name, items, total: items.reduce((n, i) => n + Math.round(i.qty * i.rate), 0), expectedDate: d.expectedDate, notes: d.notes, billNumber: d.billNumber || "" };
   }
   r.get("/purchases", wrap(async (_req, res) => res.json(await store.purchases.all({ sort: { createdAt: -1 } }))));
   r.get("/purchases/:id", wrap(async (req, res) => {
@@ -79,7 +79,19 @@ export function stockRoutes({ store, audit }) {
   r.post("/purchases", wrap(async (req, res) => {
     const d = parse(purchaseInput, req.body, res); if (!d) return;
     const b = await build(d, res); if (!b) return;
-    const po = await store.purchases.insert({ ...b, number: await nextNumber(store, "PO"), token: token(), status: "draft", createdBy: by(req), createdAt: now(), updatedAt: now() });
+    const poNumber = await nextNumber(store, "PO");
+    const status = d.receiveNow ? "received" : "draft";
+    const po = await store.purchases.insert({
+      ...b, number: poNumber, token: token(), status, receivedAt: d.receiveNow ? now() : null, createdBy: by(req), createdAt: now(), updatedAt: now(),
+    });
+    if (d.receiveNow) {
+      for (const it of b.items) {
+        const p = await store.products.get(it.productId);
+        if (p && !p.stockTracked) await store.products.update(p.id, { stockTracked: true });
+        await moveStock(store, { productId: it.productId, sku: it.sku, qty: it.qty, kind: "in", ref: po.number, note: `Purchased / Inward bill ${b.billNumber || po.number}`, by: by(req) });
+      }
+      await logActivity(store, { entity: "purchase", entityId: po.id, text: `Goods received & stock auto-incremented (+${b.items.reduce((n, i) => n + i.qty, 0)})`, by: by(req) });
+    }
     await audit(req, "purchase.create", po.number); res.status(201).json(po);
   }));
   r.put("/purchases/:id", wrap(async (req, res) => {
@@ -112,6 +124,27 @@ export function stockRoutes({ store, audit }) {
     const upd = await store.purchases.update(po.id, { status, [status + "At"]: now(), updatedAt: now() });
     await logActivity(store, { entity: "purchase", entityId: po.id, text: `Marked ${status}`, by: by(req) });
     await audit(req, "purchase." + status, po.number); res.json(upd);
+  }));
+  r.post("/purchases/:id/receive-all", wrap(async (req, res) => {
+    const po = await store.purchases.get(req.params.id); if (!po) return notFound(res, "Purchase order");
+    const billNumber = req.body?.billNumber || po.billNumber || "";
+    const items = po.items.map((i) => ({ ...i }));
+    for (const it of items) {
+      const remaining = Math.max(0, it.qty - (it.received || 0));
+      if (remaining > 0) {
+        it.received = it.qty;
+        const p = await store.products.get(it.productId);
+        if (p && !p.stockTracked) await store.products.update(p.id, { stockTracked: true });
+        await moveStock(store, {
+          productId: it.productId, sku: it.sku, qty: remaining, kind: "in", ref: po.number,
+          note: `Received to stock${billNumber ? ` (Bill #${billNumber})` : ""}`, by: by(req),
+        });
+      }
+    }
+    const upd = await store.purchases.update(po.id, { items, status: "received", billNumber, receivedAt: now(), updatedAt: now() });
+    await logActivity(store, { entity: "purchase", entityId: po.id, text: "Received all items into stock (Auto +)", by: by(req) });
+    await audit(req, "purchase.receive_all", po.number);
+    res.json(upd);
   }));
   r.post("/purchases/:id/receive", wrap(async (req, res) => {
     const po = await store.purchases.get(req.params.id); if (!po) return notFound(res, "Purchase order");

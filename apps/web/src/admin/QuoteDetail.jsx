@@ -51,8 +51,10 @@ export default function QuoteDetail() {
           <div className="btn-row">
             {["draft", "sent", "expired"].includes(q.status) && <button className="btn ghost" onClick={() => act("status", { status: "accepted" }, "Marked accepted")}>Mark accepted</button>}
             {["draft", "sent", "expired"].includes(q.status) && <button className="btn ghost" onClick={() => act("status", { status: "rejected" }, "Marked rejected")}>Mark rejected</button>}
-            {can(me, "orders") && !q.orderId && ["draft", "sent", "accepted"].includes(q.status) && <button className="btn" onClick={() => run(async () => { const o = await api(`/api/admin/quotes/${id}/order`, { method: "POST" }); nav(`/admin/orders/${o.id}`); })}>Create sales order</button>}
-            {q.orderId && <Link className="btn" to={`/admin/orders/${q.orderId}`}>Open sales order</Link>}
+            {can(me, "invoices") && !q.invoiceId && ["draft", "sent", "accepted"].includes(q.status) && <button className="btn" onClick={() => run(async () => { const inv = await api(`/api/admin/quotes/${id}/invoice`, { method: "POST" }); nav(`/admin/invoices/${inv.id}`); })}>Create Tax Invoice</button>}
+            {q.invoiceId && <Link className="btn" to={`/admin/invoices/${q.invoiceId}`}>Open Tax Invoice</Link>}
+            {can(me, "orders") && !q.orderId && !q.invoiceId && ["draft", "sent", "accepted"].includes(q.status) && <button className="btn ghost" onClick={() => run(async () => { const o = await api(`/api/admin/quotes/${id}/order`, { method: "POST" }); nav(`/admin/orders/${o.id}`); })}>Sales order</button>}
+            {q.orderId && <Link className="btn ghost" to={`/admin/orders/${q.orderId}`}>Open sales order</Link>}
             <button className="btn ghost" onClick={() => run(async () => { const n = await api(`/api/admin/quotes/${id}/duplicate`, { method: "POST" }); nav(`/admin/quotes/${n.id}`); })}>Duplicate</button>
             <Link className="btn ghost" to={`/admin/customers/${q.customerId}`}>Customer</Link>
             {q.status === "draft" && <button className="link danger" onClick={() => window.confirm("Delete this draft?") && run(async () => { await api(`/api/admin/quotes/${id}`, { method: "DELETE" }); nav("/admin/quotes"); })}>Delete draft</button>}

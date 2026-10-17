@@ -61,7 +61,7 @@ export default function ProductForm() {
             <div className="grid2">
               <label className="field"><span>Name *</span><input required minLength={2} maxLength={160} value={f.name} onChange={(e) => set("name", e.target.value)} /></label>
               <label className="field"><span>SKU {id ? "" : "(auto if blank)"}</span><input maxLength={30} value={f.sku} onChange={(e) => set("sku", e.target.value)} /></label>
-              <label className="field"><span>Category *</span><select value={f.category} onChange={(e) => set("category", e.target.value)}>{cats.data.map((c) => <option key={c.id} value={c.slug}>{c.name}</option>)}</select></label>
+              <label className="field"><span>Category (optional)</span><select value={f.category} onChange={(e) => set("category", e.target.value)}>{cats.data.map((c) => <option key={c.id} value={c.slug}>{c.name}</option>)}</select></label>
               <label className="field"><span>Collection / sub-group</span><input list="colls" maxLength={80} value={f.collection} onChange={(e) => set("collection", e.target.value)} /><datalist id="colls">{collections.map((c) => <option key={c} value={c} />)}</datalist></label>
               <label className="field"><span>Pack / specification</span><input maxLength={120} value={f.pack} onChange={(e) => set("pack", e.target.value)} placeholder="e.g. 1000 per pack, 20 ml" /></label>
               <label className="field"><span>Minimum order</span><input maxLength={60} value={f.minOrder} onChange={(e) => set("minOrder", e.target.value)} placeholder="e.g. 50 packs" /></label>
@@ -73,7 +73,7 @@ export default function ProductForm() {
               <label className="field"><span>GST rate</span><select value={f.gstRate ?? 18} onChange={(e) => set("gstRate", Number(e.target.value))}>{[0, 5, 12, 18, 28].map((g) => <option key={g} value={g}>{g}%</option>)}</select></label>
               <label className="field"><span>Unit (on documents)</span><input maxLength={20} value={f.unit || "pcs"} onChange={(e) => set("unit", e.target.value)} placeholder="pcs / pack / kg" /></label>
             </div>
-            <label className="field"><span>Description</span><textarea rows="4" maxLength={2000} value={f.description} onChange={(e) => set("description", e.target.value)} /></label>
+            <label className="field"><span>Product Description (shown on website & landing page)</span><textarea rows="4" maxLength={2000} placeholder="Describe product features, quality, materials, fragrances, dimensions, suitability for hotels/hospitals, etc." value={f.description} onChange={(e) => set("description", e.target.value)} /></label>
             <div className="field"><span>Options available (shampoo, conditioner…)</span>
               <div className="chips-edit">{f.variants.map((v) => <button type="button" key={v} className="chip on" onClick={() => set("variants", f.variants.filter((x) => x !== v))} aria-label={`Remove ${v}`}>{v} ✕</button>)}
                 <input value={variant} maxLength={60} placeholder="Type and press Enter" onChange={(e) => setVariant(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); const v = variant.trim(); if (v && !f.variants.includes(v) && f.variants.length < 20) set("variants", [...f.variants, v]); setVariant(""); } }} /></div>
