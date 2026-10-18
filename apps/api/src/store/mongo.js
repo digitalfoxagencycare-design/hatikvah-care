@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { MongoClient, Binary } from "mongodb";
 
-const COLLECTIONS = ["products", "categories", "enquiries", "admins", "audit", "settings", "customers", "activities", "priceLists", "quotes", "orders", "invoices", "payments", "stockMoves", "suppliers", "purchases", "outbox"];
+const COLLECTIONS = ["products", "categories", "enquiries", "admins", "audit", "settings", "customers", "activities", "priceLists", "quotes", "orders", "invoices", "payments", "stockMoves", "suppliers", "purchases", "outbox", "otps"];
 
 /** Production store (MongoDB Atlas). Same interface as the file store; documents use a string `id` as `_id`. */
 export async function createMongoStore(uri, dbName) {

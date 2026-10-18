@@ -14,7 +14,7 @@ export default function EnquiryForm({ items = [], onDone, cta = "Send enquiry" }
     if (!f.name.trim() || !f.phone.trim()) return setState({ busy: false, error: "Please enter your name and phone number.", field: !f.name.trim() ? "name" : "phone" });
     setState({ busy: true, error: null, field: null });
     try {
-      const r = await api("/api/public/enquiries", { method: "POST", body: { ...f, items: items.map(({ productId, qty }) => ({ productId, qty })), source: getSource() } });
+      const r = await api("/api/public/enquiries", { method: "POST", body: { ...f, items: items.map(({ productId, qty, variant }) => ({ productId, qty, ...(variant ? { variant } : {}) })), source: getSource() } });
       trackLead();
       onDone?.(r.ref, f);
       setF({ name: "", company: "", phone: "", email: "", message: "", website: "" });

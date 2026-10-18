@@ -26,6 +26,7 @@ export function loadConfig(env = process.env) {
     // Integrations: all optional, all secrets from the environment. Unset = that channel is off and messages are kept for manual sending.
     resendKey: env.RESEND_API_KEY || "", mailFrom: env.MAIL_FROM || "", mailReplyTo: env.MAIL_REPLY_TO || "",
     waToken: env.WHATSAPP_TOKEN || "", waPhoneId: env.WHATSAPP_PHONE_ID || "", waTemplate: env.WHATSAPP_TEMPLATE || "", waTemplateLang: env.WHATSAPP_TEMPLATE_LANG || "en",
+    waOtpTemplate: env.WHATSAPP_OTP_TEMPLATE || "", // an approved "Authentication" template; the login code is its only variable
     razorpayKeyId: env.RAZORPAY_KEY_ID || "", razorpaySecret: env.RAZORPAY_KEY_SECRET || "", razorpayWebhookSecret: env.RAZORPAY_WEBHOOK_SECRET || "",
   };
   if (!cfg.jwtSecret && !prod) cfg.jwtSecret = "dev-only-secret-change-me-dev-only-secret-change-me";

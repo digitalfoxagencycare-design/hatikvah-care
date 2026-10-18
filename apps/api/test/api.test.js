@@ -15,6 +15,7 @@ describe("public site API", () => {
     assert.ok(r.data.categories.every((c) => c.count > 0), "every category has products");
     assert.ok(r.data.products.every((p) => p.pricePaise === null));
     assert.ok(r.data.products.every((p) => p.images.length > 0 && p.images.every((i) => i.startsWith("/catalog/"))));
+    assert.ok(r.data.products.every((p) => Array.isArray(p.variants)), "every product has an options list (the shop search reads it)");
     assert.equal(JSON.stringify(r.data).includes("passwordHash"), false);
   });
 
