@@ -73,6 +73,24 @@ function parseWhatsAppText(rawText, catalog = [], customers = []) {
     let line = rawLine.replace(/^[\d\.\)\-\*\•\>\:\s]+/, "").trim();
     if (!line) continue;
 
+    // Extract rate/price if explicitly written in the message line
+    // e.g., "@ 150", "@ Rs 150", "Rs. 150", "₹150", "rate: 150", "150/-"
+    let detectedRate = null;
+    const ratePatterns = [
+      /(?:@|at)\s*(?:rs\.?|inr|₹)?\s*(\d+(?:\.\d+)?)\b/i,
+      /(?:rate|price|mrp)[\s:]+(?:rs\.?|inr|₹)?\s*(\d+(?:\.\d+)?)\b/i,
+      /(?:rs\.?|inr|₹)\s*(\d+(?:\.\d+)?)\b/i,
+      /\b(\d+(?:\.\d+)?)\s*\/\-/
+    ];
+    for (const pat of ratePatterns) {
+      const rm = line.match(pat);
+      if (rm) {
+        detectedRate = Number(rm[1]);
+        line = line.replace(rm[0], "").trim();
+        break;
+      }
+    }
+
     // Extract quantity and unit
     let qty = 1;
     let unit = "pcs";
@@ -145,6 +163,10 @@ function parseWhatsAppText(rawText, catalog = [], customers = []) {
     }
 
     if (bestMatch && bestScore >= 30) {
+      const itemRate = detectedRate != null
+        ? Math.round(detectedRate * 100)
+        : (bestMatch.rate || bestMatch.price || bestMatch.pricePaise || bestMatch.priceTiers?.[0]?.price || 0);
+
       parsedItems.push({
         matched: true,
         productId: bestMatch.productId || bestMatch.id,
@@ -153,13 +175,14 @@ function parseWhatsAppText(rawText, catalog = [], customers = []) {
         hsn: bestMatch.hsn || "",
         unit: bestMatch.unit || unit || "pcs",
         qty: qty || 1,
-        rate: bestMatch.rate || bestMatch.price || 0,
+        rate: itemRate,
         discountPct: 0,
         gstRate: bestMatch.gstRate ?? 18,
         originalQuery: query,
       });
     } else {
       // Custom / unlisted item from client message
+      const customRate = detectedRate != null ? Math.round(detectedRate * 100) : 0;
       parsedItems.push({
         matched: false,
         productId: "",
@@ -168,7 +191,7 @@ function parseWhatsAppText(rawText, catalog = [], customers = []) {
         hsn: "",
         unit: unit || "pcs",
         qty: qty || 1,
-        rate: 0,
+        rate: customRate,
         discountPct: 0,
         gstRate: 18,
         originalQuery: query,

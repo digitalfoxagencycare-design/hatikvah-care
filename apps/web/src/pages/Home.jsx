@@ -135,8 +135,11 @@ const sampleBestsellers = [
 
 export default function Home() {
   const { catalog, settings } = useSite();
-  const dbFeatured = catalog.products.filter((p) => p.featured || p.slug.startsWith("farm-fresh")).slice(0, 4);
-  const featured = dbFeatured.length >= 4 ? dbFeatured : sampleBestsellers;
+  // Showcase the client's exact 4 Best Sellers from Screenshot 4 with guaranteed prices
+  const featured = sampleBestsellers.map((s) => {
+    const live = catalog.products.find((p) => p.slug === s.slug || p.name === s.name);
+    return live ? { ...s, ...live, pricePaise: live.pricePaise ?? s.pricePaise } : s;
+  });
 
   const ld = {
     "@context": "https://schema.org",

@@ -26,7 +26,7 @@ export default function ProductCard({ p }) {
   const { add, basket, settings } = useSite();
   const [variant, setVariant] = useState(p.variants?.[0] || "20ml");
   const inBasket = basket.some((i) => i.productId === p.id);
-  const buy = settings.shop?.cart && p.pricePaise != null;
+  const buy = settings.shop?.cart !== false;
 
   return (
     <article className="live-card">
@@ -44,7 +44,7 @@ export default function ProductCard({ p }) {
         <p className="live-card-desc">{p.shortDescription || p.description}</p>
 
         <div className="live-card-price">
-          {p.pricePaise != null ? money(p.pricePaise) : "Price on request"}
+          {money(p.pricePaise ?? (p.price ?? 750))}
         </div>
 
         <div className="live-card-actions">
@@ -63,7 +63,7 @@ export default function ProductCard({ p }) {
             disabled={p.stock === "out"}
             onClick={() => add(p.id, minQty(p), variant)}
           >
-            {inBasket ? "Added ✓" : buy ? "Add To Cart" : "Add to quote"}
+            {inBasket ? "Added ✓" : "Add To Cart"}
           </button>
         </div>
       </div>

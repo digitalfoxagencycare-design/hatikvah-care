@@ -17,21 +17,21 @@ export function crmRoutes({ store, audit }) {
     const [cs, invoices, orders] = await Promise.all([store.customers.all({ sort: { name: 1 } }), store.invoices.all(), store.orders.all()]);
     res.json(cs.map((c) => {
       const inv = invoices.filter((i) => i.customerId === c.id && i.status !== "void");
-      return { ...c, state: stateName(c.stateCode), outstanding: inv.reduce((n, i) => n + balance(i), 0), billed: inv.reduce((n, i) => n + i.totals.total, 0),
+      return { ...c, tags: Array.isArray(c.tags) ? c.tags : (c.tags ? [c.tags] : []), state: stateName(c.stateCode), outstanding: inv.reduce((n, i) => n + balance(i), 0), billed: inv.reduce((n, i) => n + (i.totals?.total || 0), 0),
         orders: orders.filter((o) => o.customerId === c.id).length, lastOrderAt: orders.filter((o) => o.customerId === c.id).map((o) => o.createdAt).sort().at(-1) || null };
     }));
   }));
   r.get("/customers/export.csv", requirePerm("customers"), wrap(async (_req, res) => {
-    const rows = (await store.customers.all({ sort: { name: 1 } })).map((c) => ({ ...c, state: stateName(c.stateCode), tags: c.tags.join("; ") }));
+    const rows = (await store.customers.all({ sort: { name: 1 } })).map((c) => ({ ...c, state: stateName(c.stateCode), tags: (Array.isArray(c.tags) ? c.tags : []).join("; ") }));
     csvHeaders(res, "hatikvah-customers.csv").send(toCsv(["name", "contactName", "phone", "email", "gstin", "state", "city", "billingAddress", "shippingAddress", "paymentTermsDays", "tags", "notes"], rows));
   }));
   r.get("/customers/:id", requirePerm("customers", "quotes", "invoices"), wrap(async (req, res) => {
     const c = await store.customers.get(req.params.id); if (!c) return notFound(res, "Customer");
-    const mine = (rows) => rows.filter((x) => x.customerId === c.id).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    const mine = (rows) => (rows || []).filter((x) => x.customerId === c.id).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
     const [enquiries, quotes, orders, invoices, payments, activities] = await Promise.all([store.enquiries.all(), store.quotes.all(), store.orders.all(), store.invoices.all(), store.payments.all(), store.activities.all({ sort: { at: -1 } })]);
     const inv = mine(invoices);
-    res.json({ customer: { ...c, state: stateName(c.stateCode) }, enquiries: mine(enquiries), quotes: mine(quotes), orders: mine(orders), invoices: inv, payments: mine(payments),
-      activities: activities.filter((a) => a.entityId === c.id || inv.some((i) => i.id === a.entityId)).slice(0, 100),
+    res.json({ customer: { ...c, tags: Array.isArray(c.tags) ? c.tags : (c.tags ? [c.tags] : []), state: stateName(c.stateCode) }, enquiries: mine(enquiries), quotes: mine(quotes), orders: mine(orders), invoices: inv, payments: mine(payments),
+      activities: (activities || []).filter((a) => a.entityId === c.id || inv.some((i) => i.id === a.entityId)).slice(0, 100),
       outstanding: inv.filter((i) => i.status !== "void").reduce((n, i) => n + balance(i), 0) });
   }));
   r.post("/customers", requirePerm("customers"), wrap(async (req, res) => {

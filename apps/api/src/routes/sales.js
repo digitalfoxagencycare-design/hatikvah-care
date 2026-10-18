@@ -22,7 +22,10 @@ export function salesRoutes({ cfg, store, audit, automation }) {
   r.get("/rates", requirePerm("quotes", "orders", "invoices"), wrap(async (req, res) => {
     const c = req.query.customerId ? await store.customers.get(String(req.query.customerId)) : null;
     const out = [];
-    for (const p of await store.products.all({ sort: { order: 1 } })) out.push({ productId: p.id, sku: p.sku, name: p.name, pack: p.pack, hsn: p.hsn || "", gstRate: p.gstRate ?? 18, unit: p.unit || "pcs", rate: await rateFor(store, c, p), active: p.active });
+    for (const p of await store.products.all({ sort: { order: 1 } })) {
+      const rVal = await rateFor(store, c, p);
+      out.push({ productId: p.id, sku: p.sku, name: p.name, pack: p.pack, hsn: p.hsn || "", gstRate: p.gstRate ?? 18, unit: p.unit || "pcs", rate: rVal || p.price || 0, price: p.price, pricePaise: p.price, priceTiers: p.priceTiers || [], active: p.active });
+    }
     res.json(out);
   }));
 

@@ -10,8 +10,12 @@ export default function Customers() {
   const [sp, setSp] = useSearchParams();
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("");
-  const rows = useMemo(() => (s.data || []).filter((c) => (!q || `${c.name} ${c.contactName} ${c.phone} ${c.gstin} ${c.city} ${c.tags.join(" ")}`.toLowerCase().includes(q.toLowerCase())) &&
-    (!filter || (filter === "due" && c.outstanding > 0) || (filter === "follow" && c.followUpAt && c.followUpAt <= new Date().toISOString().slice(0, 10)))), [s.data, q, filter]);
+  const rows = useMemo(() => (s.data || []).filter((c) => {
+    const tagsStr = Array.isArray(c.tags) ? c.tags.join(" ") : (c.tags || "");
+    const searchStr = `${c.name || ""} ${c.contactName || ""} ${c.phone || ""} ${c.gstin || ""} ${c.city || ""} ${tagsStr}`.toLowerCase();
+    return (!q || searchStr.includes(q.toLowerCase())) &&
+      (!filter || (filter === "due" && (c.outstanding || 0) > 0) || (filter === "follow" && c.followUpAt && c.followUpAt <= new Date().toISOString().slice(0, 10)));
+  }), [s.data, q, filter]);
   return (
     <>
       <div className="row-between"><h1>Customers</h1><div className="btn-row"><a className="btn ghost" href="/api/admin/customers/export.csv">Export CSV</a><button className="btn" onClick={() => setSp({ new: "1" })}>+ Add customer</button></div></div>
@@ -25,9 +29,9 @@ export default function Customers() {
           <tbody>
             {rows.map((c) => (
               <tr key={c.id}>
-                <td><Link to={`/admin/customers/${c.id}`}><strong>{c.name}</strong></Link><small>{c.gstin || "No GSTIN"}{c.tags.length > 0 && ` · ${c.tags.join(", ")}`}</small></td>
-                <td>{c.contactName}<small>{c.phone}</small></td><td>{c.state || "—"}<small>{c.city}</small></td><td>{personName(meta, c.assignedTo) || "—"}</td>
-                <td>{c.orders}<small>{c.lastOrderAt ? "last " + fmtDate(c.lastOrderAt) : ""}</small></td><td className="num">{rs(c.billed)}</td><td className={"num" + (c.outstanding ? " due" : "")}>{rs(c.outstanding)}</td>
+                <td><Link to={`/admin/customers/${c.id}`}><strong>{c.name || "Unnamed"}</strong></Link><small>{c.gstin || "No GSTIN"}{Array.isArray(c.tags) && c.tags.length > 0 && ` · ${c.tags.join(", ")}`}</small></td>
+                <td>{c.contactName || "—"}<small>{c.phone || ""}</small></td><td>{c.state || "—"}<small>{c.city || ""}</small></td><td>{personName(meta, c.assignedTo) || "—"}</td>
+                <td>{c.orders || 0}<small>{c.lastOrderAt ? "last " + fmtDate(c.lastOrderAt) : ""}</small></td><td className="num">{rs(c.billed || 0)}</td><td className={"num" + (c.outstanding ? " due" : "")}>{rs(c.outstanding || 0)}</td>
               </tr>
             ))}
             {rows.length === 0 && <tr><td colSpan="7" className="muted">No customers yet. They are created from enquiries (Create customer) or with + Add customer.</td></tr>}
