@@ -9,8 +9,9 @@
 | 4. Orders, invoices, payments | Sales orders, dispatch + delivery challan, GST tax invoices (per financial year), payments, Razorpay links + webhook, receivables, accountant CSVs | Done (Razorpay needs keys) |
 | 5. Stock & purchasing | Stock ledger, reorder levels, low-stock alerts, suppliers, purchase orders, goods received | Done |
 | 6. Reports & access | Sales, funnel, sources, top customers/products/categories, ageing, team performance; roles (owner, manager, sales, accounts, warehouse, staff); two-step sign-in; owner backup | Done |
+| 7. Online shop | Storefront in the live site's layout (header with categories menu + search, product page with brand card, bulk price table, pack-size quantities, options, tabs), cart, checkout, WhatsApp OTP sign-in, Razorpay payment → automatic GST invoice, My orders; each part switchable in settings | Done (Razorpay / WhatsApp need keys) |
 | Automations | 16 rules, see Admin › Automation & messages | Done (email/WhatsApp need keys) |
 
 **Waiting on the client / integrations:** Resend domain, WhatsApp Business API number + template, Razorpay keys, Cloud Scheduler job, GSTIN/bank details in settings, real product photos, prices, HSN codes. See [INTEGRATIONS.md](INTEGRATIONS.md).
 
-**Possible next steps:** credit notes, e-invoice/e-way bill via GSP, direct Tally/Zoho sync, customer self-service portal (order history, re-order), multi-warehouse stock, variant-level stock.
+**Possible next steps:** verified customer reviews on product pages, credit notes, e-invoice/e-way bill via GSP, direct Tally/Zoho sync, customer self-service portal (order history, re-order), multi-warehouse stock, variant-level stock.

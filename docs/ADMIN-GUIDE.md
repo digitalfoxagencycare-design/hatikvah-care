@@ -20,6 +20,13 @@ Sign in at `/admin`. What you see in the menu depends on your role.
 * **Website content**: hero text and image, announcement banner, numbers, why-us, clients, testimonials, FAQ.
 * **Company & GST** (owner): company details, GSTIN and state, bank details/UPI (printed on invoices), standard terms, brochure PDF, Google Analytics and Meta Pixel IDs, show/hide prices.
 
+## Online shop (cart, checkout, WhatsApp sign-in)
+* **Company & GST › Online shop** has four switches: *Cart & checkout*, *Online payment (Razorpay)*, *Pay later*, *Sign in with WhatsApp code*. Untick any of them if the client does not want it; the website then falls back to quote requests / guest checkout. Online payment and WhatsApp sign-in also need their keys on the server (see INTEGRATIONS.md).
+* Only products with a price can be bought online (and only while *Show prices* is on); the rest stay "Price on request" and go through the quote list.
+* On each product, **Online shop** fields drive the product page: brand and manufacturer (brand card), short description, *sold in packs of* (quantity steps, e.g. 288), minimum quantity, bulk prices (e.g. 576+ at ₹7.35), dispatch note, non-returnable, and the *Additional information* table. Tick **Track** stock to show In stock / Out of stock.
+* Website orders appear in **Sales orders** marked *Website*. Online payment: the GST invoice is raised automatically when Razorpay confirms the money; do not dispatch while it says *awaiting payment*. Pay later: click *Create GST invoice* as usual and the customer gets the invoice with bank / UPI details.
+* Buyers see their orders, invoices and challans at **/account** after signing in with a WhatsApp code.
+
 ## Automation & messages
 Switch each automation on or off, set who gets team alerts, and see every message sent. Until email/WhatsApp are connected, use **Send by hand** on each message.
 

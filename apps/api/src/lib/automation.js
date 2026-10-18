@@ -13,6 +13,7 @@ export const RULES = [
   { id: "quoteReminder", group: "Quotes", when: "schedule", label: "Quote not answered after the set days: polite reminder to the customer" },
   { id: "quoteExpire", group: "Quotes", when: "schedule", label: "Quote past its validity date: mark it expired" },
   { id: "quoteAccepted", group: "Quotes", when: "event", label: "Quote accepted: create the sales order and tell the team" },
+  { id: "websiteOrder", group: "Orders", when: "event", label: "Website order placed: confirm to the customer and alert the team" },
   { id: "orderDispatched", group: "Orders", when: "event", label: "Order dispatched: send the customer the challan and tracking details" },
   { id: "invoiceSend", group: "Payments", when: "event", label: "Invoice created: send the customer the invoice link (with payment link when Razorpay is on)" },
   { id: "paymentReceipt", group: "Payments", when: "event", label: "Payment received: send a thank-you receipt" },
@@ -92,6 +93,17 @@ export function createAutomation({ cfg, store, notifier, log = console }) {
       body: `${q.customer.name} accepted quotation ${q.number} (${money(q.totals.total)}).${order ? `\nSales order ${order.number} created.` : ""}\nOpen: ${base()}/admin/${order ? "orders/" + order.id : "quotes/" + q.id}` });
     await notifier.flush();
     return order;
+  }
+
+  async function websiteOrder(o) {
+    const [a, company] = await Promise.all([config(), getSettings(store)]);
+    if (!isOn(a, "websiteOrder")) return;
+    const pay = o.payment === "online" ? "online payment" : "pay later (we will send the invoice)";
+    await send(toCustomer(o.customer), { event: "websiteOrder", ref: o.number, subject: `Order ${o.number} received`,
+      body: `Dear ${o.customer.contactName || o.customer.name},\nThank you for your order ${o.number} for ${money(o.totals.total)} (${pay}).\nTrack it at ${base()}/account\n– ${company.name}` });
+    await send(await teamTargets(a, company), { event: "websiteOrder", ref: o.number, subject: `New website order ${o.number}`,
+      body: `New website order ${o.number} from ${o.customer.name}${o.customer.phone ? " (" + o.customer.phone + ")" : ""}: ${money(o.totals.total)}, ${pay}.\nOpen: ${base()}/admin/orders/${o.id}` });
+    await notifier.flush();
   }
 
   async function orderDispatched(o) {
@@ -210,5 +222,5 @@ export function createAutomation({ cfg, store, notifier, log = console }) {
     return res;
   }
 
-  return { config, run, on: { enquiryCreated, quoteSent, quoteAccepted, orderDispatched, invoiceCreated, paymentReceived } };
+  return { config, run, on: { enquiryCreated, quoteSent, quoteAccepted, websiteOrder, orderDispatched, invoiceCreated, paymentReceived } };
 }

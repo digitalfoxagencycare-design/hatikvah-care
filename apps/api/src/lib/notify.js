@@ -12,7 +12,17 @@ export function channels(cfg) {
     email: cfg.resendKey && cfg.mailFrom ? "resend" : "off",
     whatsapp: cfg.waToken && cfg.waPhoneId ? "whatsapp-cloud-api" : "off",
     payments: cfg.razorpayKeyId && cfg.razorpaySecret ? "razorpay" : "off",
+    otp: cfg.novaUrl && cfg.novaKey ? "nova" : cfg.waToken && cfg.waPhoneId ? "whatsapp-cloud-api" : "off", // website sign-in codes
   };
+}
+
+/** What the website may offer right now: the owner's switches in settings, limited by which integrations have keys. */
+export function shopFlags(cfg, s) {
+  const on = channels(cfg);
+  const cart = s.shopEnabled !== false && !!s.showPrices;
+  const online = cart && s.onlinePayments !== false && on.payments !== "off";
+  const payLater = cart && s.payLater !== false;
+  return { cart: cart && (online || payLater), online, payLater, otp: s.otpLogin !== false && (on.otp !== "off" || !cfg.prod) };
 }
 
 export function createNotifier({ cfg, store, fetchImpl = globalThis.fetch, log = console }) {
@@ -56,5 +66,29 @@ export function createNotifier({ cfg, store, fetchImpl = globalThis.fetch, log =
     }
     return sent;
   }
-  return { queue, flush, channels: on };
+  /**
+   * Login codes go straight to WhatsApp and are NOT written to the outbox: staff can read the outbox, and a stored code would let them sign in as the customer.
+   * With Nova connected (NOVA_URL + NOVA_CLIENT_KEY) the code goes out on Nova's WhatsApp number (POST /v2/integrations/whatsapp/otp); Nova applies
+   * its own per-phone limits and never stores the code. Otherwise WHATSAPP_OTP_TEMPLATE, an approved "Authentication" template, is used directly.
+   * Throws an Error with `status` 429 when the code may not be sent yet.
+   */
+  async function sendOtp(phone, code) {
+    if (on.otp === "off") throw new Error("WhatsApp is not connected");
+    const to = waNumber(phone);
+    if (on.otp === "nova") {
+      const r = await fetchImpl(`${cfg.novaUrl}/v2/integrations/whatsapp/otp`, { method: "POST",
+        headers: { "X-Nova-Client-Key": cfg.novaKey, "Content-Type": "application/json", ...(cfg.novaSlug ? { "X-Tenant-Slug": cfg.novaSlug } : {}) }, body: JSON.stringify({ phone: to, code }) });
+      if (r.ok) return;
+      const err = new Error(`Nova said ${r.status}: ${(await r.text()).slice(0, 200)}`);
+      err.status = r.status;
+      throw err;
+    }
+    const payload = cfg.waOtpTemplate
+      ? { messaging_product: "whatsapp", to, type: "template", template: { name: cfg.waOtpTemplate, language: { code: cfg.waTemplateLang }, components: [
+        { type: "body", parameters: [{ type: "text", text: code }] }, { type: "button", sub_type: "url", index: "0", parameters: [{ type: "text", text: code }] }] } }
+      : { messaging_product: "whatsapp", to, type: "text", text: { body: `${code} is your HaTikvah Care login code. It expires in 10 minutes. Do not share it.` } };
+    const r = await fetchImpl(`https://graph.facebook.com/v21.0/${cfg.waPhoneId}/messages`, { method: "POST", headers: { Authorization: `Bearer ${cfg.waToken}`, "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    if (!r.ok) throw new Error(`WhatsApp said ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  }
+  return { queue, flush, sendOtp, channels: on };
 }

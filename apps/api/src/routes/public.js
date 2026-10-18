@@ -2,17 +2,20 @@ import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { enquiryInput, getSettings, publicProduct } from "../model.js";
 import { DEFAULT_HOME } from "../schemas.js";
+import { STATES } from "../lib/gst.js";
+import { stockLevels } from "../lib/sales.js";
+import { shopFlags } from "../lib/notify.js";
 
 export const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
-export function publicRoutes({ store, automation }) {
+export function publicRoutes({ cfg, store, automation }) {
   const r = Router();
   const settings = async () => (await store.settings.findBy("key", "company")) || {};
 
   r.get("/catalog", wrap(async (_req, res) => {
     const s = await settings();
-    const [cats, prods] = await Promise.all([store.categories.all(), store.products.all()]);
-    const products = prods.filter((p) => p.active).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map((p) => publicProduct(p, s));
+    const [cats, prods, lv] = await Promise.all([store.categories.all(), store.products.all(), stockLevels(store)]);
+    const products = prods.filter((p) => p.active).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map((p) => publicProduct(p, s, lv[p.id]));
     const categories = cats.sort((a, b) => a.order - b.order).map(({ id, slug, name, description, order }) => ({
       id, slug, name, description, order, count: products.filter((p) => p.category === slug).length,
     }));
@@ -24,14 +27,15 @@ export function publicRoutes({ store, automation }) {
     const s = await settings();
     const p = await store.products.findBy("slug", req.params.slug);
     if (!p || !p.active) return res.status(404).json({ error: "NOT_FOUND", message: "Product not found" });
-    res.json(publicProduct(p, s));
+    res.json(publicProduct(p, s, (await stockLevels(store))[p.id]));
   }));
 
   r.get("/settings", wrap(async (_req, res) => {
     const s = await getSettings(store), home = await store.settings.findBy("key", "home");
     const { name, legalName, tagline, about, phone, whatsapp, email, website, address, hours, showPrices, ga4Id, metaPixelId, brochureUrl, gstin } = s;
     res.set("Cache-Control", "public, max-age=60");
-    res.json({ name, legalName, tagline, about, phone, whatsapp, email, website, address, hours, showPrices, ga4Id, metaPixelId, brochureUrl, gstin, home: home ? { ...DEFAULT_HOME, ...home.value } : DEFAULT_HOME });
+    res.json({ name, legalName, tagline, about, phone, whatsapp, email, website, address, hours, showPrices, ga4Id, metaPixelId, brochureUrl, gstin, stateCode: s.stateCode,
+      shop: shopFlags(cfg, s), states: STATES, home: home ? { ...DEFAULT_HOME, ...home.value } : DEFAULT_HOME });
   }));
 
   const limiter = rateLimit({
@@ -49,7 +53,7 @@ export function publicRoutes({ store, automation }) {
     for (const it of d.items) {
       const p = products.find((x) => x.id === it.productId && x.active);
       if (!p) return res.status(400).json({ error: "INVALID", message: "A product in your list is no longer available. Please refresh." });
-      items.push({ productId: p.id, sku: p.sku, name: p.name, qty: it.qty });
+      items.push({ productId: p.id, sku: p.sku, name: it.variant && p.variants?.includes(it.variant) ? `${p.name} (${it.variant})` : p.name, qty: it.qty });
     }
     const yy = new Date().getFullYear().toString().slice(2);
     let ref; // skip numbers already used (databases created before the counter existed)

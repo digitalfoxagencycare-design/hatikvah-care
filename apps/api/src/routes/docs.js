@@ -3,7 +3,7 @@ import express, { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { amountInWords, stateName } from "../lib/gst.js";
 import { verifyWebhook } from "../lib/razorpay.js";
-import { balance, logActivity, now, recordPayment } from "../lib/sales.js";
+import { balance, invoiceWebsiteOrder, logActivity, now, recordPayment } from "../lib/sales.js";
 import { getSettings } from "../model.js";
 import { wrap } from "./public.js";
 
@@ -47,9 +47,17 @@ export function docRoutes({ cfg, store, automation }) {
     let ev; try { ev = JSON.parse(req.body.toString("utf8")); } catch { return res.status(400).end(); }
     if (ev.event !== "payment_link.paid") return res.json({ ok: true, ignored: ev.event });
     const link = ev.payload?.payment_link?.entity, pay = ev.payload?.payment?.entity;
-    const inv = link?.notes?.invoiceId ? await store.invoices.get(String(link.notes.invoiceId)) : null;
+    if (pay?.id && (await store.payments.all()).some((p) => p.external === pay.id)) return res.json({ ok: true, duplicate: true }); // Razorpay retries webhooks
+    let inv = link?.notes?.invoiceId ? await store.invoices.get(String(link.notes.invoiceId)) : null;
+    const order = !inv && link?.notes?.orderId ? await store.orders.get(String(link.notes.orderId)) : null;
+    if (order && pay?.id) { // website checkout: the GST invoice is raised now that the money is in
+      const fresh = !order.invoiceId;
+      inv = await invoiceWebsiteOrder(store, order);
+      await store.orders.update(order.id, { paymentStatus: "paid", updatedAt: now() });
+      await logActivity(store, { entity: "order", entityId: order.id, text: `Paid online (${pay.id}); invoice ${inv.number}`, by: "razorpay" });
+      if (fresh) await automation.on.invoiceCreated(inv);
+    }
     if (!inv || !pay?.id) return res.json({ ok: true, ignored: "unknown invoice" });
-    if ((await store.payments.all()).some((p) => p.external === pay.id)) return res.json({ ok: true, duplicate: true }); // Razorpay retries webhooks
     const amount = Math.min(pay.amount, balance(inv));
     if (amount > 0) { const out = await recordPayment(store, inv, { amount, mode: "razorpay", reference: pay.id, by: "razorpay", external: pay.id }); await automation.on.paymentReceived(out.invoice, out.payment); }
     res.json({ ok: true });

@@ -47,6 +47,14 @@ export default function Settings() {
           <label className="field"><span>Bank details (printed on invoices)</span><textarea rows="3" maxLength={500} value={f.bankDetails} onChange={set("bankDetails")} placeholder={"Bank: …\nA/c no: …\nIFSC: …"} /></label>
           <label className="field"><span>Standard quotation terms</span><textarea rows="4" maxLength={3000} value={f.quoteTerms} onChange={set("quoteTerms")} /></label>
           <label className="field"><span>Invoice terms / declaration</span><textarea rows="2" maxLength={3000} value={f.invoiceTerms} onChange={set("invoiceTerms")} /></label>
+          <h2>Online shop</h2>
+          <p className="muted">Cart and checkout show only for products with a price, while “Show prices” is on. Online payment needs the Razorpay keys and WhatsApp sign-in needs the WhatsApp keys on the server; until then those options stay hidden from buyers.</p>
+          {[["shopEnabled", "Cart & checkout", "Buyers can order priced products from the website. Off = quote requests only."],
+            ["onlinePayments", "Online payment (Razorpay)", "UPI, cards and net banking at checkout. The GST invoice is raised when the payment arrives."],
+            ["payLater", "Pay later", "Order now; the team sends the invoice with bank / UPI details."],
+            ["otpLogin", "Sign in with WhatsApp code", "Buyers verify their mobile number with a code on WhatsApp and can see their orders. Off = guest checkout with a phone number."]].map(([k, title, help]) => (
+            <label key={k} className="check-row"><input type="checkbox" checked={f[k] !== false} onChange={(e) => { setF({ ...f, [k]: e.target.checked }); setSt({ busy: false, error: null, saved: false }); }} /> <span><strong>{title}</strong><small>{help}</small></span></label>
+          ))}
           <h2>Website extras</h2>
           <div className="grid2">
             <label className="field"><span>Google Analytics 4 ID</span><input value={f.ga4Id} onChange={set("ga4Id")} placeholder="G-XXXXXXXXXX" /></label>

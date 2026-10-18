@@ -8,6 +8,7 @@ import { adminRoutes } from "./routes/admin.js";
 import { mediaRoute, publicRoutes } from "./routes/public.js";
 import { seoRoutes } from "./routes/seo.js";
 import { docRoutes } from "./routes/docs.js";
+import { shopRoutes } from "./routes/shop.js";
 import { createAutomation } from "./lib/automation.js";
 import { createNotifier } from "./lib/notify.js";
 
@@ -38,7 +39,8 @@ export function createApp({ cfg, store, log = console, fetchImpl }) {
   app.get("/api/health", async (_req, res) => {
     try { await store.settings.count(); res.json({ ok: true, store: store.kind }); } catch { res.status(503).json({ ok: false }); }
   });
-  app.use("/api/public", publicRoutes({ store, automation }));
+  app.use("/api/public", publicRoutes({ cfg, store, automation }));
+  app.use("/api/shop", shopRoutes({ cfg, store, automation, notifier, ...(fetchImpl ? { fetchImpl } : {}) }));
   app.use("/api/admin", adminRoutes({ cfg, store, automation, notifier }));
   app.use("/media", mediaRoute({ store }));
   app.use(seoRoutes({ cfg, store }));
