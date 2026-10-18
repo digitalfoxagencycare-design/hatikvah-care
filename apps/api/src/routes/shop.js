@@ -59,8 +59,12 @@ export function shopRoutes({ cfg, store, automation, notifier, fetchImpl = globa
     for (const o of old) await store.otps.remove(o.id);
     const code = String(crypto.randomInt(100000, 1000000));
     const otp = await store.otps.insert({ phone, hash: hashOtp(phone, code), attempts: 0, expiresAt: new Date(Date.now() + OTP_MINUTES * 60_000).toISOString(), createdAt: now() });
-    if (notifier.channels.whatsapp === "off") return res.json({ ok: true, devCode: code }); // development only: shopFlags hides OTP in production without WhatsApp
-    try { await notifier.sendOtp(phone, code); } catch (e) { await store.otps.remove(otp.id); return res.status(502).json({ error: "NOT_SENT", message: "We could not send the code on WhatsApp. Please try again." }); }
+    if (notifier.channels.otp === "off") return res.json({ ok: true, devCode: code }); // development only: shopFlags hides OTP in production without WhatsApp
+    try { await notifier.sendOtp(phone, code); } catch (e) {
+      await store.otps.remove(otp.id);
+      if (e.status === 429) return res.status(429).json({ error: "RATE_LIMITED", message: "Too many codes sent to this number. Please try again in a few minutes." });
+      return res.status(502).json({ error: "NOT_SENT", message: "We could not send the code on WhatsApp. Please try again." });
+    }
     res.json({ ok: true });
   }));
 

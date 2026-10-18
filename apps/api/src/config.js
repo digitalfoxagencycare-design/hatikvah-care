@@ -27,6 +27,8 @@ export function loadConfig(env = process.env) {
     resendKey: env.RESEND_API_KEY || "", mailFrom: env.MAIL_FROM || "", mailReplyTo: env.MAIL_REPLY_TO || "",
     waToken: env.WHATSAPP_TOKEN || "", waPhoneId: env.WHATSAPP_PHONE_ID || "", waTemplate: env.WHATSAPP_TEMPLATE || "", waTemplateLang: env.WHATSAPP_TEMPLATE_LANG || "en",
     waOtpTemplate: env.WHATSAPP_OTP_TEMPLATE || "", // an approved "Authentication" template; the login code is its only variable
+    // Nova (central engine): login codes go out on Nova's WhatsApp number through its client API. Key issued in the Nova console.
+    novaUrl: (env.NOVA_URL || "").replace(/\/$/, ""), novaKey: env.NOVA_CLIENT_KEY || "", novaSlug: env.NOVA_TENANT_SLUG || "",
     razorpayKeyId: env.RAZORPAY_KEY_ID || "", razorpaySecret: env.RAZORPAY_KEY_SECRET || "", razorpayWebhookSecret: env.RAZORPAY_WEBHOOK_SECRET || "",
   };
   if (!cfg.jwtSecret && !prod) cfg.jwtSecret = "dev-only-secret-change-me-dev-only-secret-change-me";
@@ -34,6 +36,8 @@ export function loadConfig(env = process.env) {
   if (prod && !cfg.mongoUri) problems.push("MONGODB_URI is required in production (the file store is for development only)");
   if (cfg.jwtSecret.length < 32) problems.push("JWT_SECRET must be at least 32 characters");
   if (prod && /dev-only|change-me|replace/i.test(cfg.jwtSecret)) problems.push("JWT_SECRET looks like a placeholder");
+  if (cfg.novaUrl && !/^https:\/\//.test(cfg.novaUrl) && prod) problems.push("NOVA_URL must start with https://");
+  if (!!cfg.novaUrl !== !!cfg.novaKey) problems.push("Set both NOVA_URL and NOVA_CLIENT_KEY, or neither");
   if (cfg.cronSecret && cfg.cronSecret.length < 24) problems.push("CRON_SECRET must be at least 24 characters");
   if (problems.length) throw new Error("Unsafe configuration: " + problems.join("; "));
   return cfg;
