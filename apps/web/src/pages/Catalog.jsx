@@ -20,14 +20,15 @@ export default function Catalog() {
   const collections = useMemo(() => [...new Set(inCat.map((p) => p.collection).filter(Boolean))], [inCat]);
   const list = useMemo(() => {
     const words = q.toLowerCase().split(/\s+/).filter(Boolean);
-    let r = inCat.filter((p) => (!collection || p.collection === collection) && words.every((w) => `${p.name} ${p.collection} ${p.pack} ${p.variants.join(" ")} ${p.sku}`.toLowerCase().includes(w)));
+    let r = inCat.filter((p) => (!collection || p.collection === collection) && words.every((w) => `${p.name} ${p.brand} ${p.collection} ${p.pack} ${p.variants.join(" ")} ${p.sku}`.toLowerCase().includes(w)));
     if (sort === "name") r = [...r].sort((a, b) => a.name.localeCompare(b.name));
+    if (sort === "price") r = [...r].sort((a, b) => (a.pricePaise ?? Infinity) - (b.pricePaise ?? Infinity));
     return r;
   }, [inCat, collection, q, sort]);
 
   return (
     <div className="wrap catalog">
-      <Seo title={cat ? cat.name : "Catalogue"} description={cat ? `${cat.name}: ${cat.description}` : "Browse hospitality supplies: guest amenities, bath & body, tray amenities, hotel linen and hospital linen."} />
+      <Seo title={cat ? cat.name : "Shop"} description={cat ? `${cat.name}: ${cat.description}` : "Browse hospitality supplies: guest amenities, bath & body, tray amenities, hotel linen and hospital linen."} />
       <aside className="side" aria-label="Categories">
         <h2>Categories</h2>
         <ul>
@@ -36,12 +37,12 @@ export default function Catalog() {
         </ul>
       </aside>
       <section>
-        <h1>{cat ? cat.name : "Product catalogue"}</h1>
+        <h1>{cat ? cat.name : q ? `Results for “${q}”` : "Shop"}</h1>
         {cat && <p className="muted">{cat.description}</p>}
         <div className="toolbar">
           <input type="search" value={q} onChange={(e) => set("q", e.target.value)} placeholder="Search products, e.g. towel, shampoo, sachet" aria-label="Search products" />
           <select value={sort} onChange={(e) => set("sort", e.target.value === "catalogue" ? "" : e.target.value)} aria-label="Sort">
-            <option value="catalogue">Catalogue order</option><option value="name">Name A–Z</option>
+            <option value="catalogue">Catalogue order</option><option value="name">Name A–Z</option><option value="price">Price: low to high</option>
           </select>
         </div>
         {collections.length > 1 && (

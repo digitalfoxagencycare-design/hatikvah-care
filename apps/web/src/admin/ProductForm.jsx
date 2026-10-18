@@ -3,7 +3,9 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api.js";
 import { Loader, useLoad } from "./hooks.jsx";
 
-const EMPTY = { name: "", sku: "", category: "", collection: "", pack: "", variants: [], description: "", images: [], price: null, priceUnit: "", minOrder: "", active: true, featured: false, hsn: "", gstRate: 18, unit: "pcs" };
+const EMPTY = { name: "", sku: "", category: "", collection: "", pack: "", variants: [], description: "", images: [], price: null, priceUnit: "", minOrder: "", active: true, featured: false, hsn: "", gstRate: 18, unit: "pcs",
+  brand: "", manufacturer: "", shortDescription: "", variantLabel: "", priceTiers: [], packSize: 1, minQty: 0, dispatchInfo: "", returnable: true, specs: [] };
+const rupeesIn = (v) => { const n = Number(String(v).replace(/,/g, "")); return String(v).trim() === "" || !Number.isFinite(n) || n < 0 ? null : Math.round(n * 100); };
 
 export default function ProductForm() {
   const { id } = useParams();
@@ -18,7 +20,7 @@ export default function ProductForm() {
   useEffect(() => {
     if (!all.data || !cats.data) return;
     const cur = id ? all.data.find((p) => p.id === id) : { ...EMPTY, category: cats.data[0]?.slug || "" };
-    if (cur) { setF(cur); setPrice(cur.price == null ? "" : String(cur.price / 100)); }
+    if (cur) { setF({ ...EMPTY, ...cur, priceTiers: (cur.priceTiers || []).map((t) => ({ minQty: String(t.minQty), price: String(t.price / 100) })) }); setPrice(cur.price == null ? "" : String(cur.price / 100)); }
   }, [all.data, cats.data, id]);
 
   const loading = (all.loading && !all.data) || (cats.loading && !cats.data);
@@ -39,7 +41,11 @@ export default function ProductForm() {
     if (n !== null && (!Number.isFinite(n) || n < 0 || n > 1_000_000)) return setSt({ busy: false, error: "Price must be a number in rupees, like 125 or 12.50", saved: false, field: "price" });
     const body = { name: f.name, sku: f.sku || undefined, category: f.category, collection: f.collection, pack: f.pack, variants: f.variants, description: f.description,
       images: f.images, price: n === null ? null : Math.round(n * 100), priceUnit: f.priceUnit, minOrder: f.minOrder, active: f.active, featured: f.featured,
-      hsn: f.hsn || "", gstRate: Number(f.gstRate ?? 18), unit: f.unit || "pcs" };
+      hsn: f.hsn || "", gstRate: Number(f.gstRate ?? 18), unit: f.unit || "pcs",
+      brand: f.brand, manufacturer: f.manufacturer, shortDescription: f.shortDescription, variantLabel: f.variantLabel, packSize: Number(f.packSize) || 1, minQty: Number(f.minQty) || 0,
+      dispatchInfo: f.dispatchInfo, returnable: f.returnable, specs: f.specs.filter((x) => x.label.trim() && x.value.trim()),
+      priceTiers: f.priceTiers.filter((t) => String(t.minQty).trim()).map((t) => ({ minQty: Number(t.minQty), price: rupeesIn(t.price) })) };
+    if (body.priceTiers.some((t) => !Number.isInteger(t.minQty) || t.price == null)) return setSt({ busy: false, error: "Each bulk price needs a whole quantity and a price in rupees", saved: false, field: "priceTiers" });
     setSt({ busy: true, error: null, saved: false, field: null });
     try {
       if (id) { await api(`/api/admin/products/${id}`, { method: "PATCH", body }); setSt({ busy: false, error: null, saved: true, field: null }); all.reload(); }
@@ -74,6 +80,38 @@ export default function ProductForm() {
               <label className="field"><span>Unit (on documents)</span><input maxLength={20} value={f.unit || "pcs"} onChange={(e) => set("unit", e.target.value)} placeholder="pcs / pack / kg" /></label>
             </div>
             <label className="field"><span>Product Description (shown on website & landing page)</span><textarea rows="4" maxLength={2000} placeholder="Describe product features, quality, materials, fragrances, dimensions, suitability for hotels/hospitals, etc." value={f.description} onChange={(e) => set("description", e.target.value)} /></label>
+            <h2>Online shop</h2>
+            <div className="grid2">
+              <label className="field"><span>Brand (shown with a brand card)</span><input maxLength={80} value={f.brand} onChange={(e) => set("brand", e.target.value)} placeholder="e.g. Farm Fresh" /></label>
+              <label className="field"><span>Manufacturer / company</span><input maxLength={120} value={f.manufacturer} onChange={(e) => set("manufacturer", e.target.value)} placeholder="e.g. Bio Veda Pharmacy Private Limited" /></label>
+            </div>
+            <label className="field"><span>Short description (under the product name)</span><textarea rows="2" maxLength={400} value={f.shortDescription} onChange={(e) => set("shortDescription", e.target.value)} /></label>
+            <div className="grid3">
+              <label className="field"><span>Sold in packs of (quantity steps)</span><input type="number" min="1" max="100000" value={f.packSize} onChange={(e) => set("packSize", e.target.value)} /></label>
+              <label className="field"><span>Minimum quantity (0 = one pack)</span><input type="number" min="0" max="1000000" value={f.minQty} onChange={(e) => set("minQty", e.target.value)} /></label>
+              <label className="field"><span>Dispatch note</span><input maxLength={80} value={f.dispatchInfo} onChange={(e) => set("dispatchInfo", e.target.value)} placeholder="Dispatched within 24-48 hours" /></label>
+            </div>
+            <div className={"field" + (st.field === "priceTiers" ? " bad" : "")}><span>Bulk prices (quantity and above → price per unit, ₹)</span>
+              {f.priceTiers.map((t, i) => (
+                <div className="btn-row" key={i}>
+                  <input type="number" min="2" aria-label="From quantity" placeholder="Qty, e.g. 576" value={t.minQty} onChange={(e) => set("priceTiers", f.priceTiers.map((x, j) => (j === i ? { ...x, minQty: e.target.value } : x)))} />
+                  <input inputMode="decimal" aria-label="Price per unit" placeholder="₹ per unit" value={t.price} onChange={(e) => set("priceTiers", f.priceTiers.map((x, j) => (j === i ? { ...x, price: e.target.value } : x)))} />
+                  <button type="button" className="link danger" onClick={() => set("priceTiers", f.priceTiers.filter((_, j) => j !== i))}>Remove</button>
+                </div>
+              ))}
+              {f.priceTiers.length < 6 && <div><button type="button" className="btn ghost small" onClick={() => set("priceTiers", [...f.priceTiers, { minQty: "", price: "" }])}>+ Add bulk price</button></div>}
+            </div>
+            <div className="field"><span>Additional information (spec table)</span>
+              {f.specs.map((x, i) => (
+                <div className="btn-row" key={i}>
+                  <input maxLength={60} aria-label="Label" placeholder="e.g. Volume" value={x.label} onChange={(e) => set("specs", f.specs.map((y, j) => (j === i ? { ...y, label: e.target.value } : y)))} />
+                  <input maxLength={200} aria-label="Value" placeholder="e.g. 20 ml" value={x.value} onChange={(e) => set("specs", f.specs.map((y, j) => (j === i ? { ...y, value: e.target.value } : y)))} />
+                  <button type="button" className="link danger" onClick={() => set("specs", f.specs.filter((_, j) => j !== i))}>Remove</button>
+                </div>
+              ))}
+              {f.specs.length < 20 && <div><button type="button" className="btn ghost small" onClick={() => set("specs", [...f.specs, { label: "", value: "" }])}>+ Add row</button></div>}
+            </div>
+            <label className="field"><span>Options heading (e.g. Size/Volume, Fragrance)</span><input maxLength={40} value={f.variantLabel} onChange={(e) => set("variantLabel", e.target.value)} /></label>
             <div className="field"><span>Options available (shampoo, conditioner…)</span>
               <div className="chips-edit">{f.variants.map((v) => <button type="button" key={v} className="chip on" onClick={() => set("variants", f.variants.filter((x) => x !== v))} aria-label={`Remove ${v}`}>{v} ✕</button>)}
                 <input value={variant} maxLength={60} placeholder="Type and press Enter" onChange={(e) => setVariant(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); const v = variant.trim(); if (v && !f.variants.includes(v) && f.variants.length < 20) set("variants", [...f.variants, v]); setVariant(""); } }} /></div>
@@ -88,6 +126,7 @@ export default function ProductForm() {
             <div className="checks">
               <label><input type="checkbox" checked={f.active} onChange={(e) => set("active", e.target.checked)} /> Show on website</label>
               <label><input type="checkbox" checked={f.featured} onChange={(e) => set("featured", e.target.checked)} /> Feature on home page</label>
+              <label><input type="checkbox" checked={!f.returnable} onChange={(e) => set("returnable", !e.target.checked)} /> Non returnable</label>
             </div>
             {st.error && <p className="alert" role="alert">{st.error}</p>}
             {st.saved && <p className="notice" role="status">Saved ✓</p>}

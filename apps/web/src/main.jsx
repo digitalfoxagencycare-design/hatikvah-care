@@ -7,11 +7,17 @@ import Home from "./pages/Home.jsx";
 import Catalog from "./pages/Catalog.jsx";
 import Product from "./pages/Product.jsx";
 import Quote from "./pages/Quote.jsx";
+import Cart from "./pages/Cart.jsx";
+import About from "./pages/About.jsx";
+import Contact from "./pages/Contact.jsx";
 import NotFound from "./pages/NotFound.jsx";
 import "./styles.css";
 
 const Admin = lazy(() => import("./admin/AdminApp.jsx"));
 const DocPage = lazy(() => import("./pages/DocPage.jsx"));
+const Checkout = lazy(() => import("./pages/Checkout.jsx"));
+const Account = lazy(() => import("./pages/Account.jsx"));
+const wait = (el) => <Suspense fallback={<div className="center-note">Loading…</div>}>{el}</Suspense>;
 
 createRoot(document.getElementById("root")).render(
   <BrowserRouter>
@@ -20,9 +26,15 @@ createRoot(document.getElementById("root")).render(
       <Route path="/admin/*" element={<Suspense fallback={<div className="center-note">Loading…</div>}><Admin /></Suspense>} />
       <Route element={<SiteProvider><Layout /></SiteProvider>}>
         <Route index element={<Home />} />
+        <Route path="shop" element={<Catalog />} />
         <Route path="catalog" element={<Catalog />} />
         <Route path="product/:slug" element={<Product />} />
         <Route path="quote" element={<Quote />} />
+        <Route path="cart" element={<Cart />} />
+        <Route path="checkout" element={wait(<Checkout />)} />
+        <Route path="account" element={wait(<Account />)} />
+        <Route path="about" element={<About />} />
+        <Route path="contact" element={<Contact />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

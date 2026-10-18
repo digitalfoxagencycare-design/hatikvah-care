@@ -34,6 +34,18 @@ export const productInput = z.object({
   reorderLevel: z.number().min(0).max(10_000_000).default(0),
   reorderQty: z.number().min(0).max(10_000_000).default(0),
   supplierId: z.string().max(60).default(""),
+  // Online shop details (product page): brand card, short text, bulk price tiers, pack multiples, delivery/return notes, spec table.
+  brand: text(80).default(""),
+  manufacturer: text(120).default(""),
+  shortDescription: text(400).default(""),
+  variantLabel: text(40).default(""),
+  priceTiers: z.array(z.object({ minQty: z.number().int().min(2).max(1_000_000), price: paise.unwrap() }).strict()).max(6).default([])
+    .refine((t) => t.every((x, i) => i === 0 || x.minQty > t[i - 1].minQty), "Price tiers must go up in quantity"),
+  packSize: z.number().int().min(1).max(100_000).default(1),
+  minQty: z.number().int().min(0).max(1_000_000).default(0),
+  dispatchInfo: text(80).default(""),
+  returnable: z.boolean().default(true),
+  specs: z.array(z.object({ label: text(60).min(1), value: text(200).min(1) }).strict()).max(20).default([]),
 }).strict();
 export const productPatch = productInput.partial().strict();
 
@@ -47,7 +59,7 @@ export const enquiryInput = z.object({
   phone: text(20).regex(/^[0-9+()\s-]{7,20}$/, "Enter a valid phone number"),
   email: z.union([z.literal(""), z.string().trim().email().max(160)]).default(""),
   message: text(2000).default(""),
-  items: z.array(z.object({ productId: z.string().max(60), qty: z.number().int().min(1).max(1_000_000) })).max(60).default([]),
+  items: z.array(z.object({ productId: z.string().max(60), qty: z.number().int().min(1).max(1_000_000), variant: text(60).optional() })).max(60).default([]),
   website: z.string().max(200).optional(), // honeypot: real people leave it empty
   source: z.object({ utm_source: text(100).optional(), utm_medium: text(100).optional(), utm_campaign: text(100).optional(), referrer: text(200).optional(), page: text(200).optional() }).strict().optional(),
 }).strict();
@@ -66,6 +78,8 @@ export const settingsInput = z.object({
   ga4Id: z.union([z.literal(""), z.string().trim().regex(/^G-[A-Z0-9]{4,15}$/, "Google Analytics ID looks like G-XXXXXXX")]).default(""),
   metaPixelId: z.union([z.literal(""), z.string().trim().regex(/^\d{5,20}$/, "Meta Pixel ID is digits only")]).default(""),
   brochureUrl: z.union([z.literal(""), z.string().regex(/^\/media\/[0-9a-f-]{36}$/)]).default(""),
+  // Online shop switches. Payments and OTP also need their keys in the environment; without them they stay off whatever is ticked here.
+  shopEnabled: z.boolean().default(true), onlinePayments: z.boolean().default(true), otpLogin: z.boolean().default(true), payLater: z.boolean().default(true),
 }).strict();
 
 export const DEFAULT_SETTINGS = {
@@ -83,6 +97,7 @@ export const DEFAULT_SETTINGS = {
   quoteTerms: "1. Prices are exclusive of freight unless stated.\n2. Delivery within 7–10 working days of order confirmation.\n3. We declare that this quotation shows the actual price of the goods described and that all particulars are true and correct.",
   invoiceTerms: "We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct. Subject to Hyderabad jurisdiction.",
   quoteValidityDays: 15, paymentTermsDays: 30, ga4Id: "", metaPixelId: "", brochureUrl: "",
+  shopEnabled: true, onlinePayments: true, otpLogin: true, payLater: true,
 };
 /** Company settings with defaults filled in for fields added after the database was created. */
 export async function getSettings(store) {
@@ -90,12 +105,15 @@ export async function getSettings(store) {
   return { ...DEFAULT_SETTINGS, ...(s || {}) };
 }
 
-/** What a visitor may see. Prices only when the owner has them switched on and a price exists. */
-export function publicProduct(p, settings) {
+/** What a visitor may see. Prices (and bulk tiers) only when the owner has them switched on and a price exists. `level` is the stock on hand. */
+export function publicProduct(p, settings, level) {
   const showPrice = settings.showPrices && p.price != null;
   return {
-    id: p.id, slug: p.slug, sku: p.sku, name: p.name, category: p.category, collection: p.collection, pack: p.pack, variants: p.variants,
-    description: p.description, images: p.images, featured: p.featured, pricePaise: showPrice ? p.price : null, priceUnit: showPrice ? p.priceUnit : "",
-    minOrder: p.minOrder,
+    id: p.id, slug: p.slug, sku: p.sku, name: p.name, category: p.category, collection: p.collection, pack: p.pack, variants: p.variants || [],
+    description: p.description, images: p.images || [], featured: p.featured, pricePaise: showPrice ? p.price : null, priceUnit: showPrice ? p.priceUnit : "",
+    minOrder: p.minOrder, brand: p.brand || "", manufacturer: p.manufacturer || "", shortDescription: p.shortDescription || "", variantLabel: p.variantLabel || "",
+    priceTiers: showPrice ? p.priceTiers || [] : [], packSize: p.packSize || 1, minQty: p.minQty || 0, gstRate: p.gstRate ?? 18, unit: p.unit || "pcs",
+    dispatchInfo: p.dispatchInfo || "", returnable: p.returnable !== false, specs: p.specs || [],
+    stock: p.stockTracked ? ((level || 0) > 0 ? "in" : "out") : null,
   };
 }

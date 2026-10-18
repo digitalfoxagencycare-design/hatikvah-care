@@ -15,6 +15,15 @@ export function channels(cfg) {
   };
 }
 
+/** What the website may offer right now: the owner's switches in settings, limited by which integrations have keys. */
+export function shopFlags(cfg, s) {
+  const on = channels(cfg);
+  const cart = s.shopEnabled !== false && !!s.showPrices;
+  const online = cart && s.onlinePayments !== false && on.payments !== "off";
+  const payLater = cart && s.payLater !== false;
+  return { cart: cart && (online || payLater), online, payLater, otp: s.otpLogin !== false && (on.whatsapp !== "off" || !cfg.prod) };
+}
+
 export function createNotifier({ cfg, store, fetchImpl = globalThis.fetch, log = console }) {
   const on = channels(cfg);
   const manualLink = (m) => (m.channel === "whatsapp" ? `https://wa.me/${m.to}?text=${encodeURIComponent(m.body)}` : `mailto:${m.to}?subject=${encodeURIComponent(m.subject || "")}&body=${encodeURIComponent(m.body)}`);
@@ -56,5 +65,19 @@ export function createNotifier({ cfg, store, fetchImpl = globalThis.fetch, log =
     }
     return sent;
   }
-  return { queue, flush, channels: on };
+  /**
+   * Login codes go straight to WhatsApp and are NOT written to the outbox: staff can read the outbox, and a stored code would let them sign in as the customer.
+   * WHATSAPP_OTP_TEMPLATE should be an approved "Authentication" template (Meta requires it for codes); its copy-code button takes the same code.
+   */
+  async function sendOtp(phone, code) {
+    if (on.whatsapp === "off") throw new Error("WhatsApp is not connected");
+    const to = waNumber(phone);
+    const payload = cfg.waOtpTemplate
+      ? { messaging_product: "whatsapp", to, type: "template", template: { name: cfg.waOtpTemplate, language: { code: cfg.waTemplateLang }, components: [
+        { type: "body", parameters: [{ type: "text", text: code }] }, { type: "button", sub_type: "url", index: "0", parameters: [{ type: "text", text: code }] }] } }
+      : { messaging_product: "whatsapp", to, type: "text", text: { body: `${code} is your HaTikvah Care login code. It expires in 10 minutes. Do not share it.` } };
+    const r = await fetchImpl(`https://graph.facebook.com/v21.0/${cfg.waPhoneId}/messages`, { method: "POST", headers: { Authorization: `Bearer ${cfg.waToken}`, "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    if (!r.ok) throw new Error(`WhatsApp said ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  }
+  return { queue, flush, sendOtp, channels: on };
 }

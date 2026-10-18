@@ -10,5 +10,6 @@
 * Business flow: enquiry → customer → quote (`/doc/quote/:token`, accepted online) → sales order → dispatch (challan) → GST invoice → payments. GST maths lives only in `src/lib/gst.js` (the web editor mirrors it for display; the server's totals are saved). Document numbers come from `store.nextSeq` per financial year.
 * Permissions: `src/lib/permissions.js` (roles → modules); guard new admin routes with `requirePerm`.
 * All outgoing messages go through `src/lib/notify.js` (outbox). Rules and scheduled jobs: `src/lib/automation.js`. Integrations are env-only and optional (docs/INTEGRATIONS.md).
+* Online shop: `src/routes/shop.js` (WhatsApp OTP sign-in, checkout, my orders). Switches live in settings and are limited by which keys exist (`shopFlags` in `src/lib/notify.js`). Bulk tier pricing is `tierPrice` in `src/lib/sales.js` (the web `ProductCard.jsx` mirrors it). Paid online orders get their GST invoice from the Razorpay webhook, never at checkout.
 * `npm run seed-demo` fills a dev database with sample data for previews (refuses production).
 * Known gaps: no credit notes, no e-invoice/e-way bill, no direct Tally/Zoho sync; product images are the supplier's catalogue photos.

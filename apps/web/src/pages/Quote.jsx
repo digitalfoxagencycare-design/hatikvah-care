@@ -8,11 +8,12 @@ export default function Quote() {
   const { catalog, settings, basket, setQty, remove, clear } = useSite();
   const [done, setDone] = useState(null);
   const lines = basket.map((i) => ({ ...i, p: catalog.products.find((p) => p.id === i.productId) })).filter((l) => l.p);
-  const wa = settings.whatsapp && lines.length ? `https://wa.me/${settings.whatsapp}?text=${encodeURIComponent("Hello HaTikvah Care, please quote for:\n" + lines.map((l) => `• ${l.qty} x ${l.p.name} (${l.p.sku})`).join("\n"))}` : null;
+  const label = (l) => `${l.p.name}${l.variant ? ` (${l.variant})` : ""}`;
+  const wa = settings.whatsapp && lines.length ? `https://wa.me/${settings.whatsapp}?text=${encodeURIComponent("Hello HaTikvah Care, please quote for:\n" + lines.map((l) => `• ${l.qty} x ${label(l)} (${l.p.sku})`).join("\n"))}` : null;
 
   if (done) return (
     <div className="wrap narrow"><Seo title="Quote sent" />
-      <div className="success" role="status"><h1>Thank you!</h1><p>Your quote request <strong>{done}</strong> has been received. Our team will contact you shortly with availability and pricing.</p><Link className="btn" to="/catalog">Continue browsing</Link></div>
+      <div className="success" role="status"><h1>Thank you!</h1><p>Your quote request <strong>{done}</strong> has been received. Our team will contact you shortly with availability and pricing.</p><Link className="btn" to="/shop">Continue browsing</Link></div>
     </div>
   );
   return (
@@ -20,7 +21,7 @@ export default function Quote() {
       <Seo title="Request a quote" description="Send your product list to HaTikvah Care and receive a quote." />
       <h1>Request a quote</h1>
       {lines.length === 0 ? (
-        <div className="empty"><p>Your quote list is empty. Add products from the catalogue, or send us a message below.</p><Link className="btn" to="/catalog">Browse catalogue</Link></div>
+        <div className="empty"><p>Your quote list is empty. Add products from the catalogue, or send us a message below.</p><Link className="btn" to="/shop">Browse catalogue</Link></div>
       ) : (
         <div className="panel">
           <ul className="lines">

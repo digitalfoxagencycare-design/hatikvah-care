@@ -27,6 +27,13 @@ export async function rateFor(store, customer, product) {
   return Math.round(product.price * (1 - (pl?.discountPct || 0) / 100));
 }
 
+/** Website price for a quantity: the highest bulk tier the quantity reaches, else the list price. The web product page mirrors this for display. */
+export function tierPrice(product, qty) {
+  let rate = product.price;
+  for (const t of product.priceTiers || []) if (qty >= t.minQty) rate = t.price;
+  return rate;
+}
+
 export async function stockLevels(store) {
   const moves = await store.stockMoves.all();
   const lv = {};
@@ -64,6 +71,19 @@ export async function createInvoice(store, { customer, items, placeOfSupply, dat
     orderId, orderNumber, poNumber, ...doc, notes, status: "unpaid", amountPaid: 0, payLink: null, remindersSent: [], createdBy: by, createdAt: now(), updatedAt: now(),
   });
   if (orderId) await store.orders.update(orderId, { invoiceId: inv.id, invoiceNumber: number, updatedAt: now() });
+  return inv;
+}
+
+/** GST invoice for a paid website order (raised only once the money arrives, so abandoned checkouts never become invoices). Takes stock out, as dispatch then skips it. */
+export async function invoiceWebsiteOrder(store, order) {
+  if (order.invoiceId) return store.invoices.get(order.invoiceId);
+  const customer = { ...(await store.customers.get(order.customerId)), ...order.customer, id: order.customerId, paymentTermsDays: 0 };
+  const inv = await createInvoice(store, { customer, items: order.items.map(({ amount, tax, total, ...l }) => l), placeOfSupply: order.placeOfSupply, notes: order.notes,
+    orderId: order.id, orderNumber: order.number, by: "website" });
+  for (const it of order.items) {
+    const p = it.productId ? await store.products.get(it.productId) : null;
+    if (p?.stockTracked) await moveStock(store, { productId: p.id, sku: p.sku, qty: -it.qty, kind: "out", ref: inv.number, note: `Website order ${order.number}`, by: "website" });
+  }
   return inv;
 }
 

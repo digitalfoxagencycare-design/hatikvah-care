@@ -41,6 +41,7 @@ export default function OrderDetail() {
       <p><Link to="/admin/orders">← Sales orders</Link></p>
       <Loader s={s}>{o && (
         <>
+          {o.source === "website" && <p className="notice">Website order · {o.paymentStatus === "paid" ? "paid online (invoice raised automatically)" : o.paymentStatus === "pending" ? "customer chose online payment, not paid yet: wait before dispatching" : "pay later: raise the GST invoice to send bank / UPI details"}</p>}
           <div className="row-between"><h1>Order {o.number}</h1>
             <div className="btn-row">
               {o.challanNumber && <a className="btn ghost" href={`/doc/challan/${o.token}`} target="_blank" rel="noopener noreferrer">Delivery challan</a>}
