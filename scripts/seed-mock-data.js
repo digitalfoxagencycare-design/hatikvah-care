@@ -9,7 +9,7 @@ const token = () => crypto.randomBytes(18).toString("base64url");
 const now = () => new Date().toISOString();
 
 async function run() {
-  const cfg = loadConfig({ NODE_ENV: "development" });
+  const cfg = loadConfig({ ...process.env, NODE_ENV: process.env.NODE_ENV || "development" });
   const store = await createStore(cfg);
 
   console.log("Seeding rich mock data into store...");
