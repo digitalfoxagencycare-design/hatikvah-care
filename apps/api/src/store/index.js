@@ -7,9 +7,15 @@ export async function createStore(cfg) {
     try {
       return await createMongoStore(cfg.mongoUri, cfg.dbName);
     } catch (err) {
+      if (cfg.prod) {
+        throw new Error(`[store] FATAL: Production MongoDB connection failed (${err.message}). Refusing fallback to ephemeral file store.`);
+      }
       console.warn(`[store] MongoDB connection failed (${err.message}). Falling back to file store at ${cfg.dataDir}...`);
       return createFileStore(cfg.dataDir);
     }
+  }
+  if (cfg.prod) {
+    throw new Error("[store] FATAL: MONGODB_URI is required in production. Refusing fallback to ephemeral file store.");
   }
   return createFileStore(cfg.dataDir);
 }

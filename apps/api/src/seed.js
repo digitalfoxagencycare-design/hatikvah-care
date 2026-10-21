@@ -18,16 +18,19 @@ export async function seedIfEmpty(store, seedFile, log = console) {
   }
 
   let seeded = false;
-  if ((await store.products.count()) === 0) {
-    let data;
-    try { data = JSON.parse(await fs.readFile(seedFile, "utf8")); } catch { log.warn?.("No seed catalogue found, starting empty"); }
-    if (data) {
-      const now = new Date().toISOString();
-      await store.categories.replaceAll(data.categories.map((c) => ({ ...c })));
-      await store.products.replaceAll(data.products.map((p) => ({ ...p, createdAt: now, updatedAt: now })));
-      log.info?.(`Seeded ${data.products.length} products in ${data.categories.length} categories`);
-      seeded = true;
-    }
+  let data;
+  try { data = JSON.parse(await fs.readFile(seedFile, "utf8")); } catch { log.warn?.("No seed catalogue found, starting empty"); }
+
+  if (data?.categories?.length && (await store.categories.count()) === 0) {
+    await store.categories.replaceAll(data.categories.map((c) => ({ ...c })));
+    log.info?.(`Seeded ${data.categories.length} categories`);
+  }
+
+  if (data?.products?.length && (await store.products.count()) === 0) {
+    const now = new Date().toISOString();
+    await store.products.replaceAll(data.products.map((p) => ({ ...p, createdAt: now, updatedAt: now })));
+    log.info?.(`Seeded ${data.products.length} products`);
+    seeded = true;
   }
 
   return seeded;
