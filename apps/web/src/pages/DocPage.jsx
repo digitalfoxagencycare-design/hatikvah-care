@@ -4,7 +4,7 @@ import { api, money } from "../api.js";
 const DispatchSlip = lazy(() => import("./DispatchSlip.jsx")); // the QR library loads only for slips
 import "./doc.css";
 
-const TITLES = { quote: "QUOTATION", invoice: "TAX INVOICE", challan: "DELIVERY CHALLAN", packing: "PACKING SLIP", gatepass: "GATE PASS" };
+const TITLES = { quote: "QUOTATION", invoice: "TAX INVOICE", challan: "DELIVERY CHALLAN", packing: "PACKING SLIP", gatepass: "GATE PASS", creditnote: "CREDIT NOTE" };
 
 function fmtDate(s) {
   if (!s) return "—";
@@ -39,6 +39,7 @@ export default function DocPage() {
   const challan = kind === "challan";
   const quote = kind === "quote";
   const invoice = kind === "invoice";
+  const credit = kind === "creditnote"; // GST credit note: same layout as the invoice, linked to the invoice it reduces
 
   const respond = async (action) => {
     setResp({ ...resp, busy: true, error: null });
@@ -128,20 +129,20 @@ export default function DocPage() {
         <div className="bill-meta-bar">
           <div className="bill-meta-cell">
             <span className="meta-label">
-              {challan ? "Challan #:" : quote ? "Quotation #:" : "Invoice #:"}
+              {challan ? "Challan #:" : quote ? "Quotation #:" : credit ? "Credit Note #:" : "Invoice #:"}
             </span>
             <strong>{challan ? d.challanNumber : d.number}</strong>
             {quote && d.version > 1 && <span className="text-muted"> (v{d.version})</span>}
           </div>
           <div className="bill-meta-cell">
             <span className="meta-label">
-              {challan ? "Dispatch Date:" : quote ? "Quotation Date:" : "Invoice Date:"}
+              {challan ? "Dispatch Date:" : quote ? "Quotation Date:" : credit ? "Credit Note Date:" : "Invoice Date:"}
             </span>
             <strong>{fmtDate(challan ? d.dispatch?.date : d.date || d.createdAt)}</strong>
           </div>
           <div className="bill-meta-cell">
-            <span className="meta-label">{quote ? "Validity:" : "Due Date:"}</span>
-            <strong>{fmtDate(quote ? d.validUntil : d.dueDate)}</strong>
+            <span className="meta-label">{quote ? "Validity:" : credit ? "Against Invoice:" : "Due Date:"}</span>
+            <strong>{credit ? `${d.invoiceNumber} dt. ${fmtDate(d.invoiceDate)}` : fmtDate(quote ? d.validUntil : d.dueDate)}</strong>
           </div>
         </div>
 
@@ -166,6 +167,7 @@ export default function DocPage() {
           <span>Place of Supply: <strong>{d.placeOfSupply || "36"}-{d.placeOfSupplyName || "TELANGANA"}</strong></span>
           {d.poNumber && <span>Customer PO #: <strong>{d.poNumber}</strong></span>}
           {d.orderNumber && <span>Order #: <strong>{d.orderNumber}</strong></span>}
+          {credit && <span>Reason: <strong>{String(d.reason || "").replace(/_/g, " ")}</strong>{d.restock ? " (goods returned)" : ""}</span>}
         </div>
 
         {/* Line Items Table */}
@@ -258,7 +260,7 @@ export default function DocPage() {
           </div>
           <div className="payable-right">
             <div className="payable-box">
-              <span>Amount Payable:</span> <strong>₹{fmtMoney(totalPaise)}</strong>
+              <span>{credit ? "Credit Amount:" : "Amount Payable:"}</span> <strong>₹{fmtMoney(totalPaise)}</strong>
             </div>
           </div>
         </div>
@@ -338,7 +340,7 @@ export default function DocPage() {
 
         {/* Bottom Section: UPI QR + Bank Details + Authorized Signatory Stamp */}
         <div className="bill-bottom-grid">
-          <div className="bill-upi-col">
+          {!credit && <div className="bill-upi-col">
             <p className="bottom-label"><strong>Pay using UPI:</strong></p>
             <div className="qr-container">
               <img
@@ -349,15 +351,15 @@ export default function DocPage() {
                 className="upi-qr-img"
               />
             </div>
-          </div>
+          </div>}
 
-          <div className="bill-bank-col">
+          {!credit && <div className="bill-bank-col">
             <p className="bottom-label"><strong>Bank Details:</strong></p>
             <p>Bank: <strong>State Bank of India</strong></p>
             <p>Account #: <strong>42157988420</strong></p>
             <p>IFSC Code: <strong>SBIN0020308</strong></p>
             <p>Branch: <strong>SANJEEVA REDDY NGR</strong></p>
-          </div>
+          </div>}
 
           <div className="bill-sign-col">
             <p className="sign-company">For <strong>{c.legalName || "M/s. EXL MARKETING"}</strong></p>
@@ -385,7 +387,7 @@ export default function DocPage() {
         <div className="bill-terms-section">
           <p className="terms-heading"><strong>Terms and Conditions:</strong></p>
           <p className="terms-body pre-line">
-            {d.terms || d.notes || c.invoiceTerms || "We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct. Subject to Hyderabad jurisdiction."}
+            {credit ? `${d.notes ? d.notes + "\n" : ""}This credit note reduces the value of invoice ${d.invoiceNumber} and the GST charged on it.` : d.terms || d.notes || c.invoiceTerms || "We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct. Subject to Hyderabad jurisdiction."}
           </p>
         </div>
 

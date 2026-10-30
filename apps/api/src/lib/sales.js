@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { addDays, calcTotals, nextNumber, stateName, todayIST } from "./gst.js";
+import { addDays, calcTotals, finYear, nextNumber, stateName, todayIST } from "./gst.js";
 import { getSettings } from "../model.js";
 import { expandLines, pieces } from "./units.js";
 
@@ -171,12 +171,13 @@ export async function invoiceWebsiteOrder(store, order) {
   return inv;
 }
 
-/** Re-adds the payments of an invoice and sets paid / partial / unpaid. */
+/** Re-adds the payments and credit notes of an invoice and sets paid / credited / partial / unpaid. */
 export async function refreshInvoice(store, invoiceId) {
   const inv = await store.invoices.get(invoiceId);
   if (!inv || inv.status === "void") return inv;
   const paid = (await store.payments.all()).filter((p) => p.invoiceId === invoiceId).reduce((n, p) => n + p.amount, 0);
-  const status = paid >= inv.totals.total ? "paid" : paid > 0 ? "partial" : "unpaid";
+  const credited = inv.creditedAmount || 0, total = inv.totals.total;
+  const status = paid + credited >= total ? (paid === 0 ? "credited" : "paid") : paid + credited > 0 ? "partial" : "unpaid";
   return store.invoices.update(invoiceId, { amountPaid: paid, status, paidAt: status === "paid" ? inv.paidAt || now() : null, updatedAt: now() });
 }
 
@@ -198,4 +199,82 @@ export async function removePaymentLedger(store, paymentId) {
   if (e) await store.ledger.remove(e.id);
 }
 
-export const balance = (inv) => (inv.status === "void" ? 0 : inv.totals.total - (inv.amountPaid || 0));
+/** What the customer still owes: total less payments and credit notes (never below zero; see refundDue). */
+export const balance = (inv) => (inv.status === "void" ? 0 : Math.max(0, inv.totals.total - (inv.amountPaid || 0) - (inv.creditedAmount || 0)));
+/** Money to give back when credit notes land on an invoice that was already paid. */
+export const refundDue = (inv) => (inv.status === "void" ? 0 : Math.max(0, (inv.amountPaid || 0) + (inv.creditedAmount || 0) - inv.totals.total));
+
+// ---------- credit notes (sales returns and price adjustments)
+export const CREDIT_REASONS = ["damaged", "incorrect_item", "return", "pricing_adjustment", "other"];
+/** Goods that come back sellable go back into stock unless staff say otherwise; damaged goods and price adjustments do not. */
+export const restocksByDefault = (reason) => reason === "return" || reason === "incorrect_item";
+
+/** CN-26-0001: one sequence per financial year (26 = FY 2026-27), 10 characters (GST allows 16). */
+export async function creditNoteNumber(store, d = new Date()) {
+  const fy = finYear(d);
+  return `CN-${fy.slice(2, 4)}-${String(await store.nextSeq(`CN:${fy}`)).padStart(4, "0")}`;
+}
+
+/**
+ * Issues a GST credit note against an invoice. Lines point at invoice lines (`line` = index), so the HSN, GST rate, unit,
+ * pieces per unit and discount come from the invoice; the rate may be lowered (price adjustment) but never raised.
+ * Caps: a line cannot be credited for more value than it was invoiced, and goods cannot be returned twice.
+ * Restocked goods move back into physical stock in pieces (batch-tracked products need the batch they came from).
+ * Posts a `credit_notes` ledger row and reduces the invoice balance. Returns { creditNote } or throws a userError.
+ */
+export async function createCreditNote(store, inv, d, by) {
+  if (!inv || inv.status === "void") throw userError("A void invoice cannot get a credit note", 409);
+  const prior = (await store.creditNotes.all()).filter((c) => c.invoiceId === inv.id);
+  const done = {}; // per invoice line: value already credited, quantity already returned
+  for (const c of prior) for (const l of c.items) {
+    const x = (done[l.line] ||= { amount: 0, qty: 0 });
+    x.amount += l.amount; if (c.reason !== "pricing_adjustment") x.qty += l.qty;
+  }
+  const restock = d.restock ?? restocksByDefault(d.reason);
+  const lines = [], seen = new Set();
+  for (const it of d.items) {
+    const L = inv.items[it.line];
+    if (!L) throw userError("That line is not on the invoice");
+    if (seen.has(it.line)) throw userError(`${L.name} is listed twice`);
+    seen.add(it.line);
+    const x = done[it.line] || { amount: 0, qty: 0 };
+    if (d.reason !== "pricing_adjustment" && it.qty > L.qty - x.qty) throw userError(`Only ${L.qty - x.qty} ${L.unit || "pcs"} of ${L.name} can still be credited`);
+    if (it.qty > L.qty) throw userError(`${L.name} was invoiced for ${L.qty} ${L.unit || "pcs"}`);
+    const rate = it.rate ?? L.rate;
+    if (rate > L.rate) throw userError(`The credit rate for ${L.name} cannot be more than the invoiced rate`);
+    const p = restock && L.productId ? await store.products.get(L.productId) : null;
+    if (p?.batchTracked && !it.batch) throw userError(`${L.name} is batch tracked: enter the batch number being returned`);
+    lines.push({ line: it.line, productId: L.productId || "", sku: L.sku || "", name: L.name, hsn: L.hsn || "", unit: L.unit || "pcs", uom: L.uom || "piece", perUnit: L.perUnit || 1,
+      qty: it.qty, rate, discountPct: L.discountPct || 0, gstRate: L.gstRate ?? 0, ...(it.batch ? { batch: it.batch } : {}) });
+  }
+  const { lines: priced_, totals } = calcTotals(lines, !!inv.interState); // GST maths only in gst.js
+  for (const l of priced_) {
+    const x = done[l.line] || { amount: 0 }, L = inv.items[l.line];
+    if (x.amount + l.amount > (L.amount ?? Math.round(L.qty * L.rate))) throw userError(`${L.name}: this would credit more than was invoiced`);
+  }
+  const left = inv.totals.total - (inv.creditedAmount || 0);
+  if (totals.total > left) { // rupee rounding over several notes: the last one takes only what is left
+    if (totals.total - left >= 100) throw userError("This would credit more than the invoice total");
+    totals.roundOff -= totals.total - left; totals.total = left;
+  }
+  if (totals.total <= 0) throw userError("The credit note total must be more than zero");
+  const date = d.date || todayIST();
+  const cn = await store.creditNotes.insert({
+    number: await creditNoteNumber(store, new Date(date + "T12:00:00Z")), token: token(), date, invoiceId: inv.id, invoiceNumber: inv.number, invoiceDate: inv.date,
+    customerId: inv.customerId, customer: inv.customer, placeOfSupply: inv.placeOfSupply, placeOfSupplyName: inv.placeOfSupplyName, interState: !!inv.interState,
+    reason: d.reason, restock, items: priced_, totals, notes: d.notes || "", createdBy: by, createdAt: now(),
+  });
+  if (restock) for (const l of priced_) {
+    const p = l.productId ? await store.products.get(l.productId) : null;
+    if (!p) continue;
+    if (!p.stockTracked) await store.products.update(p.id, { stockTracked: true });
+    await moveStock(store, { productId: p.id, sku: p.sku, qty: pieces(l), kind: "in", ref: cn.number, note: `Sales return (credit note ${cn.number} on ${inv.number})`, by, batch: l.batch || null });
+  }
+  await store.invoices.update(inv.id, { creditedAmount: (inv.creditedAmount || 0) + totals.total, creditNotes: [...(inv.creditNotes || []), { id: cn.id, number: cn.number }], updatedAt: now() });
+  const fresh = await refreshInvoice(store, inv.id);
+  await postLedger(store, { date, account: "credit_notes", kind: "credit_note", amount: totals.total, ref: cn.number, invoiceId: inv.id, party: inv.customer.name,
+    narration: `Credit note on ${inv.number} (${d.reason.replace(/_/g, " ")}): sales reversed${refundDue(fresh) ? `, refund due ₹${(refundDue(fresh) / 100).toFixed(2)}` : ""}`, by });
+  await logActivity(store, { entity: "invoice", entityId: inv.id, text: `Credit note ${cn.number} issued for ₹${(totals.total / 100).toFixed(2)} (${d.reason.replace(/_/g, " ")}${restock ? ", goods back in stock" : ""})`, by });
+  await logActivity(store, { entity: "customer", entityId: inv.customerId, text: `Credit note ${cn.number} on invoice ${inv.number}`, by });
+  return { creditNote: cn, invoice: fresh };
+}

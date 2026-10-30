@@ -69,6 +69,15 @@ export function reportRoutes({ store }) {
     }));
     csvHeaders(res, `sales-register-${rg.from}-to-${rg.to}.csv`).send(toCsv(["invoice_no", "date", "status", "customer", "gstin", "place_of_supply", "taxable", "cgst", "sgst", "igst", "round_off", "total", "paid", "order_no"], rows));
   }));
+  // Credit notes register (GSTR-1 credit/debit notes table): one row per note, with the original invoice it amends.
+  r.get("/reports/credit-notes.csv", requirePerm("reports", "invoices"), wrap(async (req, res) => {
+    const rg = range(req);
+    const rows = (await store.creditNotes.all({ sort: { date: 1 } })).filter((c) => inRange(c.date, rg)).map((c) => ({
+      note_no: c.number, date: c.date, invoice_no: c.invoiceNumber, invoice_date: c.invoiceDate, customer: c.customer.name, gstin: c.customer.gstin, place_of_supply: `${c.placeOfSupply}-${stateName(c.placeOfSupply)}`,
+      reason: c.reason, taxable: rupees(c.totals.taxable), cgst: rupees(c.totals.cgst), sgst: rupees(c.totals.sgst), igst: rupees(c.totals.igst), round_off: rupees(c.totals.roundOff), total: rupees(c.totals.total),
+    }));
+    csvHeaders(res, `credit-notes-${rg.from}-to-${rg.to}.csv`).send(toCsv(["note_no", "date", "invoice_no", "invoice_date", "customer", "gstin", "place_of_supply", "reason", "taxable", "cgst", "sgst", "igst", "round_off", "total"], rows));
+  }));
   r.get("/reports/hsn-summary.csv", requirePerm("reports", "invoices"), wrap(async (req, res) => {
     const rg = range(req), hsn = {};
     for (const i of (await store.invoices.all()).filter((x) => x.status !== "void" && inRange(x.date, rg))) for (const l of i.items) {

@@ -27,7 +27,7 @@ async function contract(store) {
   const seqs = await Promise.all([1, 2, 3, 4, 5].map(() => store.nextSeq("t")));
   assert.deepEqual(seqs.sort(), [1, 2, 3, 4, 5], "sequence numbers are unique under concurrency");
   assert.equal(await store.nextSeq("other"), 1);
-  for (const n of ["customers", "quotes", "orders", "invoices", "payments", "stockMoves", "suppliers", "purchases", "outbox", "activities", "priceLists", "ledger", "inbox"]) assert.equal(typeof store[n].insert, "function", n);
+  for (const n of ["customers", "quotes", "orders", "invoices", "payments", "stockMoves", "suppliers", "purchases", "outbox", "activities", "priceLists", "ledger", "inbox", "creditNotes"]) assert.equal(typeof store[n].insert, "function", n);
   const msg = await store.outbox.insert({ channel: "whatsapp", waMessageId: "wamid.X1", status: "sent" });
   assert.equal((await store.outbox.findBy("waMessageId", "wamid.X1")).id, msg.id, "outbox found by WhatsApp message id (status callbacks)");
   const le = await store.ledger.insert({ account: "bank", amount: 500, paymentId: "p1", date: "2026-10-01" });

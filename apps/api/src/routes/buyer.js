@@ -4,7 +4,7 @@ import { z } from "zod";
 import { todayIST } from "../lib/gst.js";
 import { shopFlags } from "../lib/notify.js";
 import { createPaymentLink } from "../lib/razorpay.js";
-import { balance, bucketOf, now, respondToQuote, stockBuckets, tierPrice } from "../lib/sales.js";
+import { balance, bucketOf, now, refundDue, respondToQuote, stockBuckets, tierPrice } from "../lib/sales.js";
 import { pieces } from "../lib/units.js";
 import { normaliseStatus } from "../services/delivery_shadowfax.js";
 import { getSettings } from "../model.js";
@@ -80,11 +80,14 @@ export function buyerRoutes({ cfg, store, automation, fetchImpl = globalThis.fet
 
   r.get("/invoices", wrap(async (req, res) => {
     const today = todayIST();
-    const rows = (await store.invoices.all({ sort: { createdAt: -1 } })).filter((i) => mine(req, i) && i.status !== "void");
+    const [all, notes] = await Promise.all([store.invoices.all({ sort: { createdAt: -1 } }), store.creditNotes.all({ sort: { createdAt: 1 } })]);
+    const rows = all.filter((i) => mine(req, i) && i.status !== "void");
     res.json(rows.map((i) => ({
       id: i.id, number: i.number, date: i.date, dueDate: i.dueDate, status: i.status, orderNumber: i.orderNumber || "", poNumber: i.poNumber || "",
       totals: totals(i.totals), interState: !!i.interState, amountPaid: i.amountPaid || 0, balance: balance(i), overdue: balance(i) > 0 && i.dueDate < today,
       link: doc("invoice", i.token), payUrl: balance(i) > 0 ? i.payLink?.url || "" : "",
+      creditedAmount: i.creditedAmount || 0, refundDue: refundDue(i),
+      creditNotes: notes.filter((c) => c.invoiceId === i.id && mine(req, c)).map((c) => ({ id: c.id, number: c.number, date: c.date, reason: c.reason, totals: totals(c.totals), link: doc("creditnote", c.token) })),
     })));
   }));
 

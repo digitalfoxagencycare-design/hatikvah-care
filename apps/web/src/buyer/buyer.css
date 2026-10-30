@@ -21,3 +21,4 @@
 .modal-back { position: fixed; inset: 0; background: rgba(15, 23, 42, .45); display: grid; place-items: center; padding: 16px; z-index: 50; }
 .buyer-modal { width: min(460px, 100%); }
 @media (max-width: 640px) { .buyer-lines th:nth-child(4), .buyer-lines td:nth-child(4) { display: none; } }
+.buyer-lines tr.credit-row td { background: var(--gold-soft); font-size: .88rem; }

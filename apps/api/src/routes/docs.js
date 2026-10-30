@@ -17,7 +17,7 @@ export function docRoutes({ cfg, store, automation }) {
   const find = async (kind, t) => {
     if (!/^[\w-]{20,40}$/.test(t)) return null;
     // packing slip and gate pass are print views of the delivery challan
-    const col = { quote: store.quotes, invoice: store.invoices, challan: store.orders, packing: store.orders, gatepass: store.orders }[kind];
+    const col = { quote: store.quotes, invoice: store.invoices, challan: store.orders, packing: store.orders, gatepass: store.orders, creditnote: store.creditNotes }[kind];
     return col ? col.findBy("token", t) : null;
   };
 
@@ -25,7 +25,7 @@ export function docRoutes({ cfg, store, automation }) {
     const d = await find(req.params.kind, req.params.token);
     if (!d || (["challan", "packing", "gatepass"].includes(req.params.kind) && !d.challanNumber)) return res.status(404).json({ error: "NOT_FOUND", message: "This document link is not valid" });
     res.set({ "Cache-Control": "no-store", "X-Robots-Tag": "noindex" });
-    const extra = req.params.kind === "invoice" ? { balance: balance(d), amountInWords: amountInWords(d.totals.total) } : req.params.kind === "quote" ? { amountInWords: amountInWords(d.totals.total) } : {};
+    const extra = req.params.kind === "invoice" ? { balance: balance(d), amountInWords: amountInWords(d.totals.total) } : ["quote", "creditnote"].includes(req.params.kind) ? { amountInWords: amountInWords(d.totals.total) } : {};
     res.json({ kind: req.params.kind, doc: { ...strip(d), ...extra }, company: company(await getSettings(store)) });
   }));
   r.post("/api/public/doc/quote/:token/:action", limiter, express.json({ limit: "10kb" }), wrap(async (req, res) => {

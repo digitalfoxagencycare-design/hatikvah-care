@@ -79,6 +79,14 @@ export const purchaseInput = z.object({
 }).strict();
 export const receiveInput = z.object({ lines: z.array(z.object({ productId: id.min(1), qty: z.number().positive().max(10_000_000), batch: batchInput.optional() }).strict()).min(1) }).strict();
 
+/** Credit note against an invoice: each line names the invoice line (index) and how much of it to credit. */
+export const creditNoteInput = z.object({
+  invoiceId: id.min(1, "Choose the invoice"), reason: z.enum(["damaged", "incorrect_item", "return", "pricing_adjustment", "other"]),
+  restock: z.boolean().optional(), date: optDate, notes: text(1000).default(""),
+  items: z.array(z.object({ line: z.number().int().min(0).max(149), qty: z.number().positive().max(10_000_000), rate: paise.optional(), batch: batchInput.optional() }).strict())
+    .min(1, "Choose at least one item to credit").max(150),
+}).strict();
+
 /** Counter sale: invoice and (optionally) payment in one step. No customer = walk-in, found or created by phone. */
 export const posInput = z.object({
   customerId: id.default(""), walkIn: z.object({ name: text(160).min(2), phone, gstin, stateCode }).strict().optional(),

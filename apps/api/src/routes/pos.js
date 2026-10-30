@@ -55,7 +55,7 @@ export function posRoutes({ store, audit, automation }) {
     const { account = "", from = "", to = "" } = req.query;
     const rows = (await store.ledger.all({ sort: { date: -1 } })).filter((e) => (!account || e.account === account) && (!from || e.date >= from) && (!to || e.date <= to));
     const totals = {};
-    for (const e of rows) totals[e.account] = (totals[e.account] || 0) + (e.kind === "payment" ? -e.amount : e.amount);
+    for (const e of rows) totals[e.account] = (totals[e.account] || 0) + (e.kind === "payment" || e.kind === "credit_note" ? -e.amount : e.amount); // credit notes reverse sales
     if (req.query.format === "csv") {
       csvHeaders(res, "cash-bank-book.csv");
       return res.send(toCsv(["date", "account", "kind", "amount", "ref", "party", "narration"], rows.map((e) => ({ date: e.date, account: e.account, kind: e.kind, amount: rupees(e.amount), ref: e.ref, party: e.party, narration: e.narration }))));

@@ -3,13 +3,13 @@ import { addDays, todayIST } from "../lib/gst.js";
 import { channels } from "../lib/notify.js";
 import { requirePerm } from "../lib/permissions.js";
 import { createPaymentLink } from "../lib/razorpay.js";
-import { balance, createInvoice, createOrderFromQuote, customerSnapshot, deductForInvoice, logActivity, moveStock, now, priced, rateFor, recordPayment, refreshInvoice, removePaymentLedger, token } from "../lib/sales.js";
+import { balance, createCreditNote, createInvoice, createOrderFromQuote, customerSnapshot, deductForInvoice, logActivity, moveStock, now, priced, rateFor, recordPayment, refreshInvoice, refundDue, removePaymentLedger, token } from "../lib/sales.js";
 import { measureLabel, pieces, uomOptions } from "../lib/units.js";
 import { nextNumber } from "../lib/gst.js";
 import { getSettings } from "../model.js";
 import { shadowfaxOn } from "../services/delivery_shadowfax.js";
 import { bookShipment } from "./logistics.js";
-import { dispatchInput, invoiceInput, orderInput, paymentInput, quoteInput } from "../schemas.js";
+import { creditNoteInput, dispatchInput, invoiceInput, orderInput, paymentInput, quoteInput } from "../schemas.js";
 import { wrap } from "./public.js";
 import { bad, notFound, parse } from "./shared.js";
 
@@ -226,7 +226,8 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
   }));
   r.get("/invoices/:id", requirePerm("invoices"), wrap(async (req, res) => {
     const i = await store.invoices.get(req.params.id); if (!i) return notFound(res, "Invoice");
-    res.json({ ...(await withActivity(i)), overdue: overdue(i), balance: balance(i), payments: (await store.payments.all({ sort: { date: 1 } })).filter((p) => p.invoiceId === i.id) });
+    res.json({ ...(await withActivity(i)), overdue: overdue(i), balance: balance(i), refundDue: refundDue(i), payments: (await store.payments.all({ sort: { date: 1 } })).filter((p) => p.invoiceId === i.id),
+      creditNotesList: (await store.creditNotes.all({ sort: { createdAt: 1 } })).filter((c) => c.invoiceId === i.id).map(({ id, number, date, reason, restock, totals, token, items }) => ({ id, number, date, reason, restock, total: totals.total, token, items: items.map(({ line, qty, amount }) => ({ line, qty, amount })) })) });
   }));
   r.post("/invoices", requirePerm("invoices"), wrap(async (req, res) => {
     const d = parse(invoiceInput, req.body, res); if (!d) return;
@@ -237,7 +238,8 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
   r.post("/invoices/:id/void", requirePerm("invoices"), wrap(async (req, res) => {
     const i = await store.invoices.get(req.params.id); if (!i) return notFound(res, "Invoice");
     if (i.status === "void") return bad(res, "Already void", 409);
-    if (i.amountPaid > 0) return bad(res, "Remove the payments on this invoice first (or issue a credit note in your accounts)", 409);
+    if (i.amountPaid > 0) return bad(res, "Remove the payments on this invoice first, or issue a credit note instead", 409);
+    if (i.creditedAmount > 0) return bad(res, "This invoice has credit notes, so it cannot be voided", 409);
     const reason = String(req.body?.reason || "").slice(0, 300);
     const upd = await store.invoices.update(i.id, { status: "void", voidReason: reason, voidedAt: now(), updatedAt: now() });
     if (i.orderId) await store.orders.update(i.orderId, { invoiceId: "", invoiceNumber: "" });
@@ -277,6 +279,25 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
     await automation.on.paymentReceived(out.invoice, out.payment); await audit(req, "payment.create", i.number, { amount: d.amount, mode: d.mode });
     res.status(201).json(out);
   }));
+  // ---------- credit notes (GST sales returns / price adjustments against an invoice)
+  r.get("/credit-notes", requirePerm("invoices"), wrap(async (req, res) => {
+    let rows = await store.creditNotes.all({ sort: { createdAt: -1 } });
+    if (req.query.invoiceId) rows = rows.filter((c) => c.invoiceId === req.query.invoiceId);
+    if (req.query.customerId) rows = rows.filter((c) => c.customerId === req.query.customerId);
+    res.json(rows.map(({ id, number, date, invoiceId, invoiceNumber, customerId, customer, reason, restock, totals, token }) => ({ id, number, date, invoiceId, invoiceNumber, customerId, customerName: customer.name, reason, restock, totals, token })));
+  }));
+  r.get("/credit-notes/:id", requirePerm("invoices"), wrap(async (req, res) => {
+    const c = await store.creditNotes.get(req.params.id); if (!c) return notFound(res, "Credit note");
+    res.json(c);
+  }));
+  r.post("/credit-notes", requirePerm("invoices"), wrap(async (req, res) => {
+    const d = parse(creditNoteInput, req.body, res); if (!d) return;
+    const inv = await store.invoices.get(d.invoiceId); if (!inv) return notFound(res, "Invoice");
+    const out = await createCreditNote(store, inv, d, by(req)); // throws a 400/409 for anything the invoice does not allow
+    await audit(req, "creditnote.create", out.creditNote.number, { invoice: inv.number, total: out.creditNote.totals.total, reason: d.reason });
+    res.status(201).json({ ...out.creditNote, invoice: { id: inv.id, number: inv.number, balance: balance(out.invoice), refundDue: refundDue(out.invoice), status: out.invoice.status } });
+  }));
+
   r.get("/payments", requirePerm("invoices"), wrap(async (_req, res) => res.json(await store.payments.all({ sort: { createdAt: -1 } }))));
   r.delete("/payments/:id", requirePerm("invoices"), wrap(async (req, res) => {
     const p = await store.payments.get(req.params.id); if (!p) return notFound(res, "Payment");

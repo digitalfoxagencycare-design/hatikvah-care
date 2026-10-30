@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, money } from "../api.js";
 import OtpLogin from "../components/OtpLogin.jsx";
@@ -155,17 +155,24 @@ function Invoices() {
       {s.data?.length > 0 && (
         <div className="tbl-scroll"><table className="buyer-lines inv">
           <thead><tr><th>Invoice</th><th>Date</th><th>Due</th><th className="num">Taxable</th><th className="num">GST</th><th className="num">Total</th><th className="num">Balance</th><th></th></tr></thead>
-          <tbody>{s.data.map((i) => (
-            <tr key={i.id}>
+          <tbody>{s.data.map((i) => (<Fragment key={i.id}>
+            <tr>
               <td><strong>{i.number}</strong>{i.orderNumber && <small>{i.orderNumber}</small>}</td><td>{fmt(i.date)}</td>
               <td>{fmt(i.dueDate)}{i.overdue && <small className="due">overdue</small>}</td>
               <td className="num">{money(i.totals.taxable)}</td>
               <td className="num">{money(i.totals.tax)}<small>{i.interState ? "IGST" : `CGST ${money(i.totals.cgst)} + SGST ${money(i.totals.sgst)}`}</small></td>
               <td className="num">{money(i.totals.total)}</td>
-              <td className="num">{i.balance > 0 ? money(i.balance) : <span className="pill-s paid">paid</span>}</td>
+              <td className="num">{i.balance > 0 ? money(i.balance) : <span className="pill-s paid">{i.status === "credited" ? "credited" : "paid"}</span>}{i.refundDue > 0 && <small>refund due {money(i.refundDue)}</small>}</td>
               <td className="btn-row"><a className="btn ghost small" href={i.link} target="_blank" rel="noopener noreferrer">View / download</a>{i.payUrl && <a className="btn small" href={i.payUrl}>Pay</a>}</td>
             </tr>
-          ))}</tbody>
+            {i.creditNotes.map((c) => (
+              <tr key={c.id} className="credit-row">
+                <td><strong>{c.number}</strong><small>Credit note · {String(c.reason).replace(/_/g, " ")}</small></td><td>{fmt(c.date)}</td><td></td>
+                <td className="num">−{money(c.totals.taxable)}</td><td className="num">−{money(c.totals.tax)}</td><td className="num">−{money(c.totals.total)}</td><td></td>
+                <td><a className="btn ghost small" href={c.link} target="_blank" rel="noopener noreferrer">View / download</a></td>
+              </tr>
+            ))}
+          </Fragment>))}</tbody>
         </table></div>
       )}
     </>
