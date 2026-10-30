@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { money } from "../api.js";
 import { useSite } from "../data.jsx";
+import { useRfq } from "./RfqDrawer.jsx";
 
 export const minQty = (p) => Math.max(p.minQty || 0, p.packSize || 1);
 export function unitPrice(p, qty) {
@@ -23,15 +24,15 @@ export function Price({ p, big }) {
 }
 
 export default function ProductCard({ p }) {
-  const { add, basket, settings } = useSite();
+  const { add, basket } = useSite();
   const [variant, setVariant] = useState(p.variants?.[0] || "20ml");
   const inBasket = basket.some((i) => i.productId === p.id);
-  const buy = settings.shop?.cart !== false;
+  const rfq = useRfq();
 
   return (
     <article className="live-card">
       <Link to={`/product/${p.slug}`} className="live-card-img-wrap" aria-label={p.name}>
-        <div className="card-top-tag">{p.variants?.[0] || "20ML"}</div>
+        {p.variants?.[0] && <div className="card-top-tag">{p.variants[0]}</div>}
         <img src={p.images?.[0] || "/brand/farm-fresh-tea-tree-bottles.png"} alt={p.name} loading="lazy" />
         {p.stock === "out" && <span className="card-flag">Out of stock</span>}
       </Link>
@@ -43,9 +44,7 @@ export default function ProductCard({ p }) {
         </h3>
         <p className="live-card-desc">{p.shortDescription || p.description}</p>
 
-        <div className="live-card-price">
-          {money(p.pricePaise ?? (p.price ?? 750))}
-        </div>
+        <div className="live-card-price"><Price p={p} /></div>
 
         <div className="live-card-actions">
           {p.variants && p.variants.length > 0 && (
@@ -65,6 +64,7 @@ export default function ProductCard({ p }) {
           >
             {inBasket ? "Added ✓" : "Add To Cart"}
           </button>
+          <button type="button" className="live-card-sample" onClick={() => rfq({ mode: "sample", product: p })}>Request a sample</button>
         </div>
       </div>
     </article>

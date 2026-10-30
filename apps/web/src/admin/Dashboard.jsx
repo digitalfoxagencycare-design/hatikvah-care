@@ -1,18 +1,21 @@
 import { Link } from "react-router-dom";
+import { tiltHandlers } from "../tilt.js";
 import { useMe } from "./AdminApp.jsx";
 import { Loader, useLoad } from "./hooks.jsx";
 import { fmtDate, fmtTime, Pill, rs } from "./ui.jsx";
+
+const tilt = tiltHandlers(9);
+const Tile = ({ to, n, label, sub, tone = "" }) => <Link to={to} className={"tile " + tone} {...tilt}><strong>{n}</strong><span>{label}</span>{sub && <small>{sub}</small>}</Link>;
 
 export default function Dashboard() {
   const me = useMe();
   const s = useLoad("/api/admin/dashboard");
   const d = s.data;
-  const Tile = ({ to, n, label, sub, tone = "" }) => <Link to={to} className={"tile " + tone}><strong>{n}</strong><span>{label}</span>{sub && <small>{sub}</small>}</Link>;
   return (
     <>
+      <div className="kpi-stage">
       <h1>Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}, {me.name.split(" ")[0]}</h1>
       <Loader s={s}>{d && (
-        <>
           <div className="tiles">
             {"salesThisMonth" in d && <Tile to="/admin/reports" n={rs(d.salesThisMonth)} label="Invoiced this month" sub={`${rs(d.receivedThisMonth)} received`} />}
             {"outstanding" in d && <Tile to="/admin/invoices?status=overdue" n={rs(d.outstanding)} label="To collect" sub={`${rs(d.overdue)} overdue (${d.overdueCount} invoices)`} tone={d.overdue ? "warn" : ""} />}
@@ -24,6 +27,10 @@ export default function Dashboard() {
             {"inboxUnread" in d && <Tile to="/admin/whatsapp" n={d.inboxUnread} label="Unread WhatsApp" tone={d.inboxUnread ? "hot" : ""} />}
             {me.permissions.includes("catalog") && <Tile to="/admin/products?filter=noprice" n={d.withoutPrice} label="Products without a price" sub={`${d.active} live products`} tone={d.withoutPrice ? "warn" : ""} />}
           </div>
+      )}</Loader>
+      </div>
+      {d && (
+        <>
           <div className="grid2 top">
             {d.dispatchQueue && (
               <div className="panel">
@@ -82,7 +89,7 @@ export default function Dashboard() {
           )}
           {me.permissions.includes("catalog") && d.withoutPrice > 0 && <p className="notice">Tip: open <Link to="/admin/products">Products</Link> to type prices into the table, or use <strong>Export / Import CSV</strong> to fill them from a spreadsheet.</p>}
         </>
-      )}</Loader>
+      )}
     </>
   );
 }

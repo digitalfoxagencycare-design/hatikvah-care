@@ -33,6 +33,7 @@ Create these in WhatsApp Manager › Message templates as category **Utility**, 
 | `WHATSAPP_TEMPLATE_DISPATCH` | Order dispatched, courier & Shadowfax updates | `hc_dispatch` (APPROVED) | `Dear {{1}}, your order {{2}} is on its way. {{3}}` → `/doc/challan/{{1}}` |
 | `WHATSAPP_TEMPLATE_INVOICE` | Invoice sent, overdue reminders | `hc_invoice` (APPROVED) | `Dear {{1}}, invoice {{2}} for {{3}} is due on {{4}}` → `/doc/invoice/{{1}}` |
 | `WHATSAPP_TEMPLATE` | General updates, payment receipts, order notifications | `hc_update` (APPROVED) | `Dear customer, {{1}}. - HaTikvah Care` |
+| Not set yet | Order confirmations (the inbox shows it as not approved; until then they use `hc_update`) | `hc_order_confirm` (NOT CREATED) | Proposed: `Dear {{1}}, your order {{2}} for {{3}} is confirmed. Thank you for choosing HaTikvah Care.` |
 
 Template language code is configured as `WHATSAPP_TEMPLATE_LANG=en_US`. All templates are approved on WABA ID `2667221577035024`.
 Template names are lowercase letters, numbers and `_` (the server refuses anything else at start-up). Each sent message records which route it took (`template hc_quote`, `link`, `text`) in the outbox.

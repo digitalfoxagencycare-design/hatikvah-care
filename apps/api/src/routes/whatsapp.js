@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import express, { Router } from "express";
 import { requirePerm } from "../lib/permissions.js";
 import { logActivity, now } from "../lib/sales.js";
+import { templateLibrary } from "../lib/notify.js";
 import { getSettings } from "../model.js";
 import { wrap } from "./public.js";
 import { bad, notFound } from "./shared.js";
@@ -170,7 +171,7 @@ export function whatsappWebhook({ cfg, store, automation, notifier, log = consol
 }
 
 /** Admin: the WhatsApp inbox (customer messages), replies inside the 24-hour window, and the outbox delivery log. */
-export function whatsappAdminRoutes({ store, notifier, audit }) {
+export function whatsappAdminRoutes({ cfg, store, notifier, audit }) {
   const r = Router();
   r.use("/whatsapp", requirePerm("enquiries", "automation"));
   r.get("/whatsapp/inbox", wrap(async (req, res) => {
@@ -179,6 +180,7 @@ export function whatsappAdminRoutes({ store, notifier, audit }) {
     if (req.query.unread) rows = rows.filter((m) => !m.readAt);
     res.json(rows.slice(0, 300));
   }));
+  r.get("/whatsapp/templates", wrap(async (req, res) => res.json(templateLibrary(cfg))));
   r.post("/whatsapp/inbox/:id/read", wrap(async (req, res) => {
     const m = await store.inbox.get(req.params.id); if (!m) return notFound(res, "Message");
     res.json(await store.inbox.update(m.id, { readAt: m.readAt || now(), readBy: req.admin.email }));

@@ -1,7 +1,12 @@
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import ProductCard from "../components/ProductCard.jsx";
+import { useRfq } from "../components/RfqDrawer.jsx";
+import SectorTabs from "../components/SectorTabs.jsx";
 import Seo from "../components/Seo.jsx";
 import { useSite } from "../data.jsx";
+import { inSector, SECTORS, sectorOf, spreadByCategory } from "../sectors.js";
+import { tiltHandlers } from "../tilt.js";
 
 const categoriesList = [
   { name: "Hotel Guest Amenities", slug: "bio-wet-amenities", img: "/brand/cat-1.png" },
@@ -133,13 +138,23 @@ const sampleBestsellers = [
   },
 ];
 
+const DECK = [
+  { title: "Guest amenities", note: "Farm Fresh and Biotique kits", img: "/brand/farm-fresh-tea-tree-bottles.png", to: "/shop?q=amenities" },
+  { title: "Hotel linen", note: "Towels, sheets and robes", img: "/catalog/p31-3.jpg", to: "/shop?q=towels" },
+  { title: "Dispensers", note: "Refillable pump bottles", img: "/catalog/p20-1.jpg", to: "/shop?q=dispensers" },
+];
+
 export default function Home() {
   const { catalog, settings } = useSite();
+  const rfq = useRfq();
+  const [sector, setSector] = useState(SECTORS[0].key);
   // Showcase the client's exact 4 Best Sellers from Screenshot 4 with guaranteed prices
   const featured = sampleBestsellers.map((s) => {
     const live = catalog.products.find((p) => p.slug === s.slug || p.name === s.name);
     return live ? { ...s, ...live, pricePaise: live.pricePaise ?? s.pricePaise } : s;
   });
+  const forSector = useMemo(() => catalog.products.filter((p) => inSector(p, sector)), [catalog, sector]);
+  const sec = sectorOf(sector);
 
   const ld = {
     "@context": "https://schema.org",
@@ -153,59 +168,58 @@ export default function Home() {
   };
 
   return (
-    <>
+    <div className="lux">
       <Seo
         title="HaTikvah Care | Elevating Excellence in Hospitality & Hygiene"
         description="As a trusted partner and authorized distributor, we provide premium guest amenities and industrial-grade cleaning solutions tailored for India's finest hotels, resorts, and corporate institutions."
         jsonLd={ld}
       />
 
-      {/* Hero Section matching Screenshot 2 */}
-      <section className="live-hero">
-        <div className="live-hero-bg">
-          <img src="/brand/hero_page_image.png" alt="Hospitality Amenities" className="live-hero-img" />
-          <div className="live-hero-overlay"></div>
-        </div>
-        <div className="wrap live-hero-wrap">
-          <div className="live-hero-content">
-            <span className="live-hero-badge">
-              Premium B2B Supply Partner
-            </span>
-            <h1 className="live-hero-title">
-              Elevating Excellence in <br />Hospitality &amp; Hygiene.
-            </h1>
-            <p className="live-hero-lead">
+      <section className="lux-hero">
+        <div className="wrap lux-hero-wrap">
+          <div className="lux-hero-copy">
+            <h1>Elevating Excellence in Hospitality &amp; Hygiene.</h1>
+            <p>
               As a trusted partner and authorized Boutique distributor, we provide premium guest amenities and industrial-grade cleaning solutions tailored for India&apos;s finest hotels, resorts, and corporate institutions.
             </p>
-            <div className="live-hero-actions">
-              <Link className="live-hero-btn" to="/shop">
-                Explore Our Catalog <span>→</span>
-              </Link>
-              <div className="happy-customers">
-                <div className="customers-badge-icon">
-                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                    <circle cx="9" cy="7" r="4" />
-                    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                  </svg>
-                </div>
-                <div>
-                  <div className="happy-count">100K+</div>
-                  <div className="happy-label">Happy customers</div>
-                </div>
+            <div className="lux-hero-actions">
+              <Link className="lux-cta" to="/shop">Explore our catalog</Link>
+              <button type="button" className="lux-cta quiet" onClick={() => rfq({ mode: "sample" })}>Request samples</button>
+            </div>
+            <p className="lux-hero-note"><strong>100K+</strong> happy customers</p>
+          </div>
+          <div className="deck" {...tiltHandlers(7)}>
+            <div className="deck-float">
+              <div className="deck-stage">
+                {DECK.map((c, i) => (
+                  <Link key={c.title} className={`deck-card deck-${i}`} to={c.to}>
+                    <span className="deck-photo"><img src={c.img} alt="" /></span>
+                    <span className="deck-label"><b>{c.title}</b><small>{c.note}</small></span>
+                  </Link>
+                ))}
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Categories Section matching Screenshot 4 */}
-      <section className="cat-section">
+      <section className="lux-band tint">
         <div className="wrap">
-          <div className="sec-header-center">
-            <p className="cat-sec-title">CATEGORIES</p>
+          <h2>Supplied to your kind of property</h2>
+          <SectorTabs value={sector} onChange={setSector} />
+          <div className="sector-intro">
+            <p>{sec.blurb}</p>
+            <Link to={`/shop?sector=${sector}`}>See all {forSector.length} products for {sec.label.toLowerCase()}</Link>
           </div>
+          <div className="bestsellers-grid">
+            {spreadByCategory(forSector, 4).map((p) => <ProductCard key={p.id} p={p} />)}
+          </div>
+        </div>
+      </section>
+
+      <section className="lux-band">
+        <div className="wrap">
+          <h2>Browse by category</h2>
           <div className="circle-cats-grid">
             {categoriesList.map((c) => (
               <Link key={c.name} className="circle-cat-item" to={`/shop?category=${c.slug}`}>
@@ -219,12 +233,11 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Best Sellers Section matching Screenshot 4 */}
-      <section className="bestsellers-section">
+      <section className="lux-band tint">
         <div className="wrap">
           <div className="bestsellers-head">
             <h2>Best Sellers</h2>
-            <Link to="/shop" className="show-more-btn">Show more</Link>
+            <Link to="/shop">Show more</Link>
           </div>
           <div className="bestsellers-grid">
             {featured.map((p) => (
@@ -234,10 +247,9 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Our Key Benefits Section matching Screenshot 3 */}
-      <section className="benefits-section">
+      <section className="lux-band">
         <div className="wrap">
-          <h2 className="benefits-title">Our Key Benefits</h2>
+          <h2>Our Key Benefits</h2>
           <div className="benefits-grid">
             {keyBenefits.map((b) => (
               <div key={b.title} className="benefit-card">
@@ -249,6 +261,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-    </>
+    </div>
   );
 }

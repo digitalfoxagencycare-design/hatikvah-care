@@ -26,6 +26,28 @@ export const WA_TEMPLATES = {
     sample: "Dear {{1}}, invoice {{2}} for {{3}} is due on {{4}}. Tap below to view, download or pay it." },
 };
 
+/**
+ * The WhatsApp Manager templates the business uses, for the preview in the inbox. approved reflects docs/INTEGRATIONS.md, not a live
+ * call to Meta. hc_order_confirm has not been created yet: order confirmations outside the window use the general template.
+ */
+export const WA_TEMPLATE_LIBRARY = [
+  { name: "hc_otp", label: "Sign-in code", category: "Authentication", approved: true, env: "WHATSAPP_OTP_TEMPLATE", configured: (c) => c.waOtpTemplate, usedFor: "Website sign-in",
+    body: "*{{1}}* is your verification code.", variables: [{ label: "sign-in code", source: "Generated at sign-in", sample: "482913" }], button: { label: "Copy Code" } },
+  { name: "hc_quote", label: "Quotation", category: "Utility", approved: true, env: WA_TEMPLATES.quote.env, configured: (c) => c.waTemplates?.quote, usedFor: "Sending a quotation",
+    body: WA_TEMPLATES.quote.sample, variables: [{ label: "customer name", source: "Quote: customer", sample: "Hotel Sitara" }, { label: "quotation number", source: "Quote: number", sample: "Q/2026-27/0042" }, { label: "total incl. GST", source: "Quote: total", sample: "₹18,450.00" }], button: { label: "View & approve", url: WA_TEMPLATES.quote.button } },
+  { name: "hc_dispatch", label: "Dispatch", category: "Utility", approved: true, env: WA_TEMPLATES.dispatch.env, configured: (c) => c.waTemplates?.dispatch, usedFor: "Dispatching an order",
+    body: WA_TEMPLATES.dispatch.sample, variables: [{ label: "customer name", source: "Order: customer", sample: "Hotel Sitara" }, { label: "order number", source: "Order: number", sample: "SO/2026-27/0117" }, { label: "delivery details", source: "Dispatch: courier and tracking", sample: "Shadowfax, AWB SFX880142." }], button: { label: "View challan", url: WA_TEMPLATES.dispatch.button } },
+  { name: "hc_invoice", label: "Invoice", category: "Utility", approved: true, env: WA_TEMPLATES.invoice.env, configured: (c) => c.waTemplates?.invoice, usedFor: "Sending an invoice",
+    body: WA_TEMPLATES.invoice.sample, variables: [{ label: "customer name", source: "Invoice: customer", sample: "Hotel Sitara" }, { label: "invoice number", source: "Invoice: number", sample: "INV/2026-27/0231" }, { label: "amount due", source: "Invoice: balance", sample: "₹18,450.00" }, { label: "due date", source: "Invoice: due date", sample: "14 Nov 2026" }], button: { label: "View invoice", url: WA_TEMPLATES.invoice.button } },
+  { name: "hc_order_confirm", label: "Order confirmation", category: "Utility", approved: false, env: "", configured: () => "", usedFor: "Confirming a booked order",
+    body: "Dear {{1}}, your order {{2}} for {{3}} is confirmed. Thank you for choosing HaTikvah Care.", variables: [{ label: "customer name", source: "Order: customer", sample: "Hotel Sitara" }, { label: "order number", source: "Order: number", sample: "SO/2026-27/0117" }, { label: "order total", source: "Order: total", sample: "₹18,450.00" }], button: null },
+  { name: "hc_update", label: "General update", category: "Utility", approved: true, env: "WHATSAPP_TEMPLATE", configured: (c) => c.waTemplate, usedFor: "Any other message outside the window",
+    body: "Dear customer, {{1}}. - HaTikvah Care", variables: [{ label: "message", source: "The message text", sample: "your delivery is rescheduled to Friday" }], button: null },
+];
+
+/** The library as the inbox shows it: configured is the name set in the environment, if any. */
+export const templateLibrary = (cfg) => WA_TEMPLATE_LIBRARY.map(({ configured, ...t }) => ({ ...t, connected: configured(cfg) || "", language: cfg.waTemplateLang }));
+
 /** Meta refuses template variables containing new lines, tabs or more than four spaces in a row, and empty ones. */
 export const templateText = (v, max = 1000) => String(v ?? "").replace(/\s*[\r\n]+\s*/g, " · ").replace(/\t/g, " ").replace(/ {4,}/g, "   ").trim().slice(0, max).trim() || "-";
 
