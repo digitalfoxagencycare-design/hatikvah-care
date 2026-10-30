@@ -51,7 +51,7 @@ export default function OrderDetail() {
               {["confirmed", "packed"].includes(o.status) && <button className="btn" onClick={() => setDispatch({ transporter: "", trackingNo: "", vehicleNo: "", date: today(), notes: "", courier: "", dropPincode: "", weightKg: 1, packages: 1 })}>Dispatch</button>}
             </div></div>
           <Msg st={st} />
-          <DocView d={o} extraInfo={<p className="muted small-print">{o.quoteNumber && <>From quote <Link to={`/admin/quotes/${o.quoteId}`}>{o.quoteNumber}</Link><br /></>}{o.poNumber && <>Customer PO {o.poNumber}<br /></>}{o.expectedDate && <>Expected {fmtDate(o.expectedDate)}<br /></>}
+          <DocView d={o} extraInfo={<p className="muted small-print">{o.quoteNumber && <>From quote <Link to={`/admin/quotes/${o.quoteId}`}>{o.quoteNumber}</Link><br /></>}{o.enquiryRef && <>From enquiry {o.enquiryRef}<br /></>}{o.poNumber && <>Customer PO {o.poNumber}<br /></>}{o.expectedDate && <>Expected {fmtDate(o.expectedDate)}<br /></>}
             {o.dispatch && <>Dispatched {fmtDate(o.dispatch.date)} {o.dispatch.transporter} {o.dispatch.trackingNo}<br />Challan {o.challanNumber}</>}</p>} />
           {o.shipment && (
             <div className="panel"><div className="row-between"><h2>Shadowfax shipment</h2>{o.shipment.trackingUrl && <a href={o.shipment.trackingUrl} target="_blank" rel="noopener noreferrer">Live tracking ↗</a>}</div>

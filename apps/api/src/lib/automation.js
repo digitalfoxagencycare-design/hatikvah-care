@@ -14,6 +14,7 @@ export const RULES = [
   { id: "quoteExpire", group: "Quotes", when: "schedule", label: "Quote past its validity date: mark it expired" },
   { id: "quoteAccepted", group: "Quotes", when: "event", label: "Quote accepted: create the sales order and tell the team" },
   { id: "websiteOrder", group: "Orders", when: "event", label: "Website order placed: confirm to the customer and alert the team" },
+  { id: "orderBooked", group: "Orders", when: "event", label: "Order booked from an enquiry: send the customer a WhatsApp booking receipt" },
   { id: "orderDispatched", group: "Orders", when: "event", label: "Order dispatched: send the customer the challan and tracking details" },
   { id: "shipmentUpdate", group: "Orders", when: "event", label: "Courier update (Shadowfax): send the customer the live tracking link when the rider picks up, and when delivered" },
   { id: "waBot", group: "WhatsApp", when: "event", label: "Customer messages on WhatsApp: reply with the quick menu (quote request, hotel amenities, clinic supplies) and log the lead" },
@@ -112,6 +113,14 @@ export function createAutomation({ cfg, store, notifier, log = console }) {
       body: `Dear ${o.customer.contactName || o.customer.name},\nThank you for your order ${o.number} for ${money(o.totals.total)} (${pay}).\nTrack it at ${base()}/account\n– ${company.name}` });
     await send(await teamTargets(a, company), { event: "websiteOrder", ref: o.number, subject: `New website order ${o.number}`,
       body: `New website order ${o.number} from ${o.customer.name}${o.customer.phone ? " (" + o.customer.phone + ")" : ""}: ${money(o.totals.total)}, ${pay}.\nOpen: ${base()}/admin/orders/${o.id}` });
+    await notifier.flush();
+  }
+
+  async function orderBooked(o) {
+    const [a, company] = await Promise.all([config(), getSettings(store)]);
+    if (!isOn(a, "orderBooked") || !o.customer.phone) return;
+    await send([{ channel: "whatsapp", to: o.customer.phone }], { event: "orderBooked", ref: o.number, subject: `Order ${o.number} confirmed`,
+      body: `Dear ${name(o.customer)},\nYour order ${o.number} for ${money(o.totals.total)} (incl. GST) is confirmed and your goods are reserved. We will send the tracking details when it is dispatched.\n– ${company.name}` });
     await notifier.flush();
   }
 
@@ -250,5 +259,5 @@ export function createAutomation({ cfg, store, notifier, log = console }) {
     return res;
   }
 
-  return { config, run, on: { enquiryCreated, quoteSent, quoteAccepted, websiteOrder, orderDispatched, shipmentUpdate, invoiceCreated, paymentReceived } };
+  return { config, run, on: { enquiryCreated, quoteSent, quoteAccepted, websiteOrder, orderBooked, orderDispatched, shipmentUpdate, invoiceCreated, paymentReceived } };
 }

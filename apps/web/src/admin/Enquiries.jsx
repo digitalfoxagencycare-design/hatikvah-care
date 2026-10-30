@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api.js";
 import { can, useMe } from "./AdminApp.jsx";
+import BookingModal from "./BookingModal.jsx";
 import { Loader, useLoad } from "./hooks.jsx";
 import { fmtTime, personName, PersonSelect, Pill, Timeline, useMeta } from "./ui.jsx";
 
@@ -13,7 +14,9 @@ export default function Enquiries() {
   const s = useLoad("/api/admin/enquiries" + (status ? `?status=${status}` : ""));
   const [open, setOpen] = useState(null);
   const [msg, setMsg] = useState(null);
-  const acts = useLoad(open ? `/api/admin/activities?entityId=${open}` : "/api/admin/activities?entityId=none");
+  const [booking, setBooking] = useState(null);
+  const canBook = can(me, "enquiries") && can(me, "orders");
+  const acts =useLoad(open ? `/api/admin/activities?entityId=${open}` : "/api/admin/activities?entityId=none");
   const replace = (n) => s.setData((d) => d.map((x) => (x.id === n.id ? n : x)));
   const update = async (e, body) => { setMsg(null); try { replace(await api(`/api/admin/enquiries/${e.id}`, { method: "PATCH", body })); } catch (err) { setMsg(err.message); } };
   const del = async (e) => { if (!window.confirm(`Delete enquiry ${e.ref}?`)) return; try { await api(`/api/admin/enquiries/${e.id}`, { method: "DELETE" }); s.reload(); } catch (err) { setMsg(err.message); } };
@@ -57,7 +60,8 @@ export default function Enquiries() {
                     <label className="field"><span>Internal notes</span><textarea rows="2" maxLength={2000} defaultValue={e.notes} onBlur={(ev) => ev.target.value !== e.notes && update(e, { notes: ev.target.value })} /></label>
                     <div className="btn-row">
                       {e.customerId ? <Link className="btn ghost small" to={`/admin/customers/${e.customerId}`}>Open customer</Link> : can(me, "customers") && <button className="btn ghost small" onClick={() => convert(e)}>Create customer</button>}
-                      {can(me, "quotes") && (e.quoteId ? <Link className="btn small" to={`/admin/quotes/${e.quoteId}`}>Open quote</Link> : <button className="btn small" onClick={() => quote(e)}>Make quotation</button>)}
+                      {e.orderId ? can(me, "orders") && <Link className="btn small" to={`/admin/orders/${e.orderId}`}>Order {e.orderNumber}</Link> : canBook && !e.quoteId && e.status !== "closed" && <button className="btn small" onClick={() => setBooking(e)}>Book Order</button>}
+                      {can(me, "quotes") && (e.quoteId ? <Link className="btn small" to={`/admin/quotes/${e.quoteId}`}>Open quote</Link> : !e.orderId && <button className="btn ghost small" onClick={() => quote(e)}>Make quotation</button>)}
                       {me.role === "owner" && <button className="link danger" onClick={() => del(e)}>Delete enquiry</button>}
                     </div>
                     <h3>Activity</h3>
@@ -69,6 +73,7 @@ export default function Enquiries() {
           </ul>
         )}
       </Loader>
+      {booking && <BookingModal enquiry={booking} onClose={() => setBooking(null)} onBooked={(r) => nav(`/admin/orders/${r.order.id}`)} />}
     </>
   );
 }

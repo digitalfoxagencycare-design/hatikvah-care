@@ -5,7 +5,7 @@ import { addDays, todayIST } from "../lib/gst.js";
 import { channels } from "../lib/notify.js";
 import { requirePerm } from "../lib/permissions.js";
 import { createPaymentLink } from "../lib/razorpay.js";
-import { balance, createCreditNote, createInvoice, createOrderFromQuote, customerSnapshot, deductForInvoice, logActivity, moveStock, now, priced, rateFor, recordPayment, refreshInvoice, refundDue, removePaymentLedger, postLedger, assertStockAvailable, consumeStock, token } from "../lib/sales.js";
+import { balance, bucketOf, stockBuckets, createCreditNote, createInvoice, createOrderFromQuote, customerSnapshot, deductForInvoice, logActivity, moveStock, now, priced, rateFor, recordPayment, refreshInvoice, refundDue, removePaymentLedger, postLedger, assertStockAvailable, consumeStock, token } from "../lib/sales.js";
 import { measureLabel, pieces, uomOptions } from "../lib/units.js";
 import { nextNumber } from "../lib/gst.js";
 import { getSettings } from "../model.js";
@@ -26,11 +26,11 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
   // Default rates for the line editor: customer price list, else catalogue price; plus tax details of each product.
   r.get("/rates", requirePerm("quotes", "orders", "invoices"), wrap(async (req, res) => {
     const c = req.query.customerId ? await store.customers.get(String(req.query.customerId)) : null;
-    const out = [];
+    const out = [], buckets = await stockBuckets(store);
     for (const p of await store.products.all({ sort: { order: 1 } })) {
       const rVal = await rateFor(store, c, p);
       const rate = rVal ?? p.price ?? 0;
-      out.push({ productId: p.id, sku: p.sku, name: p.name, pack: p.pack || measureLabel(p.measure), hsn: p.hsn || "", gstRate: p.gstRate ?? 18, unit: p.unit || "pcs", rate, price: p.price, pricePaise: p.price, priceTiers: p.priceTiers || [], active: p.active,
+      out.push({ productId: p.id, sku: p.sku, name: p.name, pack: p.pack || measureLabel(p.measure), hsn: p.hsn || "", gstRate: p.gstRate ?? 18, unit: p.unit || "pcs", rate, price: p.price, pricePaise: p.price, priceTiers: p.priceTiers || [], active: p.active, stockTracked: !!p.stockTracked, ...bucketOf(buckets, p.id),
         // piece / box / carton with pieces per unit and the default rate (customer's piece rate scaled; own box / carton prices win when no price list applies)
         uoms: uomOptions(rVal != null && rVal !== p.price ? { ...p, packPrices: {} } : p, rate) });
     }

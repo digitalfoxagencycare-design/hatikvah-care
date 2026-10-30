@@ -46,6 +46,12 @@ export const quoteInput = z.object({
 export const orderInput = z.object({
   customerId: id.min(1, "Choose a customer"), items: lines, expectedDate: optDate, notes: text(2000).default(""), placeOfSupply: stateCode, poNumber: text(60).default(""),
 }).strict();
+/** Direct booking from an enquiry: customerId picks a customer, customer creates one, neither matches the enquiry's phone. */
+export const bookingInput = z.object({
+  customerId: id.default(""), customer: customerInput.pick({ name: true, contactName: true, phone: true, email: true, gstin: true, stateCode: true }).optional(),
+  items: lines, deliveryAddress: text(380).min(5, "Enter the delivery address"), pincode: z.union([z.literal(""), z.string().regex(/^\d{6}$/, "PIN code is 6 digits")]).default(""),
+  placeOfSupply: stateCode, expectedDate: optDate, poNumber: text(60).default(""), notes: text(2000).default(""), notifyWhatsApp: z.boolean().default(true),
+}).strict();
 export const dispatchInput = z.object({
   transporter: text(100).default(""), trackingNo: text(100).default(""), vehicleNo: text(30).default(""), date: optDate, notes: text(500).default(""),
   // "shadowfax" books the courier pickup as soon as the challan is made (live tracking link goes to the customer)

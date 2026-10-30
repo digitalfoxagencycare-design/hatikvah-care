@@ -2,13 +2,14 @@ import { Router } from "express";
 import { toCsv } from "../csv.js";
 import { can, requirePerm } from "../lib/permissions.js";
 import { stateName } from "../lib/gst.js";
-import { balance, logActivity, now } from "../lib/sales.js";
-import { activityInput, customerInput, priceListInput } from "../schemas.js";
+import { balance, bookEnquiry, logActivity, now } from "../lib/sales.js";
+import { activityInput, bookingInput, customerInput, priceListInput } from "../schemas.js";
+import { atomicWrap } from "./atomic.js";
 import { wrap } from "./public.js";
 import { bad, csvHeaders, notFound, parse, rupees } from "./shared.js";
 
 /** Customers (companies you sell to), the activity timeline, price lists, and the lead side of enquiries. */
-export function crmRoutes({ store, audit }) {
+export function crmRoutes({ store, audit, automation }) {
   const r = Router();
   const activityPerm = { enquiry: "enquiries", customer: "customers", quote: "quotes", order: "orders", invoice: "invoices", purchase: "stock" };
   const fill = (d) => ({ ...d, stateCode: d.stateCode || (d.gstin ? d.gstin.slice(0, 2) : "") });
@@ -101,6 +102,17 @@ export function crmRoutes({ store, audit }) {
     const upd = await store.enquiries.update(e.id, { customerId: c.id });
     await logActivity(store, { entity: "enquiry", entityId: e.id, text: `Linked to customer ${c.name}`, by: req.admin.email });
     res.json({ enquiry: upd, customer: c });
+  }));
+
+  // ---------- enquiry → confirmed order in one step (needs both permissions: requirePerm alone passes on any one)
+  r.post("/enquiries/:id/book", requirePerm("enquiries"), requirePerm("orders"), atomicWrap(store, async (req, res) => {
+    const d = parse(bookingInput, req.body, res); if (!d) return;
+    const out = await bookEnquiry(store, req.params.id, d, req.admin.email);
+    if (!out.duplicate) {
+      if (d.notifyWhatsApp) await automation.on.orderBooked(out.order);
+      await audit(req, "enquiry.book", out.enquiry.ref, { order: out.order.number });
+    }
+    res.status(out.duplicate ? 200 : 201).json(out);
   }));
   return r;
 }

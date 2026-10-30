@@ -137,6 +137,47 @@ async function createOrderFromQuoteCore(store, quote, by) {
   return order;
 }
 
+async function bookingCustomer(store, e, d, address) {
+  if (d.customerId) { const c = await store.customers.get(d.customerId); if (!c) throw userError("Customer not found", 404); return c; }
+  let c = e.customerId ? await store.customers.get(e.customerId) : null;
+  if (!c && !d.customer) {
+    const digits = e.phone.replace(/\D/g, "").slice(-10);
+    c = (await store.customers.all()).find((x) => x.phone && x.phone.replace(/\D/g, "").slice(-10) === digits) || null;
+  }
+  if (c) return c;
+  const n = d.customer || {};
+  return store.customers.insert({ name: n.name || e.company || e.name, contactName: n.contactName || e.name, phone: n.phone || e.phone, email: n.email || e.email, gstin: n.gstin || "", stateCode: n.stateCode || (n.gstin ? n.gstin.slice(0, 2) : ""), city: "", billingAddress: address, shippingAddress: address,
+    priceListId: "", paymentTermsDays: 30, reorderDays: 0, tags: [], notes: "", assignedTo: e.assignedTo || "", followUpAt: "", source: e.source?.utm_source || "website", createdAt: now(), updatedAt: now() });
+}
+
+/**
+ * Enquiry → customer → confirmed sales order, all or nothing. The confirmed order is what holds the stock (reservesStock).
+ * Booking again returns the same order. An open quote blocks it: accepting that quote later would sell the goods twice.
+ */
+export function bookEnquiry(store, ...args) { return store.atomic(() => bookEnquiryCore(store, ...args)); }
+async function bookEnquiryCore(store, enquiryId, d, by) {
+  const e = await store.enquiries.get(enquiryId);
+  if (!e) throw userError("Enquiry not found", 404);
+  const prior = e.orderId ? await store.orders.get(e.orderId) : null;
+  if (prior && prior.status !== "cancelled") return { enquiry: e, order: prior, duplicate: true };
+  if (e.status === "closed") throw userError("This enquiry is closed. Reopen it before booking", 409);
+  const quote = e.quoteId ? await store.quotes.get(e.quoteId) : null;
+  if (quote && !["rejected", "expired"].includes(quote.status)) throw userError(`Quotation ${quote.number} is open on this enquiry. Use it, or reject it before booking`, 409);
+  const address = d.pincode && !d.deliveryAddress.includes(d.pincode) ? `${d.deliveryAddress} - ${d.pincode}` : d.deliveryAddress;
+  let c = await bookingCustomer(store, e, d, address);
+  if (!c.shippingAddress) c = await store.customers.update(c.id, { shippingAddress: address, updatedAt: now() });
+  const doc = await priced(store, { items: d.items, customer: c, placeOfSupply: d.placeOfSupply });
+  await assertStockAvailable(store, doc.items);
+  const number = await nextNumber(store, "SO");
+  const order = await store.orders.insert({ number, token: token(), quoteId: "", quoteNumber: "", enquiryId: e.id, enquiryRef: e.ref, source: "enquiry", customerId: c.id, customer: { ...customerSnapshot(c), shippingAddress: address }, ...doc,
+    poNumber: d.poNumber, status: "confirmed", expectedDate: d.expectedDate, notes: d.notes, dispatch: null, challanNumber: "", invoiceId: "", createdBy: by, createdAt: now(), updatedAt: now() });
+  const enquiry = await store.enquiries.update(e.id, { customerId: c.id, orderId: order.id, orderNumber: number, status: "won", lastActivityAt: now() });
+  await logActivity(store, { entity: "enquiry", entityId: e.id, text: `Booked as order ${number}`, by });
+  await logActivity(store, { entity: "order", entityId: order.id, text: `Booked from enquiry ${e.ref}`, by });
+  await logActivity(store, { entity: "customer", entityId: c.id, text: `Order ${number} created`, by });
+  return { enquiry, order };
+}
+
 /**
  * The customer accepts or rejects a sent quotation (from the document link or the buyer portal). A quote past its validity
  * date counts as expired even before the scheduled job marks it. Accepting runs the "quote accepted" automation, which
