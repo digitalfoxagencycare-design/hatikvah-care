@@ -21,6 +21,7 @@ export default function POS() {
   const [pay, setPay] = useState({ mode: "cash", reference: "", collect: true });
   const [pos, setPos] = useState("");
   const [done, setDone] = useState(null);
+  const [showCatalog, setShowCatalog] = useState(false);
   const [st, run] = useAction();
   const search = useRef(null), qtyRefs = useRef([]);
 
@@ -90,11 +91,46 @@ export default function POS() {
           </>}
           <StateSelect label={`Place of supply (${inter ? "IGST" : "CGST + SGST"})`} value={pos} onChange={setPos} />
         </div>
-        <div className="pos-search">
-          <input ref={search} autoFocus className="grow" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Scan or type SKU / product name, Enter to add" aria-label="Search product"
+        <div className="pos-search" style={{ display: "flex", gap: "10px", alignItems: "stretch", flexWrap: "wrap" }}>
+          <input ref={search} autoFocus className="grow" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Scan barcode or type SKU / product name, Enter to add" aria-label="Search product"
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(matches[0]); } if (e.key === "ArrowDown") { e.preventDefault(); qtyRefs.current[0]?.focus(); } }} />
+          <select style={{ maxWidth: "340px", padding: "8px 12px" }} value="" onChange={(e) => {
+            const r = rates.data?.find((x) => x.productId === e.target.value);
+            if (r) { add(r); e.target.value = ""; }
+          }}>
+            <option value="">— Click to pick product ({rates.data?.length || 0}) —</option>
+            {(rates.data || []).filter((r) => r.active !== false).map((r) => (
+              <option key={r.productId} value={r.productId}>{r.sku} · {r.name} {r.rate ? `(${rs(r.rate)})` : ""}</option>
+            ))}
+          </select>
+          <button type="button" className="btn ghost" style={{ whiteSpace: "nowrap" }} onClick={() => setShowCatalog(!showCatalog)}>
+            {showCatalog ? "Hide catalog ▲" : `🛍️ Products grid (${rates.data?.length || 0}) ▼`}
+          </button>
           {matches.length > 0 && <ul className="pos-matches">{matches.map((r) => <li key={r.productId}><button type="button" onClick={() => add(r)}><strong>{r.sku}</strong> {r.name} <small>{r.pack}{r.rate ? ` · ${rs(r.rate)}` : ""}</small></button></li>)}</ul>}
         </div>
+        {showCatalog && (
+          <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "12px", margin: "10px 0" }}>
+            <div className="row-between" style={{ marginBottom: "8px" }}>
+              <strong>Click any product to add to bill:</strong>
+              <small className="muted">{rates.data?.length || 0} products available</small>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: "8px", maxHeight: "260px", overflowY: "auto" }}>
+              {(rates.data || []).filter((r) => r.active !== false).map((r) => (
+                <div key={r.productId} style={{ border: "1px solid #cbd5e1", borderRadius: "6px", padding: "8px 10px", background: "#ffffff", cursor: "pointer", display: "flex", flexDirection: "column", justifyContent: "space-between", transition: "box-shadow 0.15s" }}
+                  onClick={() => add(r)} onMouseEnter={(e) => e.currentTarget.style.boxShadow = "0 2px 6px rgba(0,0,0,0.1)"} onMouseLeave={(e) => e.currentTarget.style.boxShadow = "none"}>
+                  <div>
+                    <div style={{ fontSize: "11px", fontWeight: "700", color: "#64748b" }}>{r.sku}</div>
+                    <div style={{ fontSize: "12px", fontWeight: "600", color: "#0f172a", lineHeight: "1.3", margin: "2px 0" }}>{r.name}</div>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "6px" }}>
+                    <span style={{ fontWeight: "700", color: "#166534", fontSize: "13px" }}>{rs(r.rate)}</span>
+                    <span style={{ fontSize: "11px", background: "#f0fdf4", color: "#166534", padding: "2px 6px", borderRadius: "4px", fontWeight: "600" }}>+ Add</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="tbl-wrap"><table className="tbl lines-tbl">
           <thead><tr><th>Item</th><th>Qty</th><th>Sell by</th><th>Rate ₹</th><th>GST</th><th className="num">Amount</th><th></th></tr></thead>
           <tbody>

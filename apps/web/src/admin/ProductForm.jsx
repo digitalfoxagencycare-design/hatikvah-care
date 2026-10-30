@@ -3,11 +3,80 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api.js";
 import { Loader, useLoad } from "./hooks.jsx";
 
-const EMPTY = { name: "", sku: "", category: "", collection: "", pack: "", variants: [], description: "", images: [], price: null, priceUnit: "", minOrder: "", active: true, featured: false, hsn: "", gstRate: 18, unit: "pcs",
+const EMPTY = { name: "", sku: "", category: "", collection: "", pack: "", variants: [], description: "", images: [], price: null, priceUnit: "per piece", minOrder: "", active: true, featured: false, hsn: "", gstRate: 18, unit: "pcs",
   brand: "", manufacturer: "", shortDescription: "", variantLabel: "", priceTiers: [], packSize: 1, minQty: 0, dispatchInfo: "", returnable: true, specs: [],
   measure: null, packaging: null, packPrices: { box: null, carton: null }, batchTracked: false };
 const UNITS = { volume: ["ml", "l"], weight: ["g", "kg"], dimensions: ["inch", "cm"], count: ["pcs", "rolls", "pairs"] };
 const DOMAINS = [["", "Not set"], ["volume", "Volume (liquids, gels)"], ["weight", "Weight (soaps, detergents, sachets)"], ["dimensions", "Size (linen, towels)"], ["count", "Count (pieces, rolls, pairs)"]];
+
+export const PRICE_UNITS = [
+  "per piece",
+  "per pack",
+  "per box",
+  "per carton",
+  "per bottle",
+  "per sachet",
+  "per bar",
+  "per tube",
+  "per kit",
+  "per pair",
+  "per set",
+  "per roll",
+  "per kg",
+  "per litre",
+  "per metre",
+];
+
+export const DOC_UNITS = [
+  { val: "pcs", label: "pcs — Pieces (Standard)" },
+  { val: "box", label: "box — Boxes" },
+  { val: "ctn", label: "ctn — Cartons" },
+  { val: "nos", label: "nos — Numbers" },
+  { val: "pac", label: "pac — Packs" },
+  { val: "btl", label: "btl — Bottles" },
+  { val: "bar", label: "bar — Bars (Soap)" },
+  { val: "set", label: "set — Sets" },
+  { val: "prs", label: "prs — Pairs" },
+  { val: "rol", label: "rol — Rolls" },
+  { val: "kgs", label: "kgs — Kilograms" },
+  { val: "ltr", label: "ltr — Litres" },
+  { val: "sqm", label: "sqm — Square metres" },
+  { val: "mtr", label: "mtr — Metres" },
+];
+
+export const BASE_UNITS = [
+  "piece",
+  "bottle",
+  "sachet",
+  "bar",
+  "tube",
+  "kit",
+  "pair",
+  "roll",
+  "pouch",
+  "can",
+  "pack",
+  "set",
+];
+
+export const INNER_PACK_NAMES = [
+  "box",
+  "pack",
+  "tray",
+  "bundle",
+  "pouch",
+  "bag",
+  "dispenser",
+];
+
+export const CARTON_NAMES = [
+  "carton",
+  "master carton",
+  "case",
+  "crate",
+  "box",
+  "bag",
+];
 /** Form strings → the API's measure / packaging objects (null when not filled in). */
 function measureOut(m) {
   if (!m?.domain) return null;
@@ -95,12 +164,34 @@ export default function ProductForm() {
               <label className="field"><span>Pack / specification</span><input maxLength={120} value={f.pack} onChange={(e) => set("pack", e.target.value)} placeholder="e.g. 1000 per pack, 20 ml" /></label>
               <label className="field"><span>Minimum order</span><input maxLength={60} value={f.minOrder} onChange={(e) => set("minOrder", e.target.value)} placeholder="e.g. 50 packs" /></label>
               <label className={"field" + (st.field === "price" ? " bad" : "")}><span>Price (₹) — leave blank for “Price on request”</span><input inputMode="decimal" value={price} onChange={(e) => { setPrice(e.target.value); setSt((s) => ({ ...s, saved: false })); }} placeholder="e.g. 125 or 12.50" /></label>
-              <label className="field"><span>Price unit</span><input maxLength={40} value={f.priceUnit} onChange={(e) => set("priceUnit", e.target.value)} placeholder="per piece / per pack / per kg" /></label>
+              <label className="field"><span>Price unit</span>
+                <span className="btn-row" style={{ display: "flex", gap: "6px" }}>
+                  <select value={PRICE_UNITS.includes(f.priceUnit) ? f.priceUnit : (f.priceUnit ? "__custom__" : "per piece")} onChange={(e) => {
+                    if (e.target.value === "__custom__") { set("priceUnit", f.priceUnit && !PRICE_UNITS.includes(f.priceUnit) ? f.priceUnit : "per "); }
+                    else { set("priceUnit", e.target.value); }
+                  }}>
+                    {PRICE_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+                    <option value="__custom__">Custom / Other…</option>
+                  </select>
+                  {(!PRICE_UNITS.includes(f.priceUnit) && f.priceUnit !== "") && <input className="w-sm" maxLength={40} value={f.priceUnit} onChange={(e) => set("priceUnit", e.target.value)} placeholder="e.g. per dozen" />}
+                </span>
+              </label>
             </div>
             <div className="grid3">
               <label className="field"><span>HSN code (for GST invoices)</span><input inputMode="numeric" maxLength={8} value={f.hsn || ""} onChange={(e) => set("hsn", e.target.value.replace(/\D/g, ""))} placeholder="e.g. 3305" /></label>
               <label className="field"><span>GST rate</span><select value={f.gstRate ?? 18} onChange={(e) => set("gstRate", Number(e.target.value))}>{[0, 5, 12, 18, 28].map((g) => <option key={g} value={g}>{g}%</option>)}</select></label>
-              <label className="field"><span>Unit (on documents)</span><input maxLength={20} value={f.unit || "pcs"} onChange={(e) => set("unit", e.target.value)} placeholder="pcs / pack / kg" /></label>
+              <label className="field"><span>Unit (on documents — GST UQC)</span>
+                <span className="btn-row" style={{ display: "flex", gap: "6px" }}>
+                  <select value={DOC_UNITS.some((u) => u.val === (f.unit || "pcs")) ? (f.unit || "pcs") : "__custom__"} onChange={(e) => {
+                    if (e.target.value === "__custom__") { set("unit", f.unit && !DOC_UNITS.some((u) => u.val === f.unit) ? f.unit : ""); }
+                    else { set("unit", e.target.value); }
+                  }}>
+                    {DOC_UNITS.map((u) => <option key={u.val} value={u.val}>{u.label}</option>)}
+                    <option value="__custom__">Custom UQC…</option>
+                  </select>
+                  {(!DOC_UNITS.some((u) => u.val === f.unit) && f.unit !== "") && <input className="w-sm" maxLength={20} value={f.unit} onChange={(e) => set("unit", e.target.value)} placeholder="Custom unit" />}
+                </span>
+              </label>
             </div>
             <h2>Measurement & packaging</h2>
             <p className="muted small-print">What one piece is, and how pieces are packed for B2B orders. Quotes, orders, invoices and the counter can then sell by the piece, box or carton; stock is always counted in pieces.</p>
@@ -112,9 +203,47 @@ export default function ProductForm() {
               {f.measure.domain && <label className="field"><span>Unit</span><select value={f.measure.unit} onChange={(e) => set("measure", { ...f.measure, unit: e.target.value })}>{UNITS[f.measure.domain].map((u) => <option key={u}>{u}</option>)}</select></label>}
             </div>
             <div className="grid3">
-              <label className="field"><span>Single unit is called</span><input maxLength={20} value={f.pk.baseUnit} onChange={(e) => set("pk", { ...f.pk, baseUnit: e.target.value })} placeholder="piece / bottle / sachet" /></label>
-              <label className="field"><span>Inner pack: pieces per {f.pk.innerName || "box"}</span><span className="btn-row"><input className="w-sm" maxLength={20} aria-label="Inner pack name" value={f.pk.innerName} onChange={(e) => set("pk", { ...f.pk, innerName: e.target.value })} /><input className="w-sm" type="number" min="2" aria-label="Pieces per inner pack" value={f.pk.inner} onChange={(e) => set("pk", { ...f.pk, inner: e.target.value })} placeholder="e.g. 50" /></span></label>
-              <label className="field"><span>Master carton: {f.pk.innerName || "box"}es per {f.pk.cartonName || "carton"}</span><span className="btn-row"><input className="w-sm" maxLength={20} aria-label="Carton name" value={f.pk.cartonName} onChange={(e) => set("pk", { ...f.pk, cartonName: e.target.value })} /><input className="w-sm" type="number" min="1" disabled={!f.pk.inner} aria-label="Inner packs per carton" value={f.pk.carton} onChange={(e) => set("pk", { ...f.pk, carton: e.target.value })} placeholder="e.g. 10" /></span></label>
+              <label className="field"><span>Single unit is called</span>
+                <span className="btn-row" style={{ display: "flex", gap: "6px" }}>
+                  <select value={BASE_UNITS.includes(f.pk.baseUnit || "piece") ? (f.pk.baseUnit || "piece") : "__custom__"} onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === "__custom__") { set("pk", { ...f.pk, baseUnit: f.pk.baseUnit && !BASE_UNITS.includes(f.pk.baseUnit) ? f.pk.baseUnit : "" }); }
+                    else { set("pk", { ...f.pk, baseUnit: val }); }
+                  }}>
+                    {BASE_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+                    <option value="__custom__">Custom…</option>
+                  </select>
+                  {(!BASE_UNITS.includes(f.pk.baseUnit) && f.pk.baseUnit !== "" && f.pk.baseUnit !== "piece") && <input className="w-sm" maxLength={20} value={f.pk.baseUnit} onChange={(e) => set("pk", { ...f.pk, baseUnit: e.target.value })} placeholder="Custom unit" />}
+                </span>
+              </label>
+              <label className="field"><span>Inner pack: pieces per pack</span>
+                <span className="btn-row" style={{ display: "flex", gap: "6px" }}>
+                  <select style={{ minWidth: "90px" }} value={INNER_PACK_NAMES.includes(f.pk.innerName || "box") ? (f.pk.innerName || "box") : "__custom__"} onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === "__custom__") { set("pk", { ...f.pk, innerName: f.pk.innerName && !INNER_PACK_NAMES.includes(f.pk.innerName) ? f.pk.innerName : "" }); }
+                    else { set("pk", { ...f.pk, innerName: val }); }
+                  }}>
+                    {INNER_PACK_NAMES.map((u) => <option key={u} value={u}>{u}</option>)}
+                    <option value="__custom__">Custom…</option>
+                  </select>
+                  {(!INNER_PACK_NAMES.includes(f.pk.innerName) && f.pk.innerName !== "" && f.pk.innerName !== "box") && <input className="w-sm" maxLength={20} value={f.pk.innerName} onChange={(e) => set("pk", { ...f.pk, innerName: e.target.value })} placeholder="Pack name" />}
+                  <input className="w-sm" type="number" min="2" aria-label="Pieces per inner pack" value={f.pk.inner} onChange={(e) => set("pk", { ...f.pk, inner: e.target.value })} placeholder="e.g. 50" />
+                </span>
+              </label>
+              <label className="field"><span>Master carton: packs per carton</span>
+                <span className="btn-row" style={{ display: "flex", gap: "6px" }}>
+                  <select style={{ minWidth: "90px" }} value={CARTON_NAMES.includes(f.pk.cartonName || "carton") ? (f.pk.cartonName || "carton") : "__custom__"} onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === "__custom__") { set("pk", { ...f.pk, cartonName: f.pk.cartonName && !CARTON_NAMES.includes(f.pk.cartonName) ? f.pk.cartonName : "" }); }
+                    else { set("pk", { ...f.pk, cartonName: val }); }
+                  }}>
+                    {CARTON_NAMES.map((u) => <option key={u} value={u}>{u}</option>)}
+                    <option value="__custom__">Custom…</option>
+                  </select>
+                  {(!CARTON_NAMES.includes(f.pk.cartonName) && f.pk.cartonName !== "" && f.pk.cartonName !== "carton") && <input className="w-sm" maxLength={20} value={f.pk.cartonName} onChange={(e) => set("pk", { ...f.pk, cartonName: e.target.value })} placeholder="Carton name" />}
+                  <input className="w-sm" type="number" min="1" disabled={!f.pk.inner} aria-label="Inner packs per carton" value={f.pk.carton} onChange={(e) => set("pk", { ...f.pk, carton: e.target.value })} placeholder="e.g. 10" />
+                </span>
+              </label>
             </div>
             {Number(f.pk.inner) > 0 && (
               <div className="grid3">

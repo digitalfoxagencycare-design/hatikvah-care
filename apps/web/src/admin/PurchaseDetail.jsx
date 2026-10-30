@@ -74,8 +74,14 @@ function Editor({ po, st, onSave }) {
           <td><input className="w-sm" inputMode="decimal" defaultValue={i.rate ? i.rate / 100 : ""} onBlur={(e) => { const v = toPaise(e.target.value); setF({ ...f, items: f.items.map((x, j) => (j === n ? { ...x, rate: Number.isNaN(v) || v == null ? 0 : v } : x)) }); }} aria-label="Rate" /></td>
           <td><button type="button" className="link danger" onClick={() => setF({ ...f, items: f.items.filter((_, j) => j !== n) })}>✕</button></td></tr>)}
       </tbody></table>
-      <input list="po-products" value={pick} placeholder="Search a product to add…" onChange={(e) => { setPick(e.target.value); add(e.target.value); }} aria-label="Add product" />
-      <datalist id="po-products">{stock.data?.map((p) => <option key={p.id} value={`${p.sku} · ${p.name}`} />)}</datalist>
+      <div style={{ display: "flex", gap: "10px", margin: "10px 0", flexWrap: "wrap" }}>
+        <input style={{ flex: "1 1 240px" }} list="po-products" value={pick} placeholder="Type SKU or name to add…" onChange={(e) => { setPick(e.target.value); add(e.target.value); }} aria-label="Add product" />
+        <select style={{ flex: "1 1 280px", padding: "8px 12px" }} value="" onChange={(e) => { if (e.target.value) { add(e.target.value); } }}>
+          <option value="">— Or click to pick product ({stock.data?.length || 0}) —</option>
+          {stock.data?.map((p) => <option key={p.id} value={`${p.sku} · ${p.name}`}>{p.sku} · {p.name}</option>)}
+        </select>
+        <datalist id="po-products">{stock.data?.map((p) => <option key={p.id} value={`${p.sku} · ${p.name}`} />)}</datalist>
+      </div>
       <Msg st={st} /><button className="btn" disabled={st.busy || !f.items.length}>{f.receiveNow ? "Save & Add to Stock (Auto +)" : "Save purchase order"}</button>
     </form>
   );
