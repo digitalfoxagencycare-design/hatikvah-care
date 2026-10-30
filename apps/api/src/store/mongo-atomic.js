@@ -12,10 +12,44 @@ export async function createMongoStore(uri, dbName) {
     const hello = await db.command({ hello: 1 });
     if (!hello.setName && hello.msg !== 'isdbgrid') throw new Error('MongoDB transactions require a replica set or sharded cluster');
     await fence.updateOne({ _id: 'business' }, { $setOnInsert: { revision: 0 } }, { upsert: true });
-    for (const n of COLLECTIONS) {
-      for (const field of UNIQUE[n] || []) await db.collection(n).createIndex({ [field]: 1 }, LEGACY_UNIQUE.has(n+':'+field) ? { unique: true } : { unique: true, partialFilterExpression: { [field]: { $type: 'string', $gt: '' } } });
+    async function ensureIndex(col, keys, options = {}) {
+      try {
+        await col.createIndex(keys, options);
+      } catch (err) {
+        if (err.code === 85 || (err.message && (err.message.includes('existing index') || err.message.includes('IndexOptionsConflict')))) {
+          const existing = await col.indexes().catch(() => []);
+          const keyEntries = Object.entries(keys);
+          const match = existing.find(idx => {
+            const kEntries = Object.entries(idx.key || {});
+            if (kEntries.length !== keyEntries.length) return false;
+            return keyEntries.every(([k, v]) => idx.key[k] === v);
+          });
+          if (match && match.name && match.name !== '_id_') {
+            await col.dropIndex(match.name).catch(() => {});
+            try {
+              await col.createIndex(keys, options);
+            } catch (innerErr) {
+              if (innerErr.code === 11000 && options.unique) {
+                console.warn(`[store] Non-unique fallback for index on ${col.collectionName}:`, innerErr.message);
+                await col.createIndex(keys).catch(() => {});
+              } else {
+                throw innerErr;
+              }
+            }
+            return;
+          }
+        }
+        throw err;
+      }
     }
-    for (const [n,keys] of [['enquiries',{createdAt:-1}],['audit',{at:-1}],['stockMoves',{productId:1}],['payments',{invoiceId:1}],['creditNotes',{invoiceId:1}],['outbox',{status:1,createdAt:1}],['inbox',{from:1,at:-1}],['activities',{entityId:1,at:-1}]]) await db.collection(n).createIndex(keys);
+    for (const n of COLLECTIONS) {
+      for (const field of UNIQUE[n] || []) {
+        await ensureIndex(db.collection(n), { [field]: 1 }, LEGACY_UNIQUE.has(n+':'+field) ? { unique: true } : { unique: true, partialFilterExpression: { [field]: { $type: 'string', $gt: '' } } });
+      }
+    }
+    for (const [n,keys] of [['enquiries',{createdAt:-1}],['audit',{at:-1}],['stockMoves',{productId:1}],['payments',{invoiceId:1}],['creditNotes',{invoiceId:1}],['outbox',{status:1,createdAt:1}],['inbox',{from:1,at:-1}],['activities',{entityId:1,at:-1}]]) {
+      await ensureIndex(db.collection(n), keys);
+    }
   } catch (e) { await client.close(); throw e; }
   const out = value => { if (!value) return null; const { _id, id: ignored, ...rest } = value; return { ...rest, id: _id }; };
   const options = () => context.getStore() ? { session: context.getStore().session } : {};
