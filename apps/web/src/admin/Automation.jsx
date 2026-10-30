@@ -23,6 +23,8 @@ export default function Automation() {
         <>
           <div className="tiles">
             {[["Email", d.channels.email], ["WhatsApp", d.channels.whatsapp], ["Online payments", d.channels.payments]].map(([l, v]) => <div key={l} className={"tile" + (v === "off" ? " warn" : "")}><strong className="small-strong">{v === "off" ? "Off" : "On"}</strong><span>{l}</span><small>{CH[v]}</small></div>)}
+            {d.channels.whatsapp !== "off" && <div className={"tile" + (d.channels.whatsappTemplates === "off" ? " warn" : "")}><strong className="small-strong">{d.channels.whatsappTemplates === "off" ? "None" : "Set"}</strong><span>WhatsApp templates</span>
+              <small>{d.channels.whatsappTemplates === "off" ? "Customers who have not written in 24 h get messages by hand only" : d.channels.whatsappTemplates}</small></div>}
             <div className="tile"><strong className="small-strong">{d.cron.everyMinutes ? `Every ${d.cron.everyMinutes} min` : "Manual"}</strong><span>Scheduled checks</span><small>Last run {fmtTime(d.config.lastRunAt)}</small></div>
           </div>
           {(d.channels.email === "off" || d.channels.whatsapp === "off") && <p className="notice">Until email/WhatsApp are connected, every message is still prepared and listed below with a <strong>Send by hand</strong> link: one click opens WhatsApp or your email with the text filled in. See docs/INTEGRATIONS.md to connect them.</p>}
@@ -50,7 +52,7 @@ export default function Automation() {
       <Loader s={out}>
         <ul className="outbox">{out.data?.map((m) => (
           <li key={m.id} className="panel">
-            <div className="row-between"><span><strong>{m.channel === "whatsapp" ? "WhatsApp" : "Email"}</strong> to {m.to} · {m.event} {m.ref && `· ${m.ref}`}</span><span><small className="muted">{fmtTime(m.createdAt)}</small> <Pill s={m.status === "logged" ? "new" : m.status === "sent" ? "won" : m.status === "failed" ? "overdue" : "contacted"}>{m.status === "logged" ? "send by hand" : m.status}</Pill></span></div>
+            <div className="row-between"><span><strong>{m.channel === "whatsapp" ? "WhatsApp" : "Email"}</strong> to {m.to} · {m.event} {m.ref && `· ${m.ref}`}{m.via && <small className="muted"> · {m.via.startsWith("template:") ? `template ${m.via.slice(9)}` : m.via}</small>}</span><span><small className="muted">{fmtTime(m.createdAt)}</small> <Pill s={m.status === "logged" ? "new" : m.status === "sent" ? "won" : m.status === "failed" ? "overdue" : "contacted"}>{m.status === "logged" ? "send by hand" : m.status}</Pill></span></div>
             {m.subject && m.channel === "email" && <strong>{m.subject}</strong>}
             <p className="pre small-print">{m.body}</p>
             {m.error && <p className="alert">{m.error}</p>}

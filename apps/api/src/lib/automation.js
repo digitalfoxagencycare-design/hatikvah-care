@@ -51,7 +51,12 @@ export function createAutomation({ cfg, store, notifier, log = console }) {
     return t;
   }
   const toCustomer = (c) => [c.email && { channel: "email", to: c.email }, c.phone && { channel: "whatsapp", to: c.phone }].filter(Boolean);
-  async function send(targets, { subject, body, event, ref, button = null }) { for (const t of targets) await notifier.queue({ ...t, subject, body, event, ref, button }); }
+  async function send(targets, { subject, body, event, ref, button = null, template = null }) { for (const t of targets) await notifier.queue({ ...t, subject, body, event, ref, button, template }); }
+  // Template variables for messages outside WhatsApp's 24-hour window (order and meaning: WA_TEMPLATES in notify.js)
+  const name = (c) => c.contactName || c.name;
+  const quoteTpl = (q) => ({ kind: "quote", params: [name(q.customer), q.number, money(q.totals.total)], button: q.token });
+  const invoiceTpl = (inv, amount) => ({ kind: "invoice", params: [name(inv.customer), inv.number, money(amount), inv.dueDate], button: inv.token });
+  const dispatchTpl = (o, details) => ({ kind: "dispatch", params: [name(o.customer), o.number, details], button: o.token });
 
   // ---------- events
   async function enquiryCreated(enq) {
@@ -84,7 +89,7 @@ export function createAutomation({ cfg, store, notifier, log = console }) {
     if (!isOn(a, "quoteSend")) return;
     await send(toCustomer(q.customer), { event: "quoteSend", ref: q.number, subject: `Quotation ${q.number} from ${company.name}`,
       body: `Dear ${q.customer.contactName || q.customer.name},\nPlease find our quotation ${q.number} for ${money(q.totals.total)} (incl. GST)${q.validUntil ? `, valid until ${q.validUntil}` : ""}.\nView and accept online: ${docLink("quote", q.token)}${q.payLink?.url ? `\nPay now to confirm: ${q.payLink.url}` : ""}\n– ${company.name}`,
-      button: { label: "View & approve", url: docLink("quote", q.token) } });
+      button: { label: "View & approve", url: docLink("quote", q.token) }, template: quoteTpl(q) });
     await notifier.flush();
   }
 
@@ -115,7 +120,8 @@ export function createAutomation({ cfg, store, notifier, log = console }) {
     const d = o.dispatch || {};
     await send(toCustomer(o.customer), { event: "orderDispatched", ref: o.number, subject: `Your order ${o.number} has been dispatched`,
       body: `Dear ${o.customer.contactName || o.customer.name},\nYour order ${o.number} has been dispatched${d.transporter ? ` via ${d.transporter}` : ""}${d.trackingNo ? ` (tracking ${d.trackingNo})` : ""}.${o.shipment?.trackingUrl ? `\nLive tracking: ${o.shipment.trackingUrl}` : ""}\nDelivery challan: ${docLink("challan", o.token)}\n– ${company.name}`,
-      button: o.shipment?.trackingUrl ? { label: "Track delivery", url: o.shipment.trackingUrl } : { label: "Delivery challan", url: docLink("challan", o.token) } });
+      button: o.shipment?.trackingUrl ? { label: "Track delivery", url: o.shipment.trackingUrl } : { label: "Delivery challan", url: docLink("challan", o.token) },
+      template: dispatchTpl(o, [d.transporter && `Courier: ${d.transporter}.`, (o.shipment?.awb || d.trackingNo) && `Tracking no: ${o.shipment?.awb || d.trackingNo}.`, o.shipment?.trackingUrl && `Live tracking: ${o.shipment.trackingUrl}`].filter(Boolean).join(" ") || "Dispatched today.") });
     await notifier.flush();
   }
 
@@ -127,7 +133,8 @@ export function createAutomation({ cfg, store, notifier, log = console }) {
     const what = status === "delivered" ? "has been delivered. Thank you for your business!" : status === "picked" ? "has been picked up by our delivery partner." : "is out for delivery today.";
     await send(toCustomer(o.customer).filter((x) => x.channel === "whatsapp"), { event: "shipmentUpdate", ref: o.number, subject: `Order ${o.number}: ${status}`,
       body: `Dear ${o.customer.contactName || o.customer.name},\nYour order ${o.number} ${what}${t && status !== "delivered" ? `\nLive tracking: ${t}` : ""}${o.shipment?.awb ? `\nAWB: ${o.shipment.awb}` : ""}\n– ${company.name}`,
-      button: t && status !== "delivered" ? { label: "Track rider", url: t } : null });
+      button: t && status !== "delivered" ? { label: "Track rider", url: t } : null,
+      template: dispatchTpl(o, `${status === "delivered" ? "Delivered." : status === "picked" ? "Picked up by our delivery partner." : "Out for delivery today."}${o.shipment?.awb ? ` AWB ${o.shipment.awb}.` : ""}${t && status !== "delivered" ? ` Live tracking: ${t}` : ""}`) });
     await notifier.flush();
   }
 
@@ -136,7 +143,8 @@ export function createAutomation({ cfg, store, notifier, log = console }) {
     if (!isOn(a, "invoiceSend")) return;
     await send(toCustomer(inv.customer), { event: "invoiceSend", ref: inv.number, subject: `Invoice ${inv.number} from ${company.name}`,
       body: `Dear ${inv.customer.contactName || inv.customer.name},\nInvoice ${inv.number} for ${money(inv.totals.total)} is due on ${inv.dueDate}.\nView / download: ${docLink("invoice", inv.token)}${inv.payLink?.url ? `\nPay online: ${inv.payLink.url}` : ""}${company.upiId ? `\nUPI: ${company.upiId}` : ""}\n– ${company.name}`,
-      button: inv.payLink?.url && balance(inv) > 0 ? { label: "Pay now", url: inv.payLink.url } : { label: "View invoice", url: docLink("invoice", inv.token) } });
+      button: inv.payLink?.url && balance(inv) > 0 ? { label: "Pay now", url: inv.payLink.url } : { label: "View invoice", url: docLink("invoice", inv.token) },
+      template: invoiceTpl(inv, balance(inv) || inv.totals.total) });
     await notifier.flush();
   }
 
@@ -172,7 +180,7 @@ export function createAutomation({ cfg, store, notifier, log = console }) {
       const due = a.quoteReminderDays.filter((d) => age >= d && !done.includes(d));
       if (!due.length) continue;
       await send(toCustomer(q.customer), { event: "quoteReminder", ref: q.number, subject: `Following up on quotation ${q.number}`,
-        body: `Dear ${q.customer.contactName || q.customer.name},\nJust following up on our quotation ${q.number} (${money(q.totals.total)}). You can view and accept it here: ${docLink("quote", q.token)}\nHappy to adjust quantities or answer any questions.\n– ${company.name}` });
+        body: `Dear ${q.customer.contactName || q.customer.name},\nJust following up on our quotation ${q.number} (${money(q.totals.total)}). You can view and accept it here: ${docLink("quote", q.token)}\nHappy to adjust quantities or answer any questions.\n– ${company.name}`, template: quoteTpl(q) });
       await store.quotes.update(q.id, { remindersSent: [...done, ...due] }); count("quoteReminder");
     }
     if (isOn(a, "invoiceOverdue")) {
@@ -181,7 +189,7 @@ export function createAutomation({ cfg, store, notifier, log = console }) {
         const due = a.overdueDays.filter((d) => late >= d && !done.includes(d));
         if (!due.length) continue;
         await send(toCustomer(inv.customer), { event: "invoiceOverdue", ref: inv.number, subject: `Payment reminder: invoice ${inv.number}`,
-          body: `Dear ${inv.customer.contactName || inv.customer.name},\nThis is a reminder that invoice ${inv.number} (balance ${money(balance(inv))}) was due on ${inv.dueDate}.\nView: ${docLink("invoice", inv.token)}${inv.payLink?.url ? `\nPay online: ${inv.payLink.url}` : ""}${company.upiId ? `\nUPI: ${company.upiId}` : ""}\nPlease ignore if already paid.\n– ${company.name}` });
+          body: `Dear ${inv.customer.contactName || inv.customer.name},\nThis is a reminder that invoice ${inv.number} (balance ${money(balance(inv))}) was due on ${inv.dueDate}.\nView: ${docLink("invoice", inv.token)}${inv.payLink?.url ? `\nPay online: ${inv.payLink.url}` : ""}${company.upiId ? `\nUPI: ${company.upiId}` : ""}\nPlease ignore if already paid.\n– ${company.name}`, template: invoiceTpl(inv, balance(inv)) });
         await store.invoices.update(inv.id, { remindersSent: [...done, ...due] }); count("invoiceOverdue");
       }
     }

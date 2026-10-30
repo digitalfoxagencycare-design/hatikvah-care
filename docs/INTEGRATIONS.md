@@ -14,6 +14,26 @@ Everything works without these: messages are prepared and listed in **Admin › 
 | Scheduler | `CRON_SECRET` (24+ random characters), `AUTOMATION_INTERVAL_MIN` | Cloud Run sleeps when idle, so add a Cloud Scheduler job: every 15 minutes, `POST https://YOUR-DOMAIN/api/internal/cron`, header `X-Cron-Secret: <CRON_SECRET>`. |
 | Analytics | in Admin › Company & GST: GA4 ID, Meta Pixel ID | Enquiries are sent as `generate_lead` (GA4) and `Lead` (Meta) conversions. |
 
+### WhatsApp templates (messages outside the 24-hour window)
+WhatsApp delivers free-form messages only within 24 hours of the customer's last message to you. With the inbound webhook connected, the app knows each customer's window (from the WhatsApp inbox) and chooses per message:
+
+1. **Window open** → free-form text with a tap-to-open link button.
+2. **Window closed** → the approved template for that kind of message (below), else the general `WHATSAPP_TEMPLATE` (body `{{1}}` = the whole message on one line).
+3. **No template covers it** → not sent (WhatsApp would reject it); it stays in **Automation & messages** as *send by hand* with the reason.
+
+Without the inbound webhook the window is unknown, so the app uses a template when one is set and free-form text otherwise (as before).
+
+Create these in WhatsApp Manager › Message templates as category **Utility**, language as in `WHATSAPP_TEMPLATE_LANG` (default `en`), with one **Visit website** button of type *Dynamic* whose URL ends in `{{1}}`. The app fills the variables in this order, and the button suffix is the document's secret token. Put each approved template's name in its variable:
+
+| Variable | Used for | Body (example wording; keep the variables in this order) | Button URL |
+|---|---|---|---|
+| `WHATSAPP_TEMPLATE_QUOTE` | quotation sent, quotation reminders | `Dear {{1}}, our quotation {{2}} for {{3}} (incl. GST) is ready. Tap below to view and approve it.` | `https://YOUR-DOMAIN/doc/quote/{{1}}` |
+| `WHATSAPP_TEMPLATE_DISPATCH` | order dispatched, courier updates (picked up / out for delivery / delivered) | `Dear {{1}}, your order {{2}} is on its way. {{3}} Tap below for the delivery challan.` ({{3}} = courier, AWB and live tracking link) | `https://YOUR-DOMAIN/doc/challan/{{1}}` |
+| `WHATSAPP_TEMPLATE_INVOICE` | invoice sent, overdue reminders | `Dear {{1}}, invoice {{2}} for {{3}} is due on {{4}}. Tap below to view, download or pay it.` | `https://YOUR-DOMAIN/doc/invoice/{{1}}` |
+| `WHATSAPP_TEMPLATE` | everything else (payment receipts, enquiry replies, website orders, team alerts) | `{{1}}` | none |
+
+Template names are lowercase letters, numbers and `_` (the server refuses anything else at start-up). Each sent message records which route it took (`template hc_quote`, `link`, `text`) in the outbox.
+
 After setting variables, open **Automation & messages**: the tiles show which channels are on. Failed sends are retried 5 times and can be retried by hand.
 
 ## Accounting (Tally / Zoho Books)

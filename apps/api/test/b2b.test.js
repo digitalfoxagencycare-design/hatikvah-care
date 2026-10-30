@@ -175,6 +175,8 @@ describe("Shadowfax", () => {
     const hook = (body, token = SFX_HOOK) => fetch(t.base + "/api/webhooks/shadowfax", { method: "POST", headers: { "content-type": "application/json", "x-shadowfax-token": token }, body: JSON.stringify(body) });
     assert.equal((await hook({ awb_number: "SF123456", status: "PICKED" }, "x".repeat(32))).status, 401);
     sent = [];
+    // the customer wrote to us within the last day, so WhatsApp's 24-hour window is open and a free-form link button is allowed
+    await t.store.inbox.insert({ waMessageId: "wamid.recent", from: "919876543210", at: new Date().toISOString(), type: "text", text: "When will it arrive?", items: [], readAt: null });
     assert.equal((await hook({ awb_number: "SF123456", status: "Picked", rider_name: "Anil" })).status, 200);
     await wait();
     assert.ok(sent.some((m) => m.interactive?.action?.parameters?.url?.includes("SF123456")), "tracking link sent on WhatsApp");
