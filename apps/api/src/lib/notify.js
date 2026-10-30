@@ -63,6 +63,7 @@ export function channels(cfg) {
     otp: cfg.novaUrl && cfg.novaKey ? "nova" : cfg.waToken && cfg.waPhoneId ? "whatsapp-cloud-api" : "off", // website sign-in codes
     whatsappInbound: cfg.waVerifyToken ? "webhook" : "off",
     logistics: cfg.sfxToken ? "shadowfax" : "off",
+    couriers: [cfg.sfxToken && "shadowfax", cfg.porterKey && cfg.porterBaseUrl && "porter"].filter(Boolean),
     // approved templates for messages outside the 24-hour window, e.g. "quote, invoice + general"
     whatsappTemplates: [...Object.entries(cfg.waTemplates || {}).filter(([, v]) => v).map(([k]) => k), ...(cfg.waTemplate ? ["general"] : [])].join(", ") || "off",
   };

@@ -37,6 +37,9 @@ export function loadConfig(env = process.env) {
     // Shadowfax (logistics): API token from the Shadowfax client dashboard; webhook calls must carry X-Shadowfax-Token = SHADOWFAX_WEBHOOK_TOKEN.
     sfxToken: env.SHADOWFAX_API_TOKEN || "", sfxBaseUrl: (env.SHADOWFAX_BASE_URL || "https://dale.shadowfax.in").replace(/\/$/, ""), sfxWebhookToken: env.SHADOWFAX_WEBHOOK_TOKEN || "",
     sfxPickupPincode: env.SHADOWFAX_PICKUP_PINCODE || "", sfxTrackingUrl: env.SHADOWFAX_TRACKING_URL || "", // e.g. https://tracker.shadowfax.in/#/track/{awb}
+    // Porter (same-city two-wheeler deliveries): base URL and key from Porter's API document, the shop's map location; webhook calls must carry X-Porter-Token = PORTER_WEBHOOK_TOKEN.
+    porterKey: env.PORTER_API_KEY || "", porterBaseUrl: (env.PORTER_BASE_URL || "").replace(/\/$/, ""), porterWebhookToken: env.PORTER_WEBHOOK_TOKEN || "",
+    porterPickupLat: env.PORTER_PICKUP_LAT ? Number(env.PORTER_PICKUP_LAT) : NaN, porterPickupLng: env.PORTER_PICKUP_LNG ? Number(env.PORTER_PICKUP_LNG) : NaN,
     // Nova (central engine): login codes go out on Nova's WhatsApp number through its client API. Key issued in the Nova console.
     novaUrl: (env.NOVA_URL || "").replace(/\/$/, ""), novaKey: env.NOVA_CLIENT_KEY || "", novaSlug: env.NOVA_TENANT_SLUG || "",
     razorpayKeyId: env.RAZORPAY_KEY_ID || "", razorpaySecret: env.RAZORPAY_KEY_SECRET || "", razorpayWebhookSecret: env.RAZORPAY_WEBHOOK_SECRET || "",
@@ -46,6 +49,7 @@ export function loadConfig(env = process.env) {
   if (cfg.sessionHours !== 12) problems.push("SESSION_HOURS must be exactly 12 for admin/staff sessions");
   if (prod && (cfg.razorpayKeyId || cfg.waToken) && !/^https:\/\//.test(cfg.publicUrl)) problems.push('PUBLIC_URL must be an HTTPS origin for payment and messaging integrations');
   if (prod && cfg.sfxToken && !/^https:\/\//.test(cfg.sfxBaseUrl)) problems.push('SHADOWFAX_BASE_URL must use HTTPS');
+  if (prod && cfg.porterKey && !/^https:\/\//.test(cfg.porterBaseUrl)) problems.push('PORTER_BASE_URL must use HTTPS');
   if (prod && !cfg.mongoUri) problems.push("MONGODB_URI is required in production (the file store is for development only)");
   if (cfg.jwtSecret.length < 32) problems.push("JWT_SECRET must be at least 32 characters");
   if (prod && /dev-only|change-me|replace/i.test(cfg.jwtSecret)) problems.push("JWT_SECRET looks like a placeholder");
@@ -58,6 +62,7 @@ export function loadConfig(env = process.env) {
   if (!/^[a-z]{2,3}(_[A-Z]{2})?$/.test(cfg.waTemplateLang)) problems.push("WHATSAPP_TEMPLATE_LANG must be a WhatsApp language code like en or en_US");
   if (cfg.waVerifyToken && cfg.waVerifyToken.length < 16) problems.push("WHATSAPP_WEBHOOK_VERIFY_TOKEN must be at least 16 characters");
   if (cfg.sfxWebhookToken && cfg.sfxWebhookToken.length < 24) problems.push("SHADOWFAX_WEBHOOK_TOKEN must be at least 24 characters");
+  if (cfg.porterWebhookToken && cfg.porterWebhookToken.length < 24) problems.push("PORTER_WEBHOOK_TOKEN must be at least 24 characters");
   if (cfg.buyerSessionDays !== 30) problems.push("BUYER_SESSION_DAYS must equal 30");
   if (cfg.cronSecret && cfg.cronSecret.length < 24) problems.push("CRON_SECRET must be at least 24 characters");
   if (problems.length) throw new Error("Unsafe configuration: " + problems.join("; "));

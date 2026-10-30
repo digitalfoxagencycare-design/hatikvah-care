@@ -27,7 +27,7 @@ export function createApp({ cfg, store, log = console, fetchImpl }) {
       useDefaults: false,
       directives: {
         "default-src": ["'self'"], "script-src": ["'self'", "https://www.googletagmanager.com", "https://connect.facebook.net"], "style-src": ["'self'", "https://fonts.googleapis.com"],
-        "font-src": ["https://fonts.gstatic.com"], "img-src": ["'self'", "data:", "https://www.googletagmanager.com", "https://www.google-analytics.com", "https://www.facebook.com"],
+        "font-src": ["https://fonts.gstatic.com"], "img-src": ["'self'", "data:", "https://rzp.io", "https://*.razorpay.com", "https://www.googletagmanager.com", "https://www.google-analytics.com", "https://www.facebook.com"],
         "connect-src": ["'self'", "https://www.google-analytics.com", "https://*.google-analytics.com", "https://www.googletagmanager.com", "https://www.facebook.com", "https://connect.facebook.net"],
         "frame-ancestors": ["'none'"], "base-uri": ["'none'"], "form-action": ["'self'"], "object-src": ["'none'"],
       },

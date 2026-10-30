@@ -1,7 +1,10 @@
 import { Router } from "express";
 import { requirePerm } from "../lib/permissions.js";
+import { channels } from "../lib/notify.js";
+import { applyQrPayment, qrView, refreshUpiQr } from "../lib/payments.js";
+import { closeUpiQr, fetchQrPayments } from "../lib/razorpay.js";
 import { balance, createInvoice, deductForInvoice, logActivity, now, recordPayment, postLedger } from "../lib/sales.js";
-import { posInput } from "../schemas.js";
+import { posInput, upiCloseInput } from "../schemas.js";
 import { wrap as plainWrap } from "./public.js";
 import { atomicWrap } from "./atomic.js";
 import { bad, csvHeaders, notFound, parse, rupees } from "./shared.js";
@@ -11,7 +14,7 @@ const digits10 = (phone) => String(phone || "").replace(/\D/g, "").slice(-10);
 const WALK_IN = "Walk-in (counter sale)";
 
 /** Counter billing (walk-in buyers: GST invoice + payment in one step) and the cash / bank book. */
-export function posRoutes({ store, audit, automation }) {
+export function posRoutes({ cfg, store, audit, automation, fetchImpl, log = console }) {
   const r = Router();
   const wrap = fn => atomicWrap(store, fn);
   const by = (req) => req.admin.email;
@@ -50,6 +53,46 @@ export function posRoutes({ store, audit, automation }) {
     if (payment) await automation.on.paymentReceived(out, payment);
     await audit(req, "pos.invoice", inv.number, { total: inv.totals.total, paid: payment?.amount || 0 });
     res.status(201).json({ invoice: out, payment });
+  }));
+
+  // ---------- dynamic UPI QR for a counter invoice. The invoice comes first (POST /pos/invoice without a payment); paying the QR settles it.
+  const posInvoice = async (req, res) => {
+    const i = await store.invoices.get(req.params.id);
+    if (!i || i.source !== "pos") { notFound(res, "Counter invoice"); return null; }
+    return i;
+  };
+  /** Asks Razorpay what was paid: the qr_code.credited webhook normally gets there first, and this covers a late or missing call. */
+  async function syncQr(i) {
+    if (!i.upiQr?.id || i.upiQr.status !== "active") return i;
+    const paid = await fetchQrPayments(cfg, i.upiQr.id, fetchImpl ? { fetchImpl } : {});
+    for (const pay of paid) await store.atomic(() => applyQrPayment({ store, automation }, { qrId: i.upiQr.id, invoiceId: i.id, pay }));
+    return store.invoices.get(i.id);
+  }
+  r.post("/pos/invoices/:id/upi-qr", requirePerm("pos"), plainWrap(async (req, res) => {
+    if (channels(cfg).payments === "off") return bad(res, "Online payments are not set up yet (Razorpay keys are needed)", 409);
+    const i = await posInvoice(req, res); if (!i) return;
+    if (balance(i) <= 0) return bad(res, "Nothing left to pay on this invoice", 409);
+    try { res.json(qrView(await refreshUpiQr({ cfg, store, fetchImpl }, i))); } catch (e) { bad(res, e.message, 502); }
+  }));
+  r.get("/pos/invoices/:id/upi-qr", requirePerm("pos"), plainWrap(async (req, res) => {
+    let i = await posInvoice(req, res); if (!i) return;
+    if (req.query.sync && channels(cfg).payments !== "off") { try { i = await syncQr(i); } catch (e) { log.warn?.("QR status check failed:", e.message); } }
+    res.set("Cache-Control", "no-store").json(qrView(i));
+  }));
+  r.post("/pos/invoices/:id/upi-qr/close", requirePerm("pos"), plainWrap(async (req, res) => {
+    const d = parse(upiCloseInput, req.body || {}, res); if (!d) return;
+    let i = await posInvoice(req, res); if (!i) return;
+    if (i.upiQr?.status === "active") {
+      try { await closeUpiQr(cfg, i.upiQr.id, fetchImpl ? { fetchImpl } : {}); } catch (e) { log.warn?.("QR close failed:", e.message); }
+      i = await syncQr(i).catch(() => store.invoices.get(i.id)); // the customer may have paid a moment before the close: never take the money twice
+      if (i.upiQr?.status === "active") i = await store.invoices.update(i.id, { upiQr: { ...i.upiQr, status: "closed" }, updatedAt: now() });
+    }
+    if (d.payment && balance(i) > 0) {
+      const p = await recordPayment(store, i, { amount: balance(i), mode: d.payment.mode, reference: d.payment.reference, notes: "Counter sale", by: by(req) });
+      i = p.invoice; await automation.on.paymentReceived(p.invoice, p.payment);
+      await audit(req, "pos.payment", i.number, { amount: p.payment.amount, mode: p.payment.mode });
+    }
+    res.json(qrView(i));
   }));
 
   // ---------- cash / bank book (receipts posted by every payment)

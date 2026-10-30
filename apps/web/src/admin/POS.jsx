@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api.js";
-import { calcTotals, Msg, rs, StateSelect, toPaise, Totals, useAction, useAsync } from "./ui.jsx";
+import { calcTotals, Msg, rs, StateSelect, toPaise, Totals, useAction, useAsync, useMeta } from "./ui.jsx";
+import { UpiQrModal } from "./UpiQr.jsx";
 
 const RATES = [0, 5, 12, 18, 28];
 const EMPTY_BUYER = { name: "", phone: "", gstin: "", stateCode: "" };
@@ -22,6 +23,9 @@ export default function POS() {
   const [pos, setPos] = useState("");
   const [done, setDone] = useState(null);
   const [showCatalog, setShowCatalog] = useState(false);
+  const [qrFor, setQrFor] = useState(null);
+  const qrOn = useMeta().channels.payments === "razorpay";
+  const useQr = pay.collect && pay.mode === "upi" && qrOn && !pay.reference.trim(); // a typed UTR means the money already came another way
   const [st, run] = useAction();
   const search = useRef(null), qtyRefs = useRef([]);
 
@@ -69,10 +73,11 @@ export default function POS() {
     const body = {
       ...(customerId ? { customerId } : { walkIn: { name: buyer.name.trim() || "Walk-in customer", phone: buyer.phone, gstin: buyer.gstin, stateCode: buyer.stateCode } }),
       items: lines.map(({ uoms, amount, tax, total, ...l }) => ({ ...l, qty: Number(l.qty), discountPct: Number(l.discountPct) || 0 })),
-      placeOfSupply: pos, payment: pay.collect ? { mode: pay.mode, reference: pay.reference } : null,
+      placeOfSupply: pos, payment: pay.collect && !useQr ? { mode: pay.mode, reference: pay.reference } : null,
     };
     const r = await api("/api/admin/pos/invoice", { method: "POST", body });
-    setDone(r); setLines([]); setBuyer(EMPTY_BUYER); setCustomerId(""); setPay({ ...pay, reference: "" });
+    if (useQr) setQrFor(r.invoice); else setDone(r);
+    setLines([]); setBuyer(EMPTY_BUYER); setCustomerId(""); setPay({ ...pay, reference: "" });
     setTimeout(() => search.current?.focus(), 0);
     return r;
   }, "Invoice created ✓");
@@ -154,14 +159,15 @@ export default function POS() {
             <div className="grid3">
               <label className="checks"><input type="checkbox" checked={pay.collect} onChange={(e) => setPay({ ...pay, collect: e.target.checked })} /> Payment received now</label>
               {pay.collect && <label className="field"><span>Mode</span><select value={pay.mode} onChange={(e) => setPay({ ...pay, mode: e.target.value })}>{["cash", "upi", "card", "bank", "cheque"].map((m) => <option key={m}>{m}</option>)}</select></label>}
-              {pay.collect && pay.mode !== "cash" && <label className="field"><span>UTR / reference</span><input maxLength={100} value={pay.reference} onChange={(e) => setPay({ ...pay, reference: e.target.value })} /></label>}
+              {pay.collect && pay.mode !== "cash" && <label className="field"><span>{useQr || (pay.mode === "upi" && qrOn) ? "UTR (blank = show Razorpay QR)" : "UTR / reference"}</span><input maxLength={100} value={pay.reference} onChange={(e) => setPay({ ...pay, reference: e.target.value })} /></label>}
             </div>
             <Msg st={st} />
-            <button id="pos-bill" className="btn" disabled={st.busy || !lines.length} onClick={bill}>{st.busy ? "Saving…" : `Make tax invoice ${lines.length ? rs(t.total) : ""}`}</button>
+            <button id="pos-bill" className="btn" disabled={st.busy || !lines.length} onClick={bill}>{st.busy ? "Saving…" : `${useQr ? "Make invoice and show UPI QR" : "Make tax invoice"} ${lines.length ? rs(t.total) : ""}`}</button>
           </div>
           <Totals t={t} interState={inter} />
         </div>
       </div>
+      {qrFor && <UpiQrModal invoice={qrFor} onPaid={() => { setDone({ invoice: qrFor, payment: { mode: "UPI QR" } }); setQrFor(null); }} onCancelled={() => { setDone({ invoice: qrFor, payment: null }); setQrFor(null); }} />}
     </>
   );
 }

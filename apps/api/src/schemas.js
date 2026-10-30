@@ -100,10 +100,17 @@ export const posInput = z.object({
   payment: z.object({ mode: z.enum(["cash", "upi", "card", "bank", "cheque"]), reference: text(100).default(""), amount: paise.optional() }).strict().nullable().default(null),
 }).strict().refine((d) => d.customerId || d.walkIn, "Choose a customer or enter the walk-in buyer's name");
 
+export const PICKUP_WINDOWS = ["09:00-12:00", "12:00-15:00", "15:00-18:00", "18:00-21:00"];
+const optPin = z.union([z.literal(""), z.string().regex(/^\d{6}$/, "PIN code is 6 digits")]).optional();
 export const shipmentInput = z.object({
-  pickupPincode: z.string().regex(/^\d{6}$/, "PIN code is 6 digits").optional(), dropPincode: z.string().regex(/^\d{6}$/, "PIN code is 6 digits"),
+  provider: z.enum(["shadowfax", "porter"]).default("shadowfax"), pickupPincode: optPin, dropPincode: optPin,
   weightKg: z.number().positive().max(1000).default(1), packages: z.number().int().min(1).max(500).default(1),
-}).strict();
+  pickupDate: z.union([z.literal(""), z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a date like 2026-10-31")]).default(""), pickupWindow: z.union([z.literal(""), z.enum(PICKUP_WINDOWS)]).default(""),
+  dropLat: z.number().min(-90).max(90).optional(), dropLng: z.number().min(-180).max(180).optional(), // Porter routes by map location, not PIN code
+}).strict().refine((d) => !d.pickupDate === !d.pickupWindow, { message: "Choose both the pickup date and the time slot", path: ["pickupWindow"] })
+  .refine((d) => d.provider !== "porter" || (d.dropLat !== undefined && d.dropLng !== undefined), { message: "Porter needs the delivery location (latitude and longitude)", path: ["dropLat"] });
+
+export const upiCloseInput = z.object({ payment: z.object({ mode: z.enum(["cash", "card", "bank", "cheque"]), reference: text(100).default("") }).strict().nullable().default(null) }).strict();
 
 const imageRef = z.union([z.literal(""), z.string().max(200).regex(/^(\/catalog\/[\w.-]+\.(jpe?g|png|webp)|\/brand\/[\w.-]+\.(jpe?g|png|webp)|\/media\/[0-9a-f-]{36})$/, "Choose an uploaded image")]);
 export const homeInput = z.object({

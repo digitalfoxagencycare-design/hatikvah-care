@@ -4,6 +4,7 @@ import { invoiceLines } from "../lib/accounting.js";
 import { addDays, todayIST } from "../lib/gst.js";
 import { channels } from "../lib/notify.js";
 import { requirePerm } from "../lib/permissions.js";
+import { refreshPayLink } from "../lib/payments.js";
 import { createPaymentLink } from "../lib/razorpay.js";
 import { balance, bucketOf, stockBuckets, createCreditNote, createInvoice, createOrderFromQuote, customerSnapshot, deductForInvoice, logActivity, moveStock, now, priced, rateFor, recordPayment, refreshInvoice, refundDue, removePaymentLedger, postLedger, assertStockAvailable, consumeStock, token } from "../lib/sales.js";
 import { measureLabel, pieces, uomOptions } from "../lib/units.js";
@@ -207,6 +208,20 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
     }
     await automation.on.orderDispatched(upd); await audit(req, "order.dispatch", o.number, { challanNumber }); res.json(upd);
   }));
+  r.post("/orders/:id/paylink", requirePerm("orders"), wrap(async (req, res) => {
+    const o = await store.orders.get(req.params.id); if (!o) return notFound(res, "Order");
+    if (channels(cfg).payments === "off") return bad(res, "Online payments are not set up yet (Razorpay keys are needed)", 409);
+    if (o.status === "cancelled" || o.paymentStatus === "paid") return bad(res, "Nothing left to pay on this order", 409);
+    if (o.invoiceId) return bad(res, "This order is invoiced: make the link on the invoice", 409);
+    try { res.json(await refreshPayLink({ cfg, store, fetchImpl }, store.orders, o, o.totals.total, { orderId: o.id })); } catch (e) { bad(res, e.message, 502); }
+  }));
+  r.post("/orders/:id/paylink/send", requirePerm("orders"), wrap(async (req, res) => {
+    const o = await store.orders.get(req.params.id); if (!o) return notFound(res, "Order");
+    if (!o.payLink?.url || o.invoiceId || o.status === "cancelled" || o.paymentStatus === "paid") return bad(res, "Generate a payment link first", 409);
+    const m = await automation.on.paymentLinkSend(o, "order", o.payLink.amount, o.payLink.url);
+    await logActivity(store, { entity: "order", entityId: o.id, text: "Payment link sent on WhatsApp", by: by(req) });
+    res.json(linkSent(m));
+  }));
   r.post("/orders/:id/invoice", requirePerm("invoices"), wrap(async (req, res) => {
     const o = await store.orders.get(req.params.id); if (!o) return notFound(res, "Order");
     if (o.invoiceId) return bad(res, "This order is already invoiced", 409);
@@ -215,6 +230,9 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
     const inv = await createInvoice(store, { customer: c, items: o.items.map(({ amount, tax, total, ...l }) => l), placeOfSupply: o.placeOfSupply, notes: o.notes, poNumber: o.poNumber, orderId: o.id, orderNumber: o.number, by: by(req) });
     res.status(201).json(await afterInvoice(req, inv));
   }));
+
+  /** What the Send via WhatsApp button shows; manualLink opens WhatsApp with the text filled in when the message could not go out by itself. */
+  const linkSent = (m) => ({ status: m?.status || "no_number", sent: m?.status === "sent", manualLink: m && m.status !== "sent" ? m.manualLink : "", note: m?.error || "" });
 
   // ---------- invoices and payments
   async function afterInvoice(req, inv) {
@@ -276,7 +294,14 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
     const i = await store.invoices.get(req.params.id); if (!i) return notFound(res, "Invoice");
     if (channels(cfg).payments === "off") return bad(res, "Online payments are not set up yet (Razorpay keys are needed)", 409);
     if (balance(i) <= 0) return bad(res, "Nothing left to pay on this invoice", 409);
-    try { res.json(await store.invoices.update(i.id, { payLink: await createPaymentLink(cfg, i, { fetchImpl }) })); } catch (e) { bad(res, e.message, 502); }
+    try { res.json(await refreshPayLink({ cfg, store, fetchImpl }, store.invoices, i, balance(i), { invoiceId: i.id })); } catch (e) { bad(res, e.message, 502); }
+  }));
+  r.post("/invoices/:id/paylink/send", requirePerm("invoices"), wrap(async (req, res) => {
+    const i = await store.invoices.get(req.params.id); if (!i) return notFound(res, "Invoice");
+    if (!i.payLink?.url || balance(i) <= 0) return bad(res, "Generate a payment link first", 409);
+    const m = await automation.on.paymentLinkSend(i, "invoice", i.payLink.amount, i.payLink.url);
+    await logActivity(store, { entity: "invoice", entityId: i.id, text: "Payment link sent on WhatsApp", by: by(req) });
+    res.json(linkSent(m));
   }));
   r.post("/invoices/:id/payments", requirePerm("invoices"), wrap(async (req, res) => {
     const i = await store.invoices.get(req.params.id); if (!i) return notFound(res, "Invoice");

@@ -124,6 +124,15 @@ export function createAutomation({ cfg, store, notifier, log = console }) {
     await notifier.flush();
   }
 
+  /** Staff pressed Send via WhatsApp on a payment link, so no rule switch applies. Returns the outbox row (null = no usable number). */
+  async function paymentLinkSend(doc, kind, amount, url) {
+    const company = await getSettings(store);
+    const row = await notifier.queue({ channel: "whatsapp", to: doc.customer.phone, event: "paymentLink", ref: doc.number, subject: `Payment link for ${doc.number}`, button: { label: "Pay now", url },
+      body: `Dear ${name(doc.customer)},\nPlease pay ${money(amount)} for ${kind} ${doc.number} using this secure link:\n${url}\n– ${company.name}`, ...(kind === "invoice" ? { template: invoiceTpl(doc, amount) } : {}) });
+    await notifier.flush();
+    return row && store.outbox.get(row.id);
+  }
+
   async function orderDispatched(o) {
     const [a, company] = await Promise.all([config(), getSettings(store)]);
     if (!isOn(a, "orderDispatched")) return;
@@ -259,5 +268,5 @@ export function createAutomation({ cfg, store, notifier, log = console }) {
     return res;
   }
 
-  return { config, run, on: { enquiryCreated, quoteSent, quoteAccepted, websiteOrder, orderBooked, orderDispatched, shipmentUpdate, invoiceCreated, paymentReceived } };
+  return { config, run, on: { enquiryCreated, quoteSent, quoteAccepted, websiteOrder, orderBooked, orderDispatched, shipmentUpdate, invoiceCreated, paymentReceived, paymentLinkSend } };
 }

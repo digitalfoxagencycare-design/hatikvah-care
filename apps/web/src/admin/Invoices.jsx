@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { DocList } from "./DocParts.jsx";
 import { Loader, useLoad } from "./hooks.jsx";
+import { PayLinkActions } from "./PayLink.jsx";
 import { fmtDate, rs } from "./ui.jsx";
 
 export default function Invoices() {
@@ -19,7 +20,7 @@ export default function Invoices() {
           <div className="toolbar"><select value={status} onChange={(e) => setSp(e.target.value ? { status: e.target.value } : {})} aria-label="Status"><option value="">All</option>{["unpaid", "partial", "overdue", "paid", "void"].map((x) => <option key={x}>{x}</option>)}</select></div>
           <Loader s={s}>
             {s.data && <p className="muted" role="status">{s.data.length} invoices · balance due {rs(s.data.reduce((n, i) => n + (i.balance || 0), 0))}</p>}
-            <DocList rows={s.data || []} base="/admin/invoices" cols={[["Due", (i) => fmtDate(i.dueDate)], ["Balance", (i) => rs(i.balance)]]} />
+            <DocList rows={s.data || []} base="/admin/invoices" cols={[["Due", (i) => fmtDate(i.dueDate)], ["Balance", (i) => rs(i.balance)], ["Pay link", (i) => (i.balance > 0 ? <PayLinkActions compact base={`/api/admin/invoices/${i.id}`} doc={i} due={i.balance} onChange={() => s.reload()} /> : "—")]]} />
           </Loader>
         </>
       ) : (

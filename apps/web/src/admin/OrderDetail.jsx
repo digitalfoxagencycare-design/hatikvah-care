@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api.js";
 import { can, useMe } from "./AdminApp.jsx";
 import { DocView } from "./DocParts.jsx";
 import { Loader, useLoad } from "./hooks.jsx";
+import { PickupModal, shipmentOpen, ShipmentPanel } from "./Logistics.jsx";
+import { PayLinkActions } from "./PayLink.jsx";
 import { DocEditor, fmtDate, Modal, Msg, Timeline, today, useAction } from "./ui.jsx";
 
 const strip = (items) => items.map(({ amount, tax, total, ...l }) => l);
@@ -16,8 +18,15 @@ export default function OrderDetail() {
   const s = useLoad(isNew ? "/api/admin/me" : `/api/admin/orders/${id}`);
   const [editing, setEditing] = useState(false);
   const [dispatch, setDispatch] = useState(null);
+  const [pickup, setPickup] = useState(false);
   const [st, run] = useAction();
   const o = isNew ? null : s.data;
+  const tracking = shipmentOpen(o?.shipment) && !pickup && !dispatch && !editing;
+  useEffect(() => { // webhooks update the shipment on the server; this keeps an open order page current
+    if (!tracking) return undefined;
+    const t = setInterval(() => { if (!document.hidden) s.reload(); }, 20000);
+    return () => clearInterval(t);
+  }, [tracking, s.reload]);
   const save = (body) => run(async () => {
     const out = await api(isNew ? "/api/admin/orders" : `/api/admin/orders/${id}`, { method: isNew ? "POST" : "PUT", body });
     if (isNew) nav(`/admin/orders/${out.id}`, { replace: true }); else { setEditing(false); s.reload(); }
@@ -44,30 +53,24 @@ export default function OrderDetail() {
           {o.source === "website" && <p className="notice">Website order · {o.paymentStatus === "paid" ? "paid online (invoice raised automatically)" : o.paymentStatus === "pending" ? "customer chose online payment, not paid yet: wait before dispatching" : "pay later: raise the GST invoice to send bank / UPI details"}</p>}
           <div className="row-between"><h1>Order {o.number}</h1>
             <div className="btn-row">
-              {o.challanNumber && <a className="btn ghost" href={`/doc/challan/${o.token}`} target="_blank" rel="noopener noreferrer">Delivery challan</a>}
-              {o.challanNumber && <a className="btn ghost" href={`/doc/packing/${o.token}`} target="_blank" rel="noopener noreferrer">Packing slip</a>}
-              {o.challanNumber && <a className="btn ghost" href={`/doc/gatepass/${o.token}`} target="_blank" rel="noopener noreferrer">Gate pass</a>}
               {["confirmed", "packed"].includes(o.status) && !o.invoiceId && <button className="btn ghost" onClick={() => setEditing(true)}>Edit</button>}
               {["confirmed", "packed"].includes(o.status) && <button className="btn" onClick={() => setDispatch({ transporter: "", trackingNo: "", vehicleNo: "", date: today(), notes: "", courier: "", dropPincode: "", weightKg: 1, packages: 1 })}>Dispatch</button>}
             </div></div>
           <Msg st={st} />
           <DocView d={o} extraInfo={<p className="muted small-print">{o.quoteNumber && <>From quote <Link to={`/admin/quotes/${o.quoteId}`}>{o.quoteNumber}</Link><br /></>}{o.enquiryRef && <>From enquiry {o.enquiryRef}<br /></>}{o.poNumber && <>Customer PO {o.poNumber}<br /></>}{o.expectedDate && <>Expected {fmtDate(o.expectedDate)}<br /></>}
             {o.dispatch && <>Dispatched {fmtDate(o.dispatch.date)} {o.dispatch.transporter} {o.dispatch.trackingNo}<br />Challan {o.challanNumber}</>}</p>} />
-          {o.shipment && (
-            <div className="panel"><div className="row-between"><h2>Shadowfax shipment</h2>{o.shipment.trackingUrl && <a href={o.shipment.trackingUrl} target="_blank" rel="noopener noreferrer">Live tracking ↗</a>}</div>
-              <p>AWB <strong>{o.shipment.awb || "—"}</strong> · {o.shipment.status.replace(/_/g, " ")}{o.shipment.riderName && <> · rider {o.shipment.riderName} {o.shipment.riderPhone && <a href={`tel:${o.shipment.riderPhone}`}>{o.shipment.riderPhone}</a>}</>}</p>
-              <p className="muted small-print">{(o.shipment.history || []).map((h) => `${h.raw || h.status} ${fmtDate(h.at)}`).join(" → ")}</p></div>
-          )}
+          <ShipmentPanel o={o} onBook={() => setPickup(true)} />
+          {!o.invoiceId && o.status !== "cancelled" && o.paymentStatus !== "paid" && <div className="panel"><h2>Online payment</h2><PayLinkActions base={`/api/admin/orders/${id}`} doc={o} due={o.totals.total} onChange={() => s.reload()} /></div>}
           <div className="btn-row">
             {o.status === "confirmed" && <button className="btn ghost" onClick={() => status("packed")}>Mark packed</button>}
             {o.status === "packed" && <button className="btn ghost" onClick={() => status("confirmed")}>Back to confirmed</button>}
             {o.status === "dispatched" && <button className="btn ghost" onClick={() => status("delivered")}>Mark delivered</button>}
-            {o.status === "dispatched" && (!o.shipment?.awb || ["cancelled", "returned"].includes(o.shipment.status)) && <button className="btn ghost" onClick={() => run(async () => { await api(`/api/admin/orders/${id}/shipment`, { method: "POST", body: {} }); s.reload(); }, "Shadowfax pickup booked ✓")}>Book Shadowfax pickup</button>}
             {can(me, "invoices") && !o.invoiceId && o.status !== "cancelled" && <button className="btn" onClick={() => run(async () => { const inv = await api(`/api/admin/orders/${id}/invoice`, { method: "POST" }); nav(`/admin/invoices/${inv.id}`); })}>Create GST invoice</button>}
             {o.invoiceId && <Link className="btn" to={`/admin/invoices/${o.invoiceId}`}>Invoice {o.invoiceNumber}</Link>}
             {["confirmed", "packed"].includes(o.status) && <button className="link danger" onClick={() => window.confirm("Cancel this order?") && status("cancelled")}>Cancel order</button>}
           </div>
           <div className="panel"><h2>History</h2><Timeline entity="order" entityId={o.id} items={o.activities} onAdded={s.reload} /></div>
+          {pickup && <PickupModal o={o} onClose={() => setPickup(false)} onBooked={() => { setPickup(false); s.reload(); }} />}
           {dispatch && (
             <Modal title={`Dispatch ${o.number}`} onClose={() => setDispatch(null)}>
               <form className="form" onSubmit={(e) => { e.preventDefault(); run(async () => { await api(`/api/admin/orders/${id}/dispatch`, { method: "POST", body: dispatch }); setDispatch(null); s.reload(); }, "Dispatched ✓ Challan created, stock updated, customer informed."); }}>

@@ -28,10 +28,10 @@ export async function checkServiceability(cfg, { pickup, drop }, { fetchImpl = g
 }
 
 /** Pickup request for a dispatched order (delivery challan). Returns the shipment record kept on the order. */
-export async function createPickup(cfg, { order, company, pickupPincode, dropPincode, weightKg = 1, packages = 1 }, { fetchImpl = globalThis.fetch } = {}) {
+export async function createPickup(cfg, { order, company, pickupPincode, dropPincode, weightKg = 1, packages = 1, pickupSlot = null }, { fetchImpl = globalThis.fetch } = {}) {
   const c = order.customer;
   const body = {
-    order_details: { client_order_id: order.challanNumber || order.number, actual_weight: Math.round(weightKg * 1000), product_value: Math.round(order.totals.total / 100), payment_mode: "Prepaid", total_amount: 0, cod_amount: 0, num_of_packages: packages },
+    order_details: { client_order_id: order.challanNumber || order.number, actual_weight: Math.round(weightKg * 1000), product_value: Math.round(order.totals.total / 100), payment_mode: "Prepaid", total_amount: 0, cod_amount: 0, num_of_packages: packages, ...(pickupSlot ? { pickup_slot: `${pickupSlot.date} ${pickupSlot.window}` } : {}) },
     customer_details: { name: (c.contactName || c.name).slice(0, 100), contact: c.phone.replace(/\D/g, "").slice(-10), address_line_1: (c.shippingAddress || c.billingAddress).slice(0, 250), pincode: dropPincode, state: c.state || "" },
     pickup_details: { name: company.name, contact: String(company.phone || "").replace(/\D/g, "").slice(-10), address_line_1: (company.address || company.billingAddress || "").slice(0, 250), pincode: pickupPincode, state: company.state || "" },
     product_details: order.items.slice(0, 50).map((it) => ({ sku_name: it.name.slice(0, 100), sku_id: it.sku || "", hsn_code: it.hsn || "", price: Math.round((it.rate || 0) / 100), qty: it.qty })),

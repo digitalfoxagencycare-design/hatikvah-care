@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import crypto from 'node:crypto';
 import { MongoClient } from 'mongodb';
 import { createMongoStore } from '../src/store/mongo.js';
+import { applyQrPayment } from '../src/lib/payments.js';
 import { bookEnquiry, createInvoice, createCreditNote } from '../src/lib/sales.js';
 import { assertBalancedJournals } from '../../../scripts/assert-journals.mjs';
 
@@ -43,6 +44,25 @@ test('two independent Mongo clients book the last stock once and rollback a fail
     b.enquiries.update=async()=>{throw Error('injected');};
     await assert.rejects(bookEnquiry(b,z.id,{...booking,items:[{...booking.items[0],qty:1}]},'test'),/injected/);b.enquiries.update=original;
     assert.equal(await a.orders.count(),1);assert.equal(await a.customers.count(),1);
+  }finally{
+    await a.close();await b.close();
+    assert.match(name,/^hc_test_tx_[a-f0-9]+$/);
+    const cleanup=new MongoClient(uri);await cleanup.connect();try{await cleanup.db(name).dropDatabase();}finally{await cleanup.close();}
+  }
+});
+
+test('the QR webhook and the status check racing on one payment record it once', { skip: !process.env.MONGODB_TEST_URI, timeout: 60000 }, async()=>{
+  const uri=process.env.MONGODB_TEST_URI, name='hc_test_tx_'+crypto.randomUUID().replaceAll('-','');
+  const a=await createMongoStore(uri,name),b=await createMongoStore(uri,name);
+  const automation={on:{paymentReceived:async()=>{}}};
+  try{
+    const customer=await a.customers.insert({name:'Test buyer',stateCode:'36'});
+    const invoice=await createInvoice(a,{customer,items:[{name:'Kit',qty:1,rate:10000,gstRate:0}],by:'test'});
+    await a.invoices.update(invoice.id,{upiQr:{id:'qr_race',amount:invoice.totals.total,status:'active'}});
+    const pay={id:'pay_race',amount:invoice.totals.total,currency:'INR',status:'captured'},args={qrId:'qr_race',invoiceId:invoice.id,pay};
+    await Promise.allSettled([a.atomic(()=>applyQrPayment({store:a,automation},args)),b.atomic(()=>applyQrPayment({store:b,automation},args))]);
+    assert.equal((await a.payments.all()).filter(p=>p.external==='pay_race').length,1);
+    assert.equal((await a.invoices.get(invoice.id)).amountPaid,invoice.totals.total);assertBalancedJournals(await a.ledger.all());
   }finally{
     await a.close();await b.close();
     assert.match(name,/^hc_test_tx_[a-f0-9]+$/);

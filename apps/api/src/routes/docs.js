@@ -3,13 +3,14 @@ import { atomicWrap } from "./atomic.js";
 import express, { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { amountInWords, stateName } from "../lib/gst.js";
+import { applyQrPayment, holdForReconciliation } from "../lib/payments.js";
 import { verifyWebhook } from "../lib/razorpay.js";
-import { balance, createInvoice, createOrderFromQuote, deductForInvoice, invoiceWebsiteOrder, logActivity, now, recordPayment, respondToQuote, postLedger } from "../lib/sales.js";
+import { balance, createInvoice, createOrderFromQuote, deductForInvoice, invoiceWebsiteOrder, logActivity, now, recordPayment, respondToQuote } from "../lib/sales.js";
 import { getSettings } from "../model.js";
 import { wrap } from "./public.js";
 
 const company = (s) => ({ name: s.name, legalName: s.legalName, address: s.billingAddress || "Door No.12-7-134/BITNO.2/C/103, Flat No 103, C Block, R V Advaita, Road No.6, Sri Raghavendra Nagar, Habeeb Nagar, Hyderabad, Medchal Malkajgiri, TELANGANA, 500072", phone: s.phone, email: s.email, website: s.website, gstin: s.gstin, stateCode: s.stateCode, state: stateName(s.stateCode), bankDetails: s.bankDetails, upiId: s.upiId, invoiceTerms: s.invoiceTerms, whatsapp: s.whatsapp });
-const strip = ({ token, createdBy, remindersSent, activities, ...d }) => d;
+const strip = ({ token, createdBy, remindersSent, activities, upiQr, upiQrHistory, ...d }) => d;
 
 /** Customer-facing documents by secret link (quote, invoice, delivery challan), online quote acceptance, payment webhooks, scheduler trigger. */
 export function docRoutes({ cfg, store, automation }) {
@@ -17,14 +18,14 @@ export function docRoutes({ cfg, store, automation }) {
   const limiter = rateLimit({ windowMs: 15 * 60_000, limit: 120, standardHeaders: true, legacyHeaders: false });
   const find = async (kind, t) => {
     if (!/^[\w-]{20,40}$/.test(t)) return null;
-    // packing slip and gate pass are print views of the delivery challan
-    const col = { quote: store.quotes, invoice: store.invoices, challan: store.orders, packing: store.orders, gatepass: store.orders, creditnote: store.creditNotes }[kind];
+    // packing slip, gate pass and shipping label are print views of the delivery challan
+    const col = { quote: store.quotes, invoice: store.invoices, challan: store.orders, packing: store.orders, gatepass: store.orders, label: store.orders, creditnote: store.creditNotes }[kind];
     return col ? col.findBy("token", t) : null;
   };
 
   r.get("/api/public/doc/:kind/:token", limiter, wrap(async (req, res) => {
     const d = await find(req.params.kind, req.params.token);
-    if (!d || (["challan", "packing", "gatepass"].includes(req.params.kind) && !d.challanNumber)) return res.status(404).json({ error: "NOT_FOUND", message: "This document link is not valid" });
+    if (!d || (["challan", "packing", "gatepass", "label"].includes(req.params.kind) && !d.challanNumber)) return res.status(404).json({ error: "NOT_FOUND", message: "This document link is not valid" });
     res.set({ "Cache-Control": "no-store", "X-Robots-Tag": "noindex" });
     const extra = req.params.kind === "invoice" ? { balance: balance(d), amountInWords: amountInWords(d.totals.total) } : ["quote", "creditnote"].includes(req.params.kind) ? { amountInWords: amountInWords(d.totals.total) } : {};
     res.json({ kind: req.params.kind, doc: { ...strip(d), ...extra }, company: company(await getSettings(store)) });
@@ -39,10 +40,16 @@ export function docRoutes({ cfg, store, automation }) {
     res.json({ ok: true, status: out.quote.status === "converted" ? "accepted" : out.quote.status });
   }));
 
-  // Razorpay calls this when a payment link is paid. Configure the URL https://YOUR-DOMAIN/api/webhooks/razorpay with event payment_link.paid.
+  // Razorpay calls this when a payment link is paid or a counter UPI QR is scanned. Configure the URL https://YOUR-DOMAIN/api/webhooks/razorpay with events payment_link.paid and qr_code.credited.
   r.post("/api/webhooks/razorpay", express.raw({ type: () => true, limit: "200kb" }), atomicWrap(store, async (req, res) => {
     if (!verifyWebhook(req.body, req.get("x-razorpay-signature"), cfg.razorpayWebhookSecret)) return res.status(401).json({ error: "BAD_SIGNATURE" });
     let ev; try { ev = JSON.parse(req.body.toString("utf8")); } catch { return res.status(400).end(); }
+    if (ev.event === "qr_code.credited") {
+      const qr = ev.payload?.qr_code?.entity, qrPay = ev.payload?.payment?.entity;
+      if (!qrPay || !/^pay_[A-Za-z0-9_]+$/.test(qrPay.id || "") || !Number.isSafeInteger(qrPay.amount) || qrPay.amount <= 0 || qrPay.currency !== "INR" || qrPay.status !== "captured" || !qr?.id) return res.status(400).json({ error: "INVALID_PAYMENT_EVENT" });
+      const out = await applyQrPayment({ store, automation }, { qrId: qr.id, invoiceId: String(qr.notes?.invoiceId || ""), pay: qrPay });
+      return res.status(out.reconciliationRequired ? 202 : 200).json({ ok: true, ...out });
+    }
     if (ev.event !== "payment_link.paid") return res.json({ ok: true, ignored: ev.event });
     const link = ev.payload?.payment_link?.entity, pay = ev.payload?.payment?.entity;
     if (!pay || !/^pay_[A-Za-z0-9_]+$/.test(pay.id || '') || !Number.isSafeInteger(pay.amount) || pay.amount<=0 || pay.currency!=='INR' || pay.status!=='captured' || !link?.id || link.currency!=='INR' || link.status!=='paid') return res.status(400).json({error:'INVALID_PAYMENT_EVENT'});
@@ -54,8 +61,7 @@ export function docRoutes({ cfg, store, automation }) {
     const payable=await collection.get(link.notes[key]);
     const recognised=payable && (payable.payLink?.id===link.id || payable.payLinkHistory?.some(p=>p.id===link.id));
     if(!recognised || ['cancelled','void'].includes(payable.status) || (key==='orderId'&&payable.reservationExpiresAt&&Date.parse(payable.reservationExpiresAt)<Date.now()&&payable.paymentStatus!=='paid') || (key==='quoteId'&&['rejected','expired'].includes(payable.status))) {
-      await postLedger(store,{sourceKey:'unapplied:'+pay.id,kind:'unapplied_receipt',account:'razorpay',amount:pay.amount,ref:pay.id,lines:[{account:'razorpay',debit:pay.amount,credit:0},{account:'unapplied_receipts',debit:0,credit:pay.amount}],narration:'Captured payment requires reconciliation; no goods issued'});
-      await store.webhookEvents.insert({eventKey,status:'reconciliation_required',paymentId:pay.id,linkId:link.id,amount:pay.amount,currency:pay.currency,reference:key,documentId:link.notes[key],createdAt:now()});
+      await holdForReconciliation(store,pay,{linkId:link.id,reference:key,documentId:link.notes[key]});
       return res.status(202).json({ok:true,reconciliationRequired:true});
     }
     let inv = link?.notes?.invoiceId ? await store.invoices.get(String(link.notes.invoiceId)) : null;

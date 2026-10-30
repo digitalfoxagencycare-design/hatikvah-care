@@ -3,7 +3,8 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { api } from "../api.js";
 import { DocView } from "./DocParts.jsx";
 import { Loader, useLoad } from "./hooks.jsx";
-import { DocEditor, fmtDate, Modal, Msg, rs, Timeline, today, toPaise, useAction, useMeta } from "./ui.jsx";
+import { PayLinkActions } from "./PayLink.jsx";
+import { DocEditor, fmtDate, Modal, Msg, rs, Timeline, today, toPaise, useAction } from "./ui.jsx";
 
 function getWhatsAppInvoice(inv) {
   if (!inv) return null;
@@ -20,7 +21,7 @@ function getWhatsAppInvoice(inv) {
 export default function InvoiceDetail() {
   const { id } = useParams();
   const [sp] = useSearchParams();
-  const nav = useNavigate(), meta = useMeta();
+  const nav = useNavigate();
   const isNew = id === "new";
   const s = useLoad(isNew ? "/api/admin/me" : `/api/admin/invoices/${id}`);
   const [pay, setPay] = useState(null);
@@ -53,7 +54,6 @@ export default function InvoiceDetail() {
         onSave={(body) => window.confirm("Issue this invoice? It gets the next invoice number and cannot be edited afterwards.") && run(async () => { const out = await api("/api/admin/invoices", { method: "POST", body }); nav(`/admin/invoices/${out.id}`, { replace: true }); })} />
     </>
   );
-  const payLink = meta.channels.payments !== "off";
   return (
     <>
       <p><Link to="/admin/invoices">← Invoices</Link></p>
@@ -75,8 +75,7 @@ export default function InvoiceDetail() {
             {inv.creditedAmount > 0 && <div className={"tile" + (inv.refundDue ? " warn" : "")}><strong>{rs(inv.creditedAmount)}</strong><span>Credited</span><small>{inv.refundDue ? `Refund due ${rs(inv.refundDue)}` : `${inv.creditNotesList.length} credit note(s)`}</small></div>}
           </div>
           <DocView d={inv} extraInfo={<p className="muted small-print">{inv.orderNumber && <>Order <Link to={`/admin/orders/${inv.orderId}`}>{inv.orderNumber}</Link><br /></>}{inv.poNumber && <>Customer PO {inv.poNumber}<br /></>}{inv.voidReason && <>Void: {inv.voidReason}</>}</p>}>
-            {inv.payLink?.url ? <p>Online payment link: <a href={inv.payLink.url} target="_blank" rel="noopener noreferrer">{inv.payLink.url}</a></p>
-              : inv.balance > 0 && <p className="muted small-print">{payLink ? <button className="link" onClick={() => run(async () => { await api(`/api/admin/invoices/${id}/paylink`, { method: "POST" }); s.reload(); })}>Create Razorpay payment link</button> : "Online payment links appear here once Razorpay is connected."}</p>}
+            {inv.balance > 0 && <PayLinkActions base={`/api/admin/invoices/${id}`} doc={inv} due={inv.balance} onChange={() => s.reload()} />}
           </DocView>
           {inv.creditNotesList?.length > 0 && (
             <div className="panel">
