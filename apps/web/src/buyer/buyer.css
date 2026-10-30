@@ -1,0 +1,23 @@
+/* Buyer portal (/account) */
+.buyer h1 { margin-bottom: 0; }
+.buyer-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: 16px 0; overflow-x: auto; }
+.buyer-tabs button { background: none; border: 0; border-bottom: 3px solid transparent; padding: 10px 14px; font: inherit; font-weight: 600; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.buyer-tabs button.on { color: var(--gold); border-bottom-color: var(--gold); }
+.buyer-lines { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: .92rem; }
+.buyer-lines th, .buyer-lines td { padding: 7px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.buyer-lines th { font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.buyer-lines .num { text-align: right; white-space: nowrap; }
+.buyer-lines small { display: block; color: var(--muted); font-size: .78rem; }
+.buyer-lines small.due { color: var(--red); font-weight: 600; }
+.buyer-sum { margin: 4px 0 12px; text-align: right; }
+.tbl-scroll { overflow-x: auto; background: #fff; border: 1px solid var(--line); border-radius: var(--r); }
+.pill-s.expired, .pill-s.rejected { background: var(--red-soft); color: var(--red); }
+.track { border: 1px solid var(--line); border-radius: var(--r); padding: 12px; margin-bottom: 12px; background: var(--gold-soft); }
+.track-badge { font-size: .78rem; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: #fff; color: var(--gold); border: 1px solid currentColor; }
+.track-badge.delivered { background: var(--gold); color: #fff; }
+.track-badge.cancelled, .track-badge.returned { color: var(--red); }
+.track-steps { margin: 8px 0; padding-left: 20px; font-size: .88rem; }
+.track-steps small { color: var(--muted); }
+.modal-back { position: fixed; inset: 0; background: rgba(15, 23, 42, .45); display: grid; place-items: center; padding: 16px; z-index: 50; }
+.buyer-modal { width: min(460px, 100%); }
+@media (max-width: 640px) { .buyer-lines th:nth-child(4), .buyer-lines td:nth-child(4) { display: none; } }

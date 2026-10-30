@@ -11,13 +11,13 @@ export default function OtpLogin({ onDone, title = "Sign in with your mobile num
   async function send(e) {
     e?.preventDefault();
     setSt({ busy: true, error: null, dev: "" });
-    try { const r = await api("/api/shop/otp/request", { method: "POST", body: { phone } }); setStep("code"); setSt({ busy: false, error: null, dev: r.devCode || "" }); }
+    try { const r = await api("/api/shop/auth/request-code", { method: "POST", body: { phone } }); setStep("code"); setSt({ busy: false, error: null, dev: r.devCode || "" }); }
     catch (err) { setSt({ busy: false, error: err.message, dev: "" }); }
   }
   async function verify(e) {
     e.preventDefault();
     setSt((s) => ({ ...s, busy: true, error: null }));
-    try { const r = await api("/api/shop/otp/verify", { method: "POST", body: { phone, code } }); onDone(r.customer); }
+    try { const r = await api("/api/shop/auth/verify-code", { method: "POST", body: { phone, code } }); onDone(r.customer); }
     catch (err) { setSt((s) => ({ ...s, busy: false, error: err.message })); }
   }
   return (

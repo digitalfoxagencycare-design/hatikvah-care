@@ -3,7 +3,7 @@ import express, { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { amountInWords, stateName } from "../lib/gst.js";
 import { verifyWebhook } from "../lib/razorpay.js";
-import { balance, createInvoice, createOrderFromQuote, deductForInvoice, invoiceWebsiteOrder, logActivity, now, recordPayment } from "../lib/sales.js";
+import { balance, createInvoice, createOrderFromQuote, deductForInvoice, invoiceWebsiteOrder, logActivity, now, recordPayment, respondToQuote } from "../lib/sales.js";
 import { getSettings } from "../model.js";
 import { wrap } from "./public.js";
 
@@ -31,15 +31,11 @@ export function docRoutes({ cfg, store, automation }) {
   r.post("/api/public/doc/quote/:token/:action", limiter, express.json({ limit: "10kb" }), wrap(async (req, res) => {
     const q = await find("quote", req.params.token), action = req.params.action;
     if (!q || !["accept", "reject"].includes(action)) return res.status(404).json({ error: "NOT_FOUND", message: "This document link is not valid" });
-    if (q.status !== "sent") return res.status(409).json({ error: "INVALID", message: q.status === "expired" ? "This quotation has expired. Please contact us for an updated quote." : `This quotation is already ${q.status}.` });
     const name = String(req.body?.name || "").trim().slice(0, 100), note = String(req.body?.note || "").trim().slice(0, 500);
-    if (action === "accept" && name.length < 2) return res.status(400).json({ error: "INVALID", message: "Please type your name to accept", field: "name" });
-    const status = action === "accept" ? "accepted" : "rejected";
-    const upd = await store.quotes.update(q.id, { status, [status + "At"]: now(), customerResponse: { name, note, at: now() }, updatedAt: now() });
-    await logActivity(store, { entity: "quote", entityId: q.id, text: `Customer ${status} online${name ? " (" + name + ")" : ""}${note ? ": " + note : ""}`, by: "customer" });
-    if (q.enquiryId) await store.enquiries.update(q.enquiryId, { status: status === "accepted" ? "won" : "closed" });
-    if (status === "accepted") await automation.on.quoteAccepted(upd);
-    res.json({ ok: true, status });
+    if (action === "accept" && q.status === "sent" && name.length < 2) return res.status(400).json({ error: "INVALID", message: "Please type your name to accept", field: "name" });
+    const out = await respondToQuote(store, automation, q, { action, name, note });
+    if (out.error) return res.status(out.error.status).json({ error: "INVALID", message: out.error.message });
+    res.json({ ok: true, status: out.quote.status === "converted" ? "accepted" : out.quote.status });
   }));
 
   // Razorpay calls this when a payment link is paid. Configure the URL https://YOUR-DOMAIN/api/webhooks/razorpay with event payment_link.paid.

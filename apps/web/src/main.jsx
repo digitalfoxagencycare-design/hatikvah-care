@@ -16,7 +16,7 @@ import "./styles.css";
 const Admin = lazy(() => import("./admin/AdminApp.jsx"));
 const DocPage = lazy(() => import("./pages/DocPage.jsx"));
 const Checkout = lazy(() => import("./pages/Checkout.jsx"));
-const Account = lazy(() => import("./pages/Account.jsx"));
+const Account = lazy(() => import("./buyer/BuyerPortal.jsx")); // buyer portal: quotes, orders, tracking, invoices, reorder
 const wait = (el) => <Suspense fallback={<div className="center-note">Loading…</div>}>{el}</Suspense>;
 
 createRoot(document.getElementById("root")).render(

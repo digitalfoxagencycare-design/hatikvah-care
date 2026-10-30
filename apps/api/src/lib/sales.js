@@ -126,6 +126,25 @@ export async function createOrderFromQuote(store, quote, by) {
   return order;
 }
 
+/**
+ * The customer accepts or rejects a sent quotation (from the document link or the buyer portal). A quote past its validity
+ * date counts as expired even before the scheduled job marks it. Accepting runs the "quote accepted" automation, which
+ * raises the sales order. Returns { quote } or { error: { status, message } }.
+ */
+export async function respondToQuote(store, automation, q, { action, name = "", note = "", via = "online" }) {
+  if (q.status === "sent" && q.validUntil && q.validUntil < todayIST()) {
+    await store.quotes.update(q.id, { status: "expired", updatedAt: now() });
+    q = { ...q, status: "expired" };
+  }
+  if (q.status !== "sent") return { error: { status: 409, message: q.status === "expired" ? "This quotation has expired. Please contact us for an updated quote." : `This quotation is already ${q.status}.` } };
+  const status = action === "accept" ? "accepted" : "rejected";
+  const upd = await store.quotes.update(q.id, { status, [status + "At"]: now(), customerResponse: { name, note, via, at: now() }, updatedAt: now() });
+  await logActivity(store, { entity: "quote", entityId: q.id, text: `Customer ${status} ${via}${name ? " (" + name + ")" : ""}${note ? ": " + note : ""}`, by: "customer" });
+  if (q.enquiryId) await store.enquiries.update(q.enquiryId, { status: status === "accepted" ? "won" : "closed" });
+  if (status === "accepted") await automation.on.quoteAccepted(upd);
+  return { quote: (await store.quotes.get(q.id)) || upd };
+}
+
 export async function createInvoice(store, { customer, items, placeOfSupply, date, dueDate, notes = "", poNumber = "", orderId = "", orderNumber = "", by }) {
   const s = await getSettings(store);
   const d = date || todayIST();

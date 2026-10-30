@@ -28,6 +28,8 @@ const checkoutInput = z.object({
   address: text(400).min(10, "Enter the full delivery address"), city: text(80).min(2, "Enter the city"), pincode: z.string().trim().regex(/^\d{6}$/, "PIN code is 6 digits"),
   stateCode: z.string().regex(/^\d{2}$/, "Choose your state"), notes: text(500).default(""), payment: z.enum(["online", "later"]),
 }).strict();
+const otpRequestInput = z.object({ phone: text(20).min(10, "Enter a 10-digit Indian mobile number") }).strict();
+const otpVerifyInput = z.object({ phone: text(20).min(10, "Enter a 10-digit Indian mobile number"), code: z.string().trim().regex(/^\d{6}$/, "Enter the 6-digit code") }).strict();
 const invalid = (res, message, field, status = 400) => res.status(status).json({ error: "INVALID", message, ...(field ? { field } : {}) });
 
 export function shopRoutes({ cfg, store, automation, notifier, fetchImpl = globalThis.fetch }) {
@@ -37,22 +39,17 @@ export function shopRoutes({ cfg, store, automation, notifier, fetchImpl = globa
   const siteUrl = (req) => cfg.publicUrl || `${req.protocol}://${req.get("host")}`;
   const findCustomer = async (d) => (await store.customers.all()).find((c) => c.phone && digits10(c.phone) === d) || null;
 
-  // Signed-in buyer (optional). Writes need the same anti-CSRF header as the admin API.
-  r.use(wrap(async (req, res, next) => {
-    if (!["GET", "HEAD"].includes(req.method) && req.get("x-requested-with") !== "hc-admin") return res.status(403).json({ error: "CSRF", message: "Missing request header" });
-    const t = req.cookies?.[SHOP_COOKIE];
-    if (t) {
-      try { const c = jwt.verify(t, cfg.jwtSecret, { algorithms: ["HS256"], audience: "shop" }); req.customer = await store.customers.get(c.sub); } catch { /* expired: treat as signed out */ }
-    }
-    next();
-  }));
-  const signedIn = (req, res, next) => (req.customer ? next() : res.status(401).json({ error: "LOGIN_REQUIRED", message: "Please sign in with your mobile number" }));
+  r.use(buyerSession({ cfg, store }));
+  const signedIn = requireBuyer;
 
   // ---------- WhatsApp OTP sign-in
   const limit = (n) => rateLimit({ windowMs: 15 * 60_000, limit: n, standardHeaders: true, legacyHeaders: false, message: { error: "RATE_LIMITED", message: "Too many attempts. Please try again in a few minutes." } });
-  r.post("/otp/request", limit(5), wrap(async (req, res) => {
+  // /auth/request-code and /auth/verify-code are the buyer portal's names; /otp/* stay for the checkout page.
+  r.post(["/otp/request", "/auth/request-code"], limit(5), wrap(async (req, res) => {
     if (!(await flags()).otp) return res.status(403).json({ error: "OFF", message: "Sign-in by WhatsApp code is switched off" });
-    const phone = digits10(req.body?.phone);
+    const p = otpRequestInput.safeParse(req.body ?? {});
+    if (!p.success) return invalid(res, p.error.issues[0].message, "phone");
+    const phone = digits10(p.data.phone);
     if (!mobileOk(phone)) return invalid(res, "Enter a 10-digit Indian mobile number", "phone");
     const old = (await store.otps.all()).filter((o) => o.phone === phone);
     if (old.some((o) => Date.now() - Date.parse(o.createdAt) < 60_000)) return res.status(429).json({ error: "RATE_LIMITED", message: "Please wait a minute before asking for another code" });
@@ -68,8 +65,10 @@ export function shopRoutes({ cfg, store, automation, notifier, fetchImpl = globa
     res.json({ ok: true });
   }));
 
-  r.post("/otp/verify", limit(15), wrap(async (req, res) => {
-    const phone = digits10(req.body?.phone), code = String(req.body?.code || "").trim();
+  r.post(["/otp/verify", "/auth/verify-code"], limit(15), wrap(async (req, res) => {
+    const p = otpVerifyInput.safeParse(req.body ?? {});
+    if (!p.success) return invalid(res, p.error.issues[0].message, p.error.issues[0].path.join(".") || "code");
+    const phone = digits10(p.data.phone), code = p.data.code;
     const otp = (await store.otps.all()).find((o) => o.phone === phone);
     if (!otp || Date.parse(otp.expiresAt) < Date.now()) return invalid(res, "This code has expired. Please ask for a new one.", "code");
     if (otp.attempts >= OTP_TRIES) { await store.otps.remove(otp.id); return res.status(429).json({ error: "RATE_LIMITED", message: "Too many wrong codes. Please ask for a new one." }); }
@@ -81,8 +80,7 @@ export function shopRoutes({ cfg, store, automation, notifier, fetchImpl = globa
       c = await store.customers.insert({ name: `+91 ${phone}`, contactName: "", phone: `+91 ${phone}`, email: "", gstin: "", stateCode: "", city: "", billingAddress: "", shippingAddress: "",
         priceListId: "", paymentTermsDays: 0, reorderDays: 0, tags: ["website"], notes: "", assignedTo: "", followUpAt: "", source: "website", createdAt: now(), updatedAt: now() });
     }
-    res.cookie(SHOP_COOKIE, jwt.sign({ sub: c.id }, cfg.jwtSecret, { algorithm: "HS256", audience: "shop", expiresIn: "30d" }),
-      { httpOnly: true, sameSite: "lax", secure: cfg.cookieSecure, maxAge: 30 * 86400_000, path: "/" }); // lax: the buyer comes back signed in from the Razorpay page
+    setBuyerCookie(cfg, res, c);
     res.json({ ok: true, customer: view(c) });
   }));
 
@@ -168,6 +166,23 @@ export function shopRoutes({ cfg, store, automation, notifier, fetchImpl = globa
   }
   return r;
 }
+
+/** Buyer session: httpOnly cookie for SESSION_HOURS (12 by default), shared by /api/shop and /api/buyer. */
+export function setBuyerCookie(cfg, res, c) {
+  const hours = cfg.sessionHours || 12;
+  res.cookie(SHOP_COOKIE, jwt.sign({ sub: c.id }, cfg.jwtSecret, { algorithm: "HS256", audience: "shop", expiresIn: `${hours}h` }),
+    { httpOnly: true, sameSite: "lax", secure: cfg.cookieSecure, maxAge: hours * 3600_000, path: "/" }); // lax: the buyer comes back signed in from the Razorpay page
+}
+/** Reads the buyer cookie into req.customer (signed out when missing or expired). Writes need the same anti-CSRF header as the admin API. */
+export const buyerSession = ({ cfg, store }) => wrap(async (req, res, next) => {
+  if (!["GET", "HEAD"].includes(req.method) && req.get("x-requested-with") !== "hc-admin") return res.status(403).json({ error: "CSRF", message: "Missing request header" });
+  const t = req.cookies?.[SHOP_COOKIE];
+  if (t) {
+    try { const c = jwt.verify(t, cfg.jwtSecret, { algorithms: ["HS256"], audience: "shop" }); req.customer = await store.customers.get(c.sub); } catch { /* expired: treat as signed out */ }
+  }
+  next();
+});
+export const requireBuyer = (req, res, next) => (req.customer ? next() : res.status(401).json({ error: "LOGIN_REQUIRED", message: "Please sign in with your mobile number" }));
 
 const view = (c) => ({ id: c.id, name: c.contactName || "", company: c.name.startsWith("+91 ") ? "" : c.name, phone: c.phone, email: c.email || "", gstin: c.gstin || "",
   stateCode: c.stateCode || "", city: c.city || "", address: c.shippingAddress || c.billingAddress || "" });

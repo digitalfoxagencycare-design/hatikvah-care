@@ -9,6 +9,7 @@ import { mediaRoute, publicRoutes } from "./routes/public.js";
 import { seoRoutes } from "./routes/seo.js";
 import { docRoutes } from "./routes/docs.js";
 import { shopRoutes } from "./routes/shop.js";
+import { buyerRoutes } from "./routes/buyer.js";
 import { whatsappWebhook } from "./routes/whatsapp.js";
 import { logisticsWebhook } from "./routes/logistics.js";
 import { createAutomation } from "./lib/automation.js";
@@ -45,6 +46,7 @@ export function createApp({ cfg, store, log = console, fetchImpl }) {
   });
   app.use("/api/public", publicRoutes({ cfg, store, automation }));
   app.use("/api/shop", shopRoutes({ cfg, store, automation, notifier, ...(fetchImpl ? { fetchImpl } : {}) }));
+  app.use("/api/buyer", buyerRoutes({ cfg, store, automation, ...(fetchImpl ? { fetchImpl } : {}) }));
   app.use("/api/admin", adminRoutes({ cfg, store, automation, notifier, ...(fetchImpl ? { fetchImpl } : {}) }));
   app.use("/media", mediaRoute({ store }));
   app.use(seoRoutes({ cfg, store }));
