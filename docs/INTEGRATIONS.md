@@ -25,13 +25,15 @@ Without the inbound webhook the window is unknown, so the app uses a template wh
 
 Create these in WhatsApp Manager › Message templates as category **Utility**, language as in `WHATSAPP_TEMPLATE_LANG` (default `en`), with one **Visit website** button of type *Dynamic* whose URL ends in `{{1}}`. The app fills the variables in this order, and the button suffix is the document's secret token. Put each approved template's name in its variable:
 
-| Variable | Used for | Body (example wording; keep the variables in this order) | Button URL |
+| Variable | Used for | Approved Template | Body / Button URL |
 |---|---|---|---|
-| `WHATSAPP_TEMPLATE_QUOTE` | quotation sent, quotation reminders | `Dear {{1}}, our quotation {{2}} for {{3}} (incl. GST) is ready. Tap below to view and approve it.` | `https://YOUR-DOMAIN/doc/quote/{{1}}` |
-| `WHATSAPP_TEMPLATE_DISPATCH` | order dispatched, courier updates (picked up / out for delivery / delivered) | `Dear {{1}}, your order {{2}} is on its way. {{3}} Tap below for the delivery challan.` ({{3}} = courier, AWB and live tracking link) | `https://YOUR-DOMAIN/doc/challan/{{1}}` |
-| `WHATSAPP_TEMPLATE_INVOICE` | invoice sent, overdue reminders | `Dear {{1}}, invoice {{2}} for {{3}} is due on {{4}}. Tap below to view, download or pay it.` | `https://YOUR-DOMAIN/doc/invoice/{{1}}` |
-| `WHATSAPP_TEMPLATE` | everything else (payment receipts, enquiry replies, website orders, team alerts) | `{{1}}` | none |
+| `WHATSAPP_OTP_TEMPLATE` | Website buyer login, staff/owner auth & OTP verification | `hc_otp` (APPROVED) | `*{{1}}* is your verification code.` (Copy Code button) |
+| `WHATSAPP_TEMPLATE_QUOTE` | Quotation sent, quotation reminders | `hc_quote` (APPROVED) | `Dear {{1}}, our quotation {{2}} for {{3}} (incl. GST) is ready.` → `/doc/quote/{{1}}` |
+| `WHATSAPP_TEMPLATE_DISPATCH` | Order dispatched, courier & Shadowfax updates | `hc_dispatch` (APPROVED) | `Dear {{1}}, your order {{2}} is on its way. {{3}}` → `/doc/challan/{{1}}` |
+| `WHATSAPP_TEMPLATE_INVOICE` | Invoice sent, overdue reminders | `hc_invoice` (APPROVED) | `Dear {{1}}, invoice {{2}} for {{3}} is due on {{4}}` → `/doc/invoice/{{1}}` |
+| `WHATSAPP_TEMPLATE` | General updates, payment receipts, order notifications | `hc_update` (APPROVED) | `Dear customer, {{1}}. - HaTikvah Care` |
 
+Template language code is configured as `WHATSAPP_TEMPLATE_LANG=en_US`. All templates are approved on WABA ID `2667221577035024`.
 Template names are lowercase letters, numbers and `_` (the server refuses anything else at start-up). Each sent message records which route it took (`template hc_quote`, `link`, `text`) in the outbox.
 
 After setting variables, open **Automation & messages**: the tiles show which channels are on. Failed sends are retried 5 times and can be retried by hand.
