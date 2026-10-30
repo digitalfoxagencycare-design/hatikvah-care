@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api.js";
 import { calcTotals, Msg, rs, StateSelect, toPaise, Totals, useAction, useAsync } from "./ui.jsx";
 
-const RATES = [0, 5, 12, 18];
+const RATES = [0, 5, 12, 18, 28];
 const EMPTY_BUYER = { name: "", phone: "", gstin: "", stateCode: "" };
 
 /**

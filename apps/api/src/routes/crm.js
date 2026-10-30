@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { toCsv } from "../csv.js";
-import { requirePerm } from "../lib/permissions.js";
+import { can, requirePerm } from "../lib/permissions.js";
 import { stateName } from "../lib/gst.js";
 import { balance, logActivity, now } from "../lib/sales.js";
 import { activityInput, customerInput, priceListInput } from "../schemas.js";
@@ -10,6 +10,7 @@ import { bad, csvHeaders, notFound, parse, rupees } from "./shared.js";
 /** Customers (companies you sell to), the activity timeline, price lists, and the lead side of enquiries. */
 export function crmRoutes({ store, audit }) {
   const r = Router();
+  const activityPerm = { enquiry: "enquiries", customer: "customers", quote: "quotes", order: "orders", invoice: "invoices", purchase: "stock" };
   const fill = (d) => ({ ...d, stateCode: d.stateCode || (d.gstin ? d.gstin.slice(0, 2) : "") });
 
   // ---------- customers
@@ -17,7 +18,7 @@ export function crmRoutes({ store, audit }) {
     const [cs, invoices, orders] = await Promise.all([store.customers.all({ sort: { name: 1 } }), store.invoices.all(), store.orders.all()]);
     res.json(cs.map((c) => {
       const inv = invoices.filter((i) => i.customerId === c.id && i.status !== "void");
-      return { ...c, tags: Array.isArray(c.tags) ? c.tags : (c.tags ? [c.tags] : []), state: stateName(c.stateCode), outstanding: inv.reduce((n, i) => n + balance(i), 0), billed: inv.reduce((n, i) => n + (i.totals?.total || 0), 0),
+      return { ...c, tags: Array.isArray(c.tags) ? c.tags : (c.tags ? [c.tags] : []), state: stateName(c.stateCode), outstanding: can(_req.admin,"invoices") ? inv.reduce((n, i) => n + balance(i), 0) : null, billed: can(_req.admin,"invoices") ? inv.reduce((n, i) => n + (i.totals?.total || 0), 0) : null,
         orders: orders.filter((o) => o.customerId === c.id).length, lastOrderAt: orders.filter((o) => o.customerId === c.id).map((o) => o.createdAt).sort().at(-1) || null };
     }));
   }));
@@ -30,9 +31,10 @@ export function crmRoutes({ store, audit }) {
     const mine = (rows) => (rows || []).filter((x) => x.customerId === c.id).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
     const [enquiries, quotes, orders, invoices, payments, activities] = await Promise.all([store.enquiries.all(), store.quotes.all(), store.orders.all(), store.invoices.all(), store.payments.all(), store.activities.all({ sort: { at: -1 } })]);
     const inv = mine(invoices);
-    res.json({ customer: { ...c, tags: Array.isArray(c.tags) ? c.tags : (c.tags ? [c.tags] : []), state: stateName(c.stateCode) }, enquiries: mine(enquiries), quotes: mine(quotes), orders: mine(orders), invoices: inv, payments: mine(payments),
-      activities: (activities || []).filter((a) => a.entityId === c.id || inv.some((i) => i.id === a.entityId)).slice(0, 100),
-      outstanding: inv.filter((i) => i.status !== "void").reduce((n, i) => n + balance(i), 0) });
+    const visible = { enquiry:"enquiries",customer:"customers",quote:"quotes",order:"orders",invoice:"invoices",purchase:"stock" };
+    res.json({ customer: { ...c, tags: Array.isArray(c.tags) ? c.tags : (c.tags ? [c.tags] : []), state: stateName(c.stateCode) }, enquiries: can(req.admin,"enquiries") ? mine(enquiries) : [], quotes: can(req.admin,"quotes") ? mine(quotes) : [], orders: can(req.admin,"orders") ? mine(orders) : [], invoices: can(req.admin,"invoices") ? inv : [], payments: can(req.admin,"invoices") ? mine(payments) : [],
+      activities: (activities || []).filter((a) => can(req.admin,visible[a.entity]) && (a.entityId === c.id || inv.some((i) => i.id === a.entityId))).slice(0, 100),
+      outstanding: can(req.admin,"invoices") ? inv.filter((i) => i.status !== "void").reduce((n, i) => n + balance(i), 0) : null });
   }));
   r.post("/customers", requirePerm("customers"), wrap(async (req, res) => {
     const d = parse(customerInput, req.body, res); if (!d) return;
@@ -55,10 +57,11 @@ export function crmRoutes({ store, audit }) {
   // ---------- activity timeline (calls, notes, meetings…) on any record
   r.get("/activities", wrap(async (req, res) => {
     const id = String(req.query.entityId || "");
-    res.json((await store.activities.all({ sort: { at: -1 } })).filter((a) => !id || a.entityId === id).slice(0, 200));
+    res.json((await store.activities.all({ sort: { at: -1 } })).filter((a) => can(req.admin, activityPerm[a.entity]) && (!id || a.entityId === id)).slice(0, 200));
   }));
   r.post("/activities", wrap(async (req, res) => {
     const d = parse(activityInput, req.body, res); if (!d) return;
+    if (!can(req.admin, activityPerm[d.entity])) return res.status(403).json({ error: "FORBIDDEN", message: "Your role does not allow this activity" });
     const a = await logActivity(store, { ...d, by: req.admin.email });
     if (d.followUpAt !== undefined) {
       const col = d.entity === "enquiry" ? store.enquiries : d.entity === "customer" ? store.customers : null;

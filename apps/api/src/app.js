@@ -39,7 +39,9 @@ export function createApp({ cfg, store, log = console, fetchImpl }) {
   app.use(docRoutes({ cfg, store, automation })); // before the JSON parser: the payment webhook needs the raw body to check its signature
   app.use(whatsappWebhook({ cfg, store, automation, notifier, log })); // same: Meta signs the raw body
   app.use(logisticsWebhook({ cfg, store, automation, log }));
+  app.use("/api/admin/products/import", express.json({ limit: "2mb" }));
   app.use(express.json({ limit: "100kb" }));
+  app.use(["/api/admin", "/api/shop", "/api/buyer"], (_req,res,next)=>{res.set("Cache-Control","no-store");next();});
 
   app.get("/api/health", async (_req, res) => {
     try { await store.settings.count(); res.json({ ok: true, store: store.kind }); } catch { res.status(503).json({ ok: false }); }

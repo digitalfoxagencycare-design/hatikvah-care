@@ -1,9 +1,10 @@
 import crypto from "node:crypto";
+import { atomicWrap } from "./atomic.js";
 import express, { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { amountInWords, stateName } from "../lib/gst.js";
 import { verifyWebhook } from "../lib/razorpay.js";
-import { balance, createInvoice, createOrderFromQuote, deductForInvoice, invoiceWebsiteOrder, logActivity, now, recordPayment, respondToQuote } from "../lib/sales.js";
+import { balance, createInvoice, createOrderFromQuote, deductForInvoice, invoiceWebsiteOrder, logActivity, now, recordPayment, respondToQuote, postLedger } from "../lib/sales.js";
 import { getSettings } from "../model.js";
 import { wrap } from "./public.js";
 
@@ -39,12 +40,24 @@ export function docRoutes({ cfg, store, automation }) {
   }));
 
   // Razorpay calls this when a payment link is paid. Configure the URL https://YOUR-DOMAIN/api/webhooks/razorpay with event payment_link.paid.
-  r.post("/api/webhooks/razorpay", express.raw({ type: () => true, limit: "200kb" }), wrap(async (req, res) => {
+  r.post("/api/webhooks/razorpay", express.raw({ type: () => true, limit: "200kb" }), atomicWrap(store, async (req, res) => {
     if (!verifyWebhook(req.body, req.get("x-razorpay-signature"), cfg.razorpayWebhookSecret)) return res.status(401).json({ error: "BAD_SIGNATURE" });
     let ev; try { ev = JSON.parse(req.body.toString("utf8")); } catch { return res.status(400).end(); }
     if (ev.event !== "payment_link.paid") return res.json({ ok: true, ignored: ev.event });
     const link = ev.payload?.payment_link?.entity, pay = ev.payload?.payment?.entity;
-    if (pay?.id && (await store.payments.all()).some((p) => p.external === pay.id)) return res.json({ ok: true, duplicate: true }); // Razorpay retries webhooks
+    if (!pay || !/^pay_[A-Za-z0-9_]+$/.test(pay.id || '') || !Number.isSafeInteger(pay.amount) || pay.amount<=0 || pay.currency!=='INR' || pay.status!=='captured' || !link?.id || link.currency!=='INR' || link.status!=='paid') return res.status(400).json({error:'INVALID_PAYMENT_EVENT'});
+    const eventKey='razorpay:'+pay.id;
+    if(await store.webhookEvents.findBy('eventKey',eventKey) || await store.payments.findBy('external',pay.id)) return res.json({ok:true,duplicate:true});
+    const references=['invoiceId','quoteId','orderId'].filter(k=>typeof link.notes?.[k]==='string'&&link.notes[k]);
+    if(references.length!==1)return res.status(400).json({error:'INVALID_PAYMENT_REFERENCE'});
+    const key=references[0],collection={invoiceId:store.invoices,quoteId:store.quotes,orderId:store.orders}[key];
+    const payable=await collection.get(link.notes[key]);
+    const recognised=payable && (payable.payLink?.id===link.id || payable.payLinkHistory?.some(p=>p.id===link.id));
+    if(!recognised || ['cancelled','void'].includes(payable.status) || (key==='orderId'&&payable.reservationExpiresAt&&Date.parse(payable.reservationExpiresAt)<Date.now()&&payable.paymentStatus!=='paid') || (key==='quoteId'&&['rejected','expired'].includes(payable.status))) {
+      await postLedger(store,{sourceKey:'unapplied:'+pay.id,kind:'unapplied_receipt',account:'razorpay',amount:pay.amount,ref:pay.id,lines:[{account:'razorpay',debit:pay.amount,credit:0},{account:'unapplied_receipts',debit:0,credit:pay.amount}],narration:'Captured payment requires reconciliation; no goods issued'});
+      await store.webhookEvents.insert({eventKey,status:'reconciliation_required',paymentId:pay.id,linkId:link.id,amount:pay.amount,currency:pay.currency,reference:key,documentId:link.notes[key],createdAt:now()});
+      return res.status(202).json({ok:true,reconciliationRequired:true});
+    }
     let inv = link?.notes?.invoiceId ? await store.invoices.get(String(link.notes.invoiceId)) : null;
     const quote = !inv && link?.notes?.quoteId ? await store.quotes.get(String(link.notes.quoteId)) : null;
     if (quote && pay?.id) inv = await invoicePaidQuote(quote, pay.id);
@@ -57,8 +70,9 @@ export function docRoutes({ cfg, store, automation }) {
       if (fresh) await automation.on.invoiceCreated(inv);
     }
     if (!inv || !pay?.id) return res.json({ ok: true, ignored: "unknown invoice" });
-    const amount = Math.min(pay.amount, balance(inv));
+    const amount = pay.amount;
     if (amount > 0) { const out = await recordPayment(store, inv, { amount, mode: "razorpay", reference: pay.id, by: "razorpay", external: pay.id }); await automation.on.paymentReceived(out.invoice, out.payment); }
+    await store.webhookEvents.insert({eventKey,status:"processed",paymentId:pay.id,linkId:link.id,amount:pay.amount,invoiceId:inv.id,createdAt:now()});
     res.json({ ok: true });
   }));
 
@@ -70,7 +84,7 @@ export function docRoutes({ cfg, store, automation }) {
     if (order.invoiceId) return store.invoices.get(order.invoiceId);
     const customer = { ...(await store.customers.get(q.customerId)), id: q.customerId, paymentTermsDays: 0 };
     const inv = await createInvoice(store, { customer, items: order.items.map(({ amount, tax, total, ...l }) => l), placeOfSupply: order.placeOfSupply, notes: order.notes,
-      orderId: order.id, orderNumber: order.number, by: "razorpay" });
+      quoteId: q.id, orderId: order.id, orderNumber: order.number, by: "razorpay" });
     await deductForInvoice(store, inv, "razorpay");
     await store.orders.update(order.id, { paymentStatus: "paid", updatedAt: now() });
     await store.quotes.update(q.id, { invoiceId: inv.id, invoiceNumber: inv.number, updatedAt: now() });

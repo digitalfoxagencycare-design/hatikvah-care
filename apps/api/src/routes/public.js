@@ -60,8 +60,10 @@ export function publicRoutes({ cfg, store, automation }) {
     do ref = `HC-${yy}${String(await store.nextSeq("enquiry:" + yy)).padStart(4, "0")}`; while (await store.enquiries.findBy("ref", ref));
     const enq = await store.enquiries.insert({ ref, name: d.name, company: d.company, phone: d.phone, email: d.email, message: d.message, items, source: d.source || {}, status: "new", notes: "",
       assignedTo: "", customerId: "", followUpAt: "", createdAt: new Date().toISOString() });
+    await automation?.on.enquiryCreated(enq);
     res.status(201).json({ ok: true, ref });
-    automation?.on.enquiryCreated(enq); // alerts, auto-reply and assignment run after the visitor gets their answer
+    // Message intent has been persisted before acknowledging the enquiry.
+    void 0; // alerts, auto-reply and assignment run after the visitor gets their answer
   }));
 
   return r;

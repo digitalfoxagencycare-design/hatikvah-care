@@ -1,4 +1,5 @@
 /** GST helpers: state codes, line/document totals (all money in integer paise), financial-year document numbers, amount in words. */
+import { roundMoneyProduct, safePaise } from "./money.js";
 export const STATES = [
   ["01", "Jammu & Kashmir"], ["02", "Himachal Pradesh"], ["03", "Punjab"], ["04", "Chandigarh"], ["05", "Uttarakhand"], ["06", "Haryana"], ["07", "Delhi"],
   ["08", "Rajasthan"], ["09", "Uttar Pradesh"], ["10", "Bihar"], ["11", "Sikkim"], ["12", "Arunachal Pradesh"], ["13", "Nagaland"], ["14", "Manipur"],
@@ -15,12 +16,13 @@ export const GSTIN_RE = /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
 export function calcTotals(items, interState) {
   let gross = 0, discount = 0, taxable = 0, cgst = 0, sgst = 0, igst = 0;
   const lines = items.map((it) => {
-    const g = Math.round(it.qty * it.rate), d = Math.round((g * (it.discountPct || 0)) / 100), t = g - d, tax = Math.round((t * (it.gstRate || 0)) / 100);
-    const c = interState ? 0 : Math.round(tax / 2), s = interState ? 0 : tax - c, i = interState ? tax : 0;
+    const g = roundMoneyProduct(it.rate, it.qty), d = roundMoneyProduct(g, it.discountPct || 0, 100), t = safePaise(g - d), tax = roundMoneyProduct(t, it.gstRate || 0, 100);
+    const c = interState ? 0 : Number((BigInt(tax) + 1n) / 2n), s = interState ? 0 : tax - c, i = interState ? tax : 0;
     gross += g; discount += d; taxable += t; cgst += c; sgst += s; igst += i;
-    return { ...it, amount: t, tax, total: t + tax };
+    [gross, discount, taxable, cgst, sgst, igst].forEach(safePaise);
+    return { ...it, amount: t, tax, total: safePaise(t + tax) };
   });
-  const exact = taxable + cgst + sgst + igst, total = Math.round(exact / 100) * 100;
+  const exact = safePaise(taxable + cgst + sgst + igst), total = safePaise(roundMoneyProduct(exact, 1, 100) * 100);
   return { lines, totals: { gross, discount, taxable, cgst, sgst, igst, tax: cgst + sgst + igst, roundOff: total - exact, total } };
 }
 
@@ -32,7 +34,9 @@ export function finYear(d = new Date()) {
 /** Q/2026-27/0001 style numbers; a separate sequence per prefix and financial year (max 16 characters, as GST invoices require). */
 export async function nextNumber(store, prefix, d = new Date()) {
   const fy = finYear(d);
-  return `${prefix}/${fy}/${String(await store.nextSeq(`${prefix}:${fy}`)).padStart(4, "0")}`;
+  const number = `${prefix}/${fy}/${String(await store.nextSeq(`${prefix}:${fy}`)).padStart(4, "0")}`;
+  if (number.length > 16) throw new RangeError("Document sequence exhausted: number exceeds 16 characters");
+  return number;
 }
 
 /** Today's date (YYYY-MM-DD) in India, and date arithmetic on such strings. */

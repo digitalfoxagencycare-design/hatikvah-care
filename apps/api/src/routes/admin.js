@@ -1,4 +1,5 @@
 import express, { Router } from "express";
+import { parseRupees } from "../lib/money.js";
 import rateLimit from "express-rate-limit";
 import { authenticate, checkPassword, hashPassword, passwordProblem, requireOwner, setSessionCookie, signSession, COOKIE } from "../auth.js";
 import { parseCsv, toCsv } from "../csv.js";
@@ -23,7 +24,7 @@ const bad = (res, issue, status = 400) => res.status(status).json({ error: "INVA
 const now = () => new Date().toISOString();
 const me = (a) => ({ id: a.id, email: a.email, name: a.name, role: a.role, permissions: ROLES[a.role] || [], twoFactor: !!a.totpEnabled });
 const rupees = (p) => (p == null ? "" : (p / 100).toFixed(2));
-const toPaise = (s) => { if (s === "" || s == null) return null; const n = Number(String(s).replace(/,/g, "")); return Number.isFinite(n) && n >= 0 && n <= 1_000_000 ? Math.round(n * 100) : NaN; };
+const toPaise = s => parseRupees(s, 100_000_000);
 const IMG_TYPES = { "image/jpeg": [[0xff, 0xd8, 0xff]], "image/png": [[0x89, 0x50, 0x4e, 0x47]], "image/webp": [[0x52, 0x49, 0x46, 0x46]], "application/pdf": [[0x25, 0x50, 0x44, 0x46, 0x2d]] };
 const sniff = (buf) => Object.entries(IMG_TYPES).find(([, sigs]) => sigs.some((s) => s.every((b, i) => buf[i] === b)))?.[0];
 
@@ -113,8 +114,8 @@ export function adminRoutes({ cfg, store, automation, notifier, fetchImpl }) {
     const out = {
       products: products.length, active: products.filter((p) => p.active).length, withoutPrice: products.filter((p) => p.active && p.price == null).length,
       withoutImage: products.filter((p) => !p.images.length).length, categories: cats.length,
-      newEnquiries: enquiries.filter((e) => e.status === "new").length, totalEnquiries: enquiries.length, recentEnquiries: enquiries.slice(0, 5),
-      followUps: enquiries.filter((e) => e.followUpAt && e.followUpAt <= today && !["won", "closed"].includes(e.status) && mine(e)).slice(0, 10),
+      newEnquiries: can(req.admin,"enquiries") ? enquiries.filter((e) => e.status === "new").length : 0, totalEnquiries: can(req.admin,"enquiries") ? enquiries.length : 0, recentEnquiries: can(req.admin,"enquiries") ? enquiries.slice(0, 5) : [],
+      followUps: can(req.admin,"enquiries") ? enquiries.filter((e) => e.followUpAt && e.followUpAt <= today && !["won", "closed"].includes(e.status) && mine(e)).slice(0, 10) : [],
     };
     if (can(req.admin, "quotes")) Object.assign(out, { openQuotes: quotes.filter((q) => q.status === "sent").length, openQuoteValue: quotes.filter((q) => q.status === "sent").reduce((n, q) => n + q.totals.total, 0) });
     if (can(req.admin, "orders")) {

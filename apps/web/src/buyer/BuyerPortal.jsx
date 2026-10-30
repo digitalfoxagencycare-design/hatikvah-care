@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, money } from "../api.js";
 import OtpLogin from "../components/OtpLogin.jsx";
@@ -16,10 +16,12 @@ export default function BuyerPortal() {
   const { settings } = useSite();
   const [sp, setSp] = useSearchParams();
   const [me, setMe] = useState(undefined);
+  const [authError, setAuthError] = useState("");
   const tab = TABS.some(([k]) => k === sp.get("tab")) ? sp.get("tab") : "quotes";
-  useEffect(() => { api("/api/shop/me").then(setMe).catch(() => setMe(null)); }, []);
-  async function logout() { await api("/api/shop/logout", { method: "POST" }).catch(() => {}); setMe(null); }
+  useEffect(() => { api("/api/shop/me").then(setMe).catch(e => e.status === 401 ? setMe(null) : setAuthError(e.message)); }, []);
+  async function logout() { try { await api("/api/shop/logout", { method: "POST" }); setMe(null); } catch(e) { setAuthError(e.message); } }
 
+  if (authError) return <p className="alert" role="alert">{authError} <button onClick={() => window.location.reload()}>Try again</button></p>;
   if (me === undefined) return <div className="center-note">Loading…</div>;
   if (!me) return (
     <div className="wrap narrow account"><Seo title="Buyer sign-in" />
@@ -42,11 +44,13 @@ export default function BuyerPortal() {
 }
 
 function useList(path) {
-  const [s, setS] = useState({ data: null, error: null });
-  const load = () => api(path).then((data) => setS({ data, error: null })).catch((e) => setS({ data: null, error: e.message }));
-  useEffect(() => { load(); }, [path]); // eslint-disable-line react-hooks/exhaustive-deps
-  return { ...s, reload: load };
+  const [s,setS]=useState({data:null,error:null});const current=useRef(null);
+  const load=useCallback(()=>{current.current?.abort();const c=new AbortController();current.current=c;
+    return api(path,{signal:c.signal}).then(data=>{if(!c.signal.aborted)setS({data,error:null});}).catch(e=>{if(!c.signal.aborted)setS({data:null,error:e.message});});
+  },[path]);
+  useEffect(()=>{load();return()=>current.current?.abort();},[load]);return{...s,reload:load};
 }
+
 const Lines = ({ items }) => (
   <table className="buyer-lines"><thead><tr><th>Item</th><th className="num">Qty</th><th className="num">Rate</th><th className="num">GST</th><th className="num">Amount</th></tr></thead>
     <tbody>{items.map((it, i) => <tr key={i}><td>{it.name}{it.perUnit > 1 && <small>{it.pieces.toLocaleString("en-IN")} pcs</small>}</td><td className="num">{it.qty.toLocaleString("en-IN")} {it.unit}</td><td className="num">{money(it.rate)}</td><td className="num">{it.gstRate}%</td><td className="num">{money(it.total)}</td></tr>)}</tbody>
@@ -107,14 +111,16 @@ function Orders() {
   const { add, settings } = useSite();
   const nav = useNavigate();
   const [msg, setMsg] = useState(null);
+  const reordering = useRef(new Set());
   async function reorder(o) {
+    if (reordering.current.has(o.id)) return; reordering.current.add(o.id);
     setMsg(null);
     try {
       const r = await api(`/api/buyer/orders/${o.id}/reorder`);
       for (const it of r.items) add(it.productId, it.qty, it.variant);
       if (!r.items.length) return setMsg({ error: `Nothing from ${o.number} can be ordered online right now${r.skipped.length ? ` (${r.skipped.map((x) => `${x.name}: ${x.reason}`).join("; ")})` : ""}. Please ask us for a quote.` });
       nav("/cart", { state: { reorder: r } });
-    } catch (e) { setMsg({ error: e.message }); }
+    } catch (e) { setMsg({ error: e.message }); } finally { reordering.current.delete(o.id); }
   }
   return (
     <>

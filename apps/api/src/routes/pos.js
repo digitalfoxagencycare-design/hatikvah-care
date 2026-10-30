@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { requirePerm } from "../lib/permissions.js";
-import { balance, createInvoice, deductForInvoice, logActivity, now, recordPayment } from "../lib/sales.js";
+import { balance, createInvoice, deductForInvoice, logActivity, now, recordPayment, postLedger } from "../lib/sales.js";
 import { posInput } from "../schemas.js";
-import { wrap } from "./public.js";
+import { wrap as plainWrap } from "./public.js";
+import { atomicWrap } from "./atomic.js";
 import { bad, csvHeaders, notFound, parse, rupees } from "./shared.js";
 import { toCsv } from "../csv.js";
 
@@ -12,6 +13,7 @@ const WALK_IN = "Walk-in (counter sale)";
 /** Counter billing (walk-in buyers: GST invoice + payment in one step) and the cash / bank book. */
 export function posRoutes({ store, audit, automation }) {
   const r = Router();
+  const wrap = fn => atomicWrap(store, fn);
   const by = (req) => req.admin.email;
 
   /** The buyer: a chosen customer, a customer with the walk-in's phone, a new one for that phone, or the shared walk-in record. */
@@ -53,9 +55,16 @@ export function posRoutes({ store, audit, automation }) {
   // ---------- cash / bank book (receipts posted by every payment)
   r.get("/ledger", requirePerm("ledger"), wrap(async (req, res) => {
     const { account = "", from = "", to = "" } = req.query;
-    const rows = (await store.ledger.all({ sort: { date: -1 } })).filter((e) => (!account || e.account === account) && (!from || e.date >= from) && (!to || e.date <= to));
+    const rows = (await store.ledger.all({ sort: { date: -1 } })).filter((e) => !e.legacySupersededBy && (!account || e.account === account || e.lines?.some(l=>l.account===account)) && (!from || e.date >= from) && (!to || e.date <= to));
     const totals = {};
-    for (const e of rows) totals[e.account] = (totals[e.account] || 0) + (e.kind === "payment" || e.kind === "credit_note" ? -e.amount : e.amount); // credit notes reverse sales
+    for (const e of rows) {
+      if (e.lines) {
+        for (const l of e.lines) totals[l.account] = (totals[l.account] || 0) + l.debit - l.credit;
+        if (e.account === "credit_notes") totals.credit_notes = (totals.credit_notes || 0) - e.amount;
+      } else {
+        totals[e.account] = (totals[e.account] || 0) + (e.kind === 'payment' || e.kind === 'credit_note' ? -e.amount : e.amount);
+      }
+    }
     if (req.query.format === "csv") {
       csvHeaders(res, "cash-bank-book.csv");
       return res.send(toCsv(["date", "account", "kind", "amount", "ref", "party", "narration"], rows.map((e) => ({ date: e.date, account: e.account, kind: e.kind, amount: rupees(e.amount), ref: e.ref, party: e.party, narration: e.narration }))));
@@ -69,7 +78,8 @@ export function posRoutes({ store, audit, automation }) {
     if (!["receipt", "payment"].includes(b.kind)) return bad(res, "Kind must be receipt or payment");
     if (!Number.isInteger(b.amount) || b.amount <= 0 || b.amount > 10_000_000_000) return bad(res, "Amount must be paise above zero");
     if (b.date && !/^\d{4}-\d{2}-\d{2}$/.test(b.date)) return bad(res, "Use a date like 2026-10-31");
-    const e = await store.ledger.insert({ date: b.date || now().slice(0, 10), account: b.account, kind: b.kind, amount: b.amount, ref: String(b.ref || "").slice(0, 60), paymentId: "", invoiceId: "",
+    if (!/^[a-z][a-z0-9_]{1,60}$/.test(b.contraAccount || "") || b.contraAccount === b.account) return bad(res, "Choose a different counter-account");
+    const e = await postLedger(store, { contraAccount: b.contraAccount, date: b.date || now().slice(0, 10), account: b.account, kind: b.kind, amount: b.amount, ref: String(b.ref || "").slice(0, 60), paymentId: "", invoiceId: "",
       party: String(b.party || "").slice(0, 160), narration: String(b.narration || "").slice(0, 300), by: by(req), createdAt: now() });
     await audit(req, "ledger.create", e.ref || e.account, { amount: e.amount, kind: e.kind }); res.status(201).json(e);
   }));

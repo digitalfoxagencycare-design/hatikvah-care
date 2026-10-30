@@ -208,7 +208,8 @@ describe("roles, two-step sign-in, payments webhook, content, backup", () => {
   it("a signed Razorpay webhook records the payment once; a forged one is refused", async () => {
     const c = (await t.store.customers.all())[0];
     const inv = (await owner.post("/api/admin/invoices", { customerId: c.id, items: [{ name: "Kits", qty: 1, rate: 100000, gstRate: 0 }] })).data;
-    const body = JSON.stringify({ event: "payment_link.paid", payload: { payment_link: { entity: { notes: { invoiceId: inv.id } } }, payment: { entity: { id: "pay_ABC", amount: 100000 } } } });
+    await t.store.invoices.update(inv.id, { payLink: { id: "plink_fixture", amount: 100000 } });
+    const body = JSON.stringify({ event: "payment_link.paid", payload: { payment_link: { entity: { id: "plink_fixture", currency: "INR", status: "paid", notes: { invoiceId: inv.id } } }, payment: { entity: { id: "pay_ABC", amount: 100000, currency: "INR", status: "captured" } } } });
     const sig = crypto.createHmac("sha256", "whsec_test").update(body).digest("hex");
     const post = (s) => fetch(t.base + "/api/webhooks/razorpay", { method: "POST", headers: { "content-type": "application/json", "x-razorpay-signature": s }, body });
     assert.equal((await post("bad".repeat(21) + "a")).status, 401);

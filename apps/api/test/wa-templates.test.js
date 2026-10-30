@@ -42,11 +42,11 @@ describe("WhatsApp payloads (Graph API v21.0)", () => {
     assert.deepEqual(g.payload.template, { name: "hc_update", language: { code: "en_US" }, components: [{ type: "body", parameters: [{ type: "text", text: "Dear Ravi, · Quote Q/1 is ready." }] }] });
     const none = { ...general, waTemplate: "" };
     assert.match(buildWhatsAppMessage(none, row({ template: quoteTpl }), false).manual, /WHATSAPP_TEMPLATE_QUOTE/);
-    assert.equal(buildWhatsAppMessage(none, row(), null).payload.type, "text", "window unknown (no inbound webhook): free-form as before");
+    assert.match(buildWhatsAppMessage(none, row(), null).manual, /24-hour window/, "unknown window must fail closed");
   });
 
-  it("bot replies always go as written", () => {
-    const out = buildWhatsAppMessage(cfg, row({ payload: { type: "text", text: { body: "menu" } } }), false);
+  it("bot replies go as written inside the verified service window", () => {
+    const out = buildWhatsAppMessage(cfg, row({ payload: { type: "text", text: { body: "menu" } } }), true);
     assert.deepEqual(out.payload, { messaging_product: "whatsapp", recipient_type: "individual", to: "919876543210", type: "text", text: { body: "menu" } });
   });
 

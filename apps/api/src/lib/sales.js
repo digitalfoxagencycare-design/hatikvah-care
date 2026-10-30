@@ -1,4 +1,6 @@
 import crypto from "node:crypto";
+import { invoiceLines, postJournal } from "./accounting.js";
+import { safePaise, roundMoneyProduct } from "./money.js";
 import { addDays, calcTotals, finYear, nextNumber, stateName, todayIST } from "./gst.js";
 import { getSettings } from "../model.js";
 import { expandLines, pieces } from "./units.js";
@@ -22,7 +24,8 @@ export async function priced(store, { items, customer, placeOfSupply }) {
   const byId = Object.fromEntries((await Promise.all(ids.map((id) => store.products.get(id)))).filter(Boolean).map((p) => [p.id, p]));
   const ex = expandLines(items, byId);
   if (ex.error) throw userError(ex.error);
-  const { lines, totals } = calcTotals(ex.items, interState);
+  let lines, totals;
+  try { ({ lines, totals } = calcTotals(ex.items, interState)); } catch (e) { if (e instanceof RangeError) throw userError(e.message); throw e; }
   return { items: lines, totals, interState, placeOfSupply: pos, placeOfSupplyName: stateName(pos) };
 }
 
@@ -31,7 +34,7 @@ export async function rateFor(store, customer, product) {
   const pl = customer?.priceListId ? await store.priceLists.get(customer.priceListId) : null;
   if (pl?.prices?.[product.id] != null) return pl.prices[product.id];
   if (product.price == null) return 0;
-  return Math.round(product.price * (1 - (pl?.discountPct || 0) / 100));
+  return roundMoneyProduct(product.price, 100 - (pl?.discountPct || 0), 100);
 }
 
 /** Website price for a quantity: the highest bulk tier the quantity reaches, else the list price. The web product page mirrors this for display. */
@@ -100,21 +103,29 @@ export function batchLevels(moves, today = todayIST()) {
 }
 
 /** Takes an invoice's goods out of stock (in pieces) unless its order was already dispatched, which took them out then. */
-export async function deductForInvoice(store, inv, by) {
-  if (inv.orderId && (await store.orders.get(inv.orderId))?.status === "dispatched") return;
-  for (const it of inv.items || []) {
-    const p = it.productId ? await store.products.get(it.productId) : null;
-    if (!p) continue;
-    if (!p.stockTracked) await store.products.update(p.id, { stockTracked: true });
-    await moveStock(store, { productId: p.id, sku: p.sku, qty: -Math.abs(pieces(it)), kind: "out", ref: inv.number, note: `Sale invoice ${inv.number}`, by });
+export function deductForInvoice(store, ...args) { return store.atomic(() => deductForInvoiceCore(store, ...args)); }
+async function deductForInvoiceCore(store, inv, by) {
+  inv=(await store.invoices.get(inv.id))||inv;
+  if(inv.stockConsumedAt)return;
+  const order=inv.orderId?await store.orders.get(inv.orderId):null;
+  if (order && (order.stockConsumedAt || ["dispatched", "delivered"].includes(order.status))) {
+    if(inv.id)await store.invoices.update(inv.id,{stockConsumedAt:order.stockConsumedAt||now(),stockAllocations:order.stockAllocations||[],allocationStatus:order.stockAllocations?'verified':'legacy_unverified'});
+    return;
   }
+  const stockAllocations=await consumeStock(store,inv.items||[],{ref:inv.number,by,excludeOrderId:inv.orderId});
+  if(inv.id)await store.invoices.update(inv.id,{stockConsumedAt:now(),stockAllocations,allocationStatus:'verified'});
 }
 
 export async function logActivity(store, { entity, entityId, kind = "system", text, by = "system" }) {
   return store.activities.insert({ entity, entityId, kind, text, by, at: now() });
 }
 
-export async function createOrderFromQuote(store, quote, by) {
+export function createOrderFromQuote(store, ...args) { return store.atomic(() => createOrderFromQuoteCore(store, ...args)); }
+async function createOrderFromQuoteCore(store, quote, by) {
+  quote = (await store.quotes.get(quote.id)) || quote;
+  if (quote.orderId) return store.orders.get(quote.orderId);
+  if (!["draft", "sent", "accepted"].includes(quote.status)) throw userError("Quote cannot become an order",409);
+  await assertStockAvailable(store, quote.items);
   const number = await nextNumber(store, "SO");
   const order = await store.orders.insert({
     number, token: token(), quoteId: quote.id, quoteNumber: quote.number, customerId: quote.customerId, customer: quote.customer, items: quote.items, totals: quote.totals,
@@ -131,7 +142,9 @@ export async function createOrderFromQuote(store, quote, by) {
  * date counts as expired even before the scheduled job marks it. Accepting runs the "quote accepted" automation, which
  * raises the sales order. Returns { quote } or { error: { status, message } }.
  */
-export async function respondToQuote(store, automation, q, { action, name = "", note = "", via = "online" }) {
+export function respondToQuote(store, ...args) { return store.atomic(() => respondToQuoteCore(store, ...args)); }
+async function respondToQuoteCore(store, automation, q, { action, name = "", note = "", via = "online" }) {
+  q = (await store.quotes.get(q.id)) || q;
   if (q.status === "sent" && q.validUntil && q.validUntil < todayIST()) {
     await store.quotes.update(q.id, { status: "expired", updatedAt: now() });
     q = { ...q, status: "expired" };
@@ -145,64 +158,100 @@ export async function respondToQuote(store, automation, q, { action, name = "", 
   return { quote: (await store.quotes.get(q.id)) || upd };
 }
 
-export async function createInvoice(store, { customer, items, placeOfSupply, date, dueDate, notes = "", poNumber = "", orderId = "", orderNumber = "", by }) {
+export function createInvoice(store, ...args) { return store.atomic(() => createInvoiceCore(store, ...args)); }
+async function createInvoiceCore(store, { customer, items, placeOfSupply, date, dueDate, notes = "", poNumber = "", orderId = "", orderNumber = "", quoteId = "", by }) {
   const s = await getSettings(store);
   const d = date || todayIST();
-  const doc = await priced(store, { items, customer, placeOfSupply });
+  const order = orderId ? await store.orders.get(orderId) : null;
+  if (order?.invoiceId) return store.invoices.get(order.invoiceId);
+  if (order?.status === 'cancelled') throw userError('A cancelled order cannot be invoiced',409);
+  const quote = quoteId ? await store.quotes.get(quoteId) : null;
+  if (quote?.invoiceId) return store.invoices.get(quote.invoiceId);
+  if (quote && !['draft','sent','accepted','converted'].includes(quote.status)) throw userError('Quote cannot be invoiced',409);
+  let doc;
+  if (order || quote) {
+    const snapshot=order||quote;
+    doc={items:structuredClone(snapshot.items),totals:structuredClone(snapshot.totals),interState:!!snapshot.interState,placeOfSupply:snapshot.placeOfSupply,placeOfSupplyName:snapshot.placeOfSupplyName};
+    customer={...customer,...snapshot.customer,id:snapshot.customerId};
+  } else doc = await priced(store, { items, customer, placeOfSupply });
   const number = await nextNumber(store, "INV", new Date(d + "T12:00:00Z"));
   const inv = await store.invoices.insert({
     number, token: token(), date: d, dueDate: dueDate || addDays(d, customer.paymentTermsDays ?? s.paymentTermsDays), customerId: customer.id, customer: customerSnapshot(customer),
     orderId, orderNumber, poNumber, ...doc, notes, status: "unpaid", amountPaid: 0, payLink: null, remindersSent: [], createdBy: by, createdAt: now(), updatedAt: now(),
   });
   if (orderId) await store.orders.update(orderId, { invoiceId: inv.id, invoiceNumber: number, updatedAt: now() });
-  return inv;
+  if (quote) await store.quotes.update(quote.id,{invoiceId:inv.id,invoiceNumber:number,status:'accepted',updatedAt:now()});
+  const lines=invoiceLines(inv.totals);
+  if(lines.length) await postLedger(store,{sourceKey:'invoice:'+inv.id,kind:'invoice',account:'accounts_receivable',amount:inv.totals.total,invoiceId:inv.id,ref:inv.number,date:inv.date,party:inv.customer.name,by,lines});
+  await deductForInvoice(store,inv,by);
+  return (await store.invoices.get(inv.id)) || inv;
 }
 
 /** GST invoice for a paid website order (raised only once the money arrives, so abandoned checkouts never become invoices). Takes stock out, as dispatch then skips it. */
-export async function invoiceWebsiteOrder(store, order) {
+export function invoiceWebsiteOrder(store, ...args) { return store.atomic(() => invoiceWebsiteOrderCore(store, ...args)); }
+async function invoiceWebsiteOrderCore(store, order) {
+  order = (await store.orders.get(order.id)) || order;
   if (order.invoiceId) return store.invoices.get(order.invoiceId);
   const customer = { ...(await store.customers.get(order.customerId)), ...order.customer, id: order.customerId, paymentTermsDays: 0 };
   const inv = await createInvoice(store, { customer, items: order.items.map(({ amount, tax, total, ...l }) => l), placeOfSupply: order.placeOfSupply, notes: order.notes,
     orderId: order.id, orderNumber: order.number, by: "website" });
-  for (const it of order.items) {
-    const p = it.productId ? await store.products.get(it.productId) : null;
-    if (p?.stockTracked) await moveStock(store, { productId: p.id, sku: p.sku, qty: -pieces(it), kind: "out", ref: inv.number, note: `Website order ${order.number}`, by: "website" });
-  }
   return inv;
 }
 
 /** Re-adds the payments and credit notes of an invoice and sets paid / credited / partial / unpaid. */
-export async function refreshInvoice(store, invoiceId) {
+export function refreshInvoice(store, ...args) { return store.atomic(() => refreshInvoiceCore(store, ...args)); }
+async function refreshInvoiceCore(store, invoiceId) {
   const inv = await store.invoices.get(invoiceId);
-  if (!inv || inv.status === "void") return inv;
-  const paid = (await store.payments.all()).filter((p) => p.invoiceId === invoiceId).reduce((n, p) => n + p.amount, 0);
+  if (!inv) return inv;
+  const paid = safePaise(Number((await store.payments.all()).filter((p) => p.invoiceId === invoiceId && !p.reversedAt).reduce((n, p) => n + BigInt(p.amount), 0n)));
   const credited = inv.creditedAmount || 0, total = inv.totals.total;
+  if (inv.status === 'void') return store.invoices.update(invoiceId, { amountPaid: paid, updatedAt: now() });
   const status = paid + credited >= total ? (paid === 0 ? "credited" : "paid") : paid + credited > 0 ? "partial" : "unpaid";
   return store.invoices.update(invoiceId, { amountPaid: paid, status, paidAt: status === "paid" ? inv.paidAt || now() : null, updatedAt: now() });
 }
 
-export async function recordPayment(store, inv, { amount, date, mode, reference = "", notes = "", by, external = "" }) {
-  const p = await store.payments.insert({ invoiceId: inv.id, invoiceNumber: inv.number, customerId: inv.customerId, customerName: inv.customer.name, amount, date: date || todayIST(), mode, reference, notes, external, by, createdAt: now() });
-  await postLedger(store, { date: p.date, account: ledgerAccount(mode), kind: "receipt", amount, ref: inv.number, paymentId: p.id, invoiceId: inv.id, party: inv.customer.name, narration: `${mode}${reference ? " " + reference : ""}`, by });
+export function recordPayment(store, ...args) { return store.atomic(() => recordPaymentCore(store, ...args)); }
+async function recordPaymentCore(store, inv, { amount, date, mode, reference = "", notes = "", by, external = "" }) {
+  inv=(await store.invoices.get(inv.id))||inv;
+  try { safePaise(amount); } catch { throw userError('Payment must be safe-integer paise'); }
+  if (amount <= 0) throw userError('Payment must be positive');
+  if(external){const old=await store.payments.findBy('external',external);if(old){if(old.invoiceId!==inv.id||old.amount!==amount)throw userError('External payment identity mismatch',409);return{payment:old,invoice:await store.invoices.get(inv.id),duplicate:true};}}
+  if(!external && (inv.status==='void'||amount>balance(inv)))throw userError('Payment exceeds current balance or invoice is void',409);
+  const appliedAmount=Math.min(amount,balance(inv)),unappliedAmount=amount-appliedAmount;
+  const p = await store.payments.insert({ invoiceId: inv.id, invoiceNumber: inv.number, customerId: inv.customerId, customerName: inv.customer.name, amount, appliedAmount, unappliedAmount, reconciliationStatus:unappliedAmount?'refund_or_allocation_required':'allocated', date: date || todayIST(), mode, reference, notes, external, by, createdAt: now() });
+  const receiptLines=[{account:ledgerAccount(mode),debit:amount,credit:0},...(appliedAmount?[{account:'accounts_receivable',debit:0,credit:appliedAmount}]:[]),...(unappliedAmount?[{account:'customer_credits',debit:0,credit:unappliedAmount}]:[])];
+  await postLedger(store, { sourceKey: "payment:" + p.id, lines: receiptLines, date: p.date, account: ledgerAccount(mode), kind: "receipt", amount, ref: inv.number, paymentId: p.id, invoiceId: inv.id, party: inv.customer.name, narration: `${mode}${reference ? " " + reference : ""}`, by });
   await logActivity(store, { entity: "invoice", entityId: inv.id, text: `Payment ₹${(amount / 100).toFixed(2)} received (${mode}${reference ? " " + reference : ""})`, by });
   return { payment: p, invoice: await refreshInvoice(store, inv.id) };
 }
 
 /** Cash and bank book. Every payment received posts a receipt; removing the payment posts nothing but deletes its entry. */
 export const ledgerAccount = (mode) => (mode === "cash" ? "cash" : mode === "razorpay" ? "razorpay" : "bank");
-export async function postLedger(store, e) {
-  return store.ledger.insert({ date: e.date || todayIST(), account: e.account, kind: e.kind, amount: e.amount, ref: e.ref || "", paymentId: e.paymentId || "", invoiceId: e.invoiceId || "",
-    party: e.party || "", narration: e.narration || "", by: e.by || "system", createdAt: now() });
+export async function postLedger(store,e) {
+  const amount=e.amount ?? 0;
+  let lines=e.lines;
+  if(!lines && e.contraAccount && ['receipt','payment'].includes(e.kind)) {
+    const debit=e.kind==='receipt'?e.account:e.contraAccount, credit=e.kind==='receipt'?e.contraAccount:e.account;
+    lines=[{account:debit,debit:amount,credit:0},{account:credit,debit:0,credit:amount}];
+  }
+  const { id: ignoredId, _id: ignoredMongo, ...entry } = e;
+  return postJournal(store,{...entry,lines,date:e.date||todayIST(),sourceKey:e.sourceKey||'manual:'+token(),account:e.account||'',kind:e.kind||'journal',amount,ref:e.ref||'',paymentId:e.paymentId||'',invoiceId:e.invoiceId||'',party:e.party||'',narration:e.narration||'',by:e.by||'system'});
 }
-export async function removePaymentLedger(store, paymentId) {
-  const e = await store.ledger.findBy("paymentId", paymentId);
-  if (e) await store.ledger.remove(e.id);
+export function removePaymentLedger(store,paymentId,by='system') {
+  return store.atomic(async()=>{
+    const p=await store.payments.get(paymentId);if(!p||p.reversedAt)return p;
+    if(p.external && p.mode==='razorpay')throw userError('Captured gateway payments require the provider refund/reconciliation workflow',409);
+    const original=await store.ledger.findBy('sourceKey','payment:'+paymentId) || await store.ledger.findBy('paymentId',paymentId);
+    if(!original?.lines)throw userError('Legacy payment requires reconciled journal migration before reversal',409);
+    await postLedger(store,{...original,id:undefined,sourceKey:'payment-reversal:'+paymentId,reversalOf:original.id,kind:'payment',lines:original.lines.map(l=>({...l,debit:l.credit,credit:l.debit})),date:todayIST(),by});
+    await store.payments.update(paymentId,{reversedAt:now(),reversedBy:by});await refreshInvoice(store,p.invoiceId);return p;
+  });
 }
 
 /** What the customer still owes: total less payments and credit notes (never below zero; see refundDue). */
 export const balance = (inv) => (inv.status === "void" ? 0 : Math.max(0, inv.totals.total - (inv.amountPaid || 0) - (inv.creditedAmount || 0)));
 /** Money to give back when credit notes land on an invoice that was already paid. */
-export const refundDue = (inv) => (inv.status === "void" ? 0 : Math.max(0, (inv.amountPaid || 0) + (inv.creditedAmount || 0) - inv.totals.total));
+export const refundDue = (inv) => (inv.status === "void" ? (inv.amountPaid || 0) : Math.max(0, (inv.amountPaid || 0) + (inv.creditedAmount || 0) - inv.totals.total));
 
 // ---------- credit notes (sales returns and price adjustments)
 export const CREDIT_REASONS = ["damaged", "incorrect_item", "return", "pricing_adjustment", "other"];
@@ -222,8 +271,13 @@ export async function creditNoteNumber(store, d = new Date()) {
  * Restocked goods move back into physical stock in pieces (batch-tracked products need the batch they came from).
  * Posts a `credit_notes` ledger row and reduces the invoice balance. Returns { creditNote } or throws a userError.
  */
-export async function createCreditNote(store, inv, d, by) {
+export function createCreditNote(store, ...args) { return store.atomic(() => createCreditNoteCore(store, ...args)); }
+async function createCreditNoteCore(store, inv, d, by) {
+  // The enclosing store transaction serializes caps, stock, invoice aggregates and journal posting.
+  if (inv?.id) inv = (await store.invoices.get(inv.id)) || inv;
   if (!inv || inv.status === "void") throw userError("A void invoice cannot get a credit note", 409);
+  if (d.reason === "pricing_adjustment" && d.restock === true) throw userError("Pricing adjustments cannot restock goods");
+  if (d.reason === 'damaged' && d.restock === true) throw userError('Damaged goods must be quarantined, not returned to sellable stock');
   const prior = (await store.creditNotes.all()).filter((c) => c.invoiceId === inv.id);
   const done = {}; // per invoice line: value already credited, quantity already returned
   for (const c of prior) for (const l of c.items) {
@@ -244,10 +298,25 @@ export async function createCreditNote(store, inv, d, by) {
     if (rate > L.rate) throw userError(`The credit rate for ${L.name} cannot be more than the invoiced rate`);
     const p = restock && L.productId ? await store.products.get(L.productId) : null;
     if (p?.batchTracked && !it.batch) throw userError(`${L.name} is batch tracked: enter the batch number being returned`);
+    let originalBatch = it.batch || null;
+    if (p?.batchTracked) {
+      const sold = (inv.stockAllocations || []).filter(a => a.line === it.line && a.productId === p.id && a.batch?.batchNumber === it.batch.batchNumber);
+      const returned = prior.filter(c => c.restock).flatMap(c => c.items).filter(l => l.line === it.line && l.batch?.batchNumber === it.batch.batchNumber).reduce((n,l)=>n+pieces(l),0);
+      if (!sold.length || pieces({ ...L, qty: it.qty }) > sold.reduce((n,a)=>n+a.qty,0)-returned) throw userError('Return exceeds the original sold batch allocation; legacy invoices require reconciliation',409);
+      originalBatch = sold[0].batch;
+      if (originalBatch.expDate && originalBatch.expDate < todayIST()) throw userError('Expired returns must be quarantined, not restocked',409);
+    }
     lines.push({ line: it.line, productId: L.productId || "", sku: L.sku || "", name: L.name, hsn: L.hsn || "", unit: L.unit || "pcs", uom: L.uom || "piece", perUnit: L.perUnit || 1,
-      qty: it.qty, rate, discountPct: L.discountPct || 0, gstRate: L.gstRate ?? 0, ...(it.batch ? { batch: it.batch } : {}) });
+      qty: it.qty, rate, discountPct: L.discountPct || 0, gstRate: L.gstRate ?? 0, ...(originalBatch ? { batch: originalBatch } : {}) });
   }
   const { lines: priced_, totals } = calcTotals(lines, !!inv.interState); // GST maths only in gst.js
+  // Several partial notes must never reverse more of a tax head than the original invoice posted.
+  for (const head of ['cgst','sgst','igst']) totals[head] = Math.min(totals[head], Math.max(0,(inv.totals[head]||0)-prior.reduce((n,c)=>n+(c.totals[head]||0),0)));
+  totals.tax = totals.cgst + totals.sgst + totals.igst;
+  let excessTax = priced_.reduce((n,l)=>n+l.tax,0)-totals.tax;
+  for (const l of [...priced_].reverse()) { const adjustment=Math.min(l.tax,excessTax);l.tax-=adjustment;l.total=l.amount+l.tax;excessTax-=adjustment; }
+  const exactCredit=totals.taxable+totals.tax;
+  totals.total=roundMoneyProduct(exactCredit,1,100)*100;totals.roundOff=totals.total-exactCredit;
   for (const l of priced_) {
     const x = done[l.line] || { amount: 0 }, L = inv.items[l.line];
     if (x.amount + l.amount > (L.amount ?? Math.round(L.qty * L.rate))) throw userError(`${L.name}: this would credit more than was invoiced`);
@@ -272,9 +341,39 @@ export async function createCreditNote(store, inv, d, by) {
   }
   await store.invoices.update(inv.id, { creditedAmount: (inv.creditedAmount || 0) + totals.total, creditNotes: [...(inv.creditNotes || []), { id: cn.id, number: cn.number }], updatedAt: now() });
   const fresh = await refreshInvoice(store, inv.id);
-  await postLedger(store, { date, account: "credit_notes", kind: "credit_note", amount: totals.total, ref: cn.number, invoiceId: inv.id, party: inv.customer.name,
+  const reversalLines=invoiceLines(totals,true),receivableCredit=Math.min(totals.total,balance(inv)),customerCredit=totals.total-receivableCredit;
+  const creditLines=reversalLines.filter(l=>l.account!=='accounts_receivable');
+  if(receivableCredit)creditLines.push({account:'accounts_receivable',debit:0,credit:receivableCredit});
+  if(customerCredit)creditLines.push({account:'customer_credits',debit:0,credit:customerCredit});
+  await postLedger(store, { sourceKey: "credit-note:" + cn.id, lines: creditLines, date, account: "credit_notes", kind: "credit_note", amount: totals.total, ref: cn.number, invoiceId: inv.id, party: inv.customer.name,
     narration: `Credit note on ${inv.number} (${d.reason.replace(/_/g, " ")}): sales reversed${refundDue(fresh) ? `, refund due ₹${(refundDue(fresh) / 100).toFixed(2)}` : ""}`, by });
   await logActivity(store, { entity: "invoice", entityId: inv.id, text: `Credit note ${cn.number} issued for ₹${(totals.total / 100).toFixed(2)} (${d.reason.replace(/_/g, " ")}${restock ? ", goods back in stock" : ""})`, by });
   await logActivity(store, { entity: "customer", entityId: inv.customerId, text: `Credit note ${cn.number} on invoice ${inv.number}`, by });
   return { creditNote: cn, invoice: fresh };
+}
+
+/** Must run inside the same atomic unit that creates/reserves the order. */
+export async function assertStockAvailable(store,items,excludeOrderId='') {
+  const buckets=await stockBuckets(store);const own=excludeOrderId?await store.orders.get(excludeOrderId):null;
+  const needed={};for(const it of items)if(it.productId)needed[it.productId]=(needed[it.productId]||0)+pieces(it);
+  for(const[id,qty]of Object.entries(needed)){const p=await store.products.get(id);if(!p?.stockTracked)continue;const reservedOwn=own&&reservesStock(own)?own.items.filter(l=>l.productId===id).reduce((n,l)=>n+pieces(l),0):0;if(qty>bucketOf(buckets,id).available+reservedOwn)throw userError(p.name+' has insufficient available stock',409);}
+}
+
+/** Persist the exact batch/line movements at sale time; returns must reference these allocations. */
+export function consumeStock(store,items,{ref,by='system',excludeOrderId=''}={}) {
+  return store.atomic(async()=>{
+    await assertStockAvailable(store,items,excludeOrderId);
+    const allocations=[];
+    for(const [line,it]of items.entries()){
+      const p=it.productId?await store.products.get(it.productId):null;if(!p?.stockTracked)continue;
+      let left=pieces(it);
+      const batches=p.batchTracked?batchLevels(await store.stockMoves.all()).filter(b=>b.productId===p.id&&(!b.expDate||b.expDate>=todayIST())):[{qty:left,batchNumber:null}];
+      if(p.batchTracked&&batches.reduce((n,b)=>n+b.qty,0)<left)throw userError(p.name+' has insufficient non-expired batch stock',409);
+      for(const b of batches){if(left<=0)break;const qty=Math.min(left,b.qty),batch=b.batchNumber?{batchNumber:b.batchNumber,mfgDate:b.mfgDate||'',expDate:b.expDate||''}:null;
+        const move=await store.stockMoves.insert({productId:p.id,sku:p.sku,qty:-qty,kind:'out',ref,note:'Goods issued',by,at:now(),line,...(batch?{batch}:{})});
+        allocations.push({line,productId:p.id,qty,batch,moveId:move.id});left-=qty;
+      }
+    }
+    return allocations;
+  });
 }

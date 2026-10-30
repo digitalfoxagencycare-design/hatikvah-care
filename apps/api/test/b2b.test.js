@@ -104,7 +104,7 @@ describe("counter billing (POS) and cash book", () => {
     const book = (await owner.get("/api/admin/ledger?account=cash")).data;
     assert.ok(book.rows.some((e) => e.ref === r.data.invoice.number && e.amount === r.data.payment.amount));
     assert.equal((await owner.del(`/api/admin/payments/${r.data.payment.id}`)).status, 204);
-    assert.ok(!(await owner.get("/api/admin/ledger?account=cash")).data.rows.some((e) => e.paymentId === r.data.payment.id), "removing the payment removes its entry");
+    assert.equal((await owner.get("/api/admin/ledger?account=cash")).data.rows.filter((e) => e.paymentId === r.data.payment.id).length, 2, "payment reversal preserves the receipt and compensating entry");
   });
 });
 
@@ -126,7 +126,7 @@ describe("roles", () => {
 describe("WhatsApp webhook", () => {
   const sign = (body) => "sha256=" + crypto.createHmac("sha256", APP_SECRET).update(body).digest("hex");
   const post = (payload, sig) => { const body = JSON.stringify(payload); return fetch(t.base + "/api/webhooks/whatsapp", { method: "POST", headers: { "content-type": "application/json", "x-hub-signature-256": sig ?? sign(body) }, body }); };
-  const msg = (id, from, m) => ({ object: "whatsapp_business_account", entry: [{ changes: [{ value: { metadata: { phone_number_id: "1368252233043036" }, contacts: [{ wa_id: from, profile: { name: "Dr. Mehta" } }], messages: [{ id, from, timestamp: "1790000000", ...m }] } }] }] });
+  const msg = (id, from, m) => ({ object: "whatsapp_business_account", entry: [{ changes: [{ value: { metadata: { phone_number_id: "1368252233043036" }, contacts: [{ wa_id: from, profile: { name: "Dr. Mehta" } }], messages: [{ id, from, timestamp: String(Math.floor(Date.now() / 1000)), ...m }] } }] }] });
 
   it("answers Meta's verification", async () => {
     const ok = await fetch(`${t.base}/api/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=${VERIFY}&hub.challenge=12345`);
@@ -191,7 +191,7 @@ describe("Razorpay link on a quote", () => {
     const q = (await owner.post("/api/admin/quotes", { customerId: customer.id, items: [{ productId: product.id, name: product.name, qty: 1, rate: 45000, uom: "box" }] })).data;
     const l = await owner.post(`/api/admin/quotes/${q.id}/paylink`);
     assert.equal(l.status, 200); assert.equal(l.data.payLink.url, "https://rzp.io/i/quote1");
-    const body = JSON.stringify({ event: "payment_link.paid", payload: { payment_link: { entity: { notes: { quoteId: q.id } } }, payment: { entity: { id: "pay_Q1", amount: q.totals.total } } } });
+    const body = JSON.stringify({ event: "payment_link.paid", payload: { payment_link: { entity: { id: l.data.payLink.id, currency: "INR", status: "paid", notes: { quoteId: q.id } } }, payment: { entity: { id: "pay_Q1", amount: q.totals.total, currency: "INR", status: "captured" } } } });
     const sig = crypto.createHmac("sha256", "whsec_b2b").update(body).digest("hex");
     const r = await fetch(t.base + "/api/webhooks/razorpay", { method: "POST", headers: { "content-type": "application/json", "x-razorpay-signature": sig }, body });
     assert.equal(r.status, 200);

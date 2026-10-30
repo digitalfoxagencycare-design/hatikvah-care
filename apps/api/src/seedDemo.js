@@ -5,7 +5,8 @@ import { customerSnapshot, priced, moveStock, recordPayment } from "./lib/sales.
 const token = () => crypto.randomBytes(18).toString("base64url");
 const now = () => new Date().toISOString();
 
-export async function seedDemoData(store, log = console) {
+export async function seedDemoData(store, log = console, cfg = {}) {
+  if (cfg.prod || process.env.NODE_ENV === "production") throw new Error("Demo seeding is forbidden in production");
   if (process.env.NODE_ENV === "test") return;
   if ((await store.customers.count()) >= 10 && (await store.quotes.count()) >= 10 && (await store.invoices.count()) >= 10) return;
 

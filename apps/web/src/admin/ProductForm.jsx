@@ -1,3 +1,4 @@
+import { parseRupees } from "../../../api/src/lib/money.js";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api.js";
@@ -88,7 +89,7 @@ function packagingOut(k) {
   if (!inner) return null;
   return { baseUnit: k.baseUnit || "piece", innerPack: { name: k.innerName || "box", qty: inner }, masterCarton: carton ? { name: k.cartonName || "carton", qty: carton } : null };
 }
-const rupeesIn = (v) => { const n = Number(String(v).replace(/,/g, "")); return String(v).trim() === "" || !Number.isFinite(n) || n < 0 ? null : Math.round(n * 100); };
+const rupeesIn = parseRupees;
 
 export default function ProductForm() {
   const { id } = useParams();

@@ -34,7 +34,8 @@ export function createAutomation({ cfg, store, notifier, log = console }) {
   const base = () => cfg.publicUrl || `http://localhost:${cfg.port}`;
   const docLink = (kind, t) => `${base()}/doc/${kind}/${t}`;
 
-  async function config() {
+  async function config() { return store.atomic(configCore); }
+  async function configCore() {
     const s = await store.settings.findBy("key", "automation");
     if (!s) return { ...(await store.settings.insert(structuredClone(DEFAULT_AUTOMATION))) };
     return { ...DEFAULT_AUTOMATION, ...s, enabled: { ...DEFAULT_AUTOMATION.enabled, ...s.enabled } };
@@ -157,7 +158,9 @@ export function createAutomation({ cfg, store, notifier, log = console }) {
   }
 
   // ---------- scheduled
-  async function run(at = new Date()) {
+  async function run(at = new Date()) { return store.atomic(() => runCore(at)); }
+  async function runCore(at) {
+    for (const order of await store.orders.all()) if (order.payment === 'online' && order.paymentStatus !== 'paid' && !order.invoiceId && ['confirmed','packed'].includes(order.status) && order.reservationExpiresAt && Date.parse(order.reservationExpiresAt) < at.getTime()) await store.orders.update(order.id,{status:'cancelled',cancelReason:'payment_timeout',updatedAt:now()});
     const a = await config(), company = await getSettings(store), today = todayIST(at), res = {};
     const count = (k, n = 1) => { res[k] = (res[k] || 0) + n; };
     const istHour = new Date(at.getTime() + 5.5 * 3600_000).getUTCHours();

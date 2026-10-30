@@ -4,7 +4,8 @@ import { requirePerm } from "../lib/permissions.js";
 import { batchLevels, bucketOf, isLow, logActivity, moveStock, now, stockBuckets, token } from "../lib/sales.js";
 import { measureLabel } from "../lib/units.js";
 import { purchaseInput, receiveInput, stockAdjustInput, supplierInput } from "../schemas.js";
-import { wrap } from "./public.js";
+import { wrap as plainWrap } from "./public.js";
+import { atomicWrap } from "./atomic.js";
 import { bad, notFound, parse } from "./shared.js";
 
 /**
@@ -13,6 +14,7 @@ import { bad, notFound, parse } from "./shared.js";
  */
 export function stockRoutes({ store, audit }) {
   const r = Router();
+  const wrap = fn => atomicWrap(store, fn);
   r.use(["/stock", "/suppliers", "/purchases"], requirePerm("stock"));
   const by = (req) => req.admin.email;
 
@@ -79,6 +81,7 @@ export function stockRoutes({ store, audit }) {
     const items = [];
     for (const it of d.items) {
       const p = await store.products.get(it.productId); if (!p) { bad(res, "A product in this purchase order no longer exists"); return null; }
+      if (d.receiveNow && p.batchTracked) { bad(res, `${p.name} requires receiving with batch details`); return null; }
       items.push({ productId: p.id, sku: p.sku, name: p.name, unit: p.unit || "pcs", qty: it.qty, rate: it.rate || p.costPrice || 0, received: d.receiveNow ? it.qty : 0 });
     }
     return { supplierId: sup.id, supplierName: sup.name, items, total: items.reduce((n, i) => n + Math.round(i.qty * i.rate), 0), expectedDate: d.expectedDate, notes: d.notes, billNumber: d.billNumber || "" };
@@ -109,6 +112,7 @@ export function stockRoutes({ store, audit }) {
   r.put("/purchases/:id", wrap(async (req, res) => {
     const po = await store.purchases.get(req.params.id); if (!po) return notFound(res, "Purchase order");
     if (po.status !== "draft") return bad(res, "Only draft purchase orders can be edited", 409);
+    if (req.body?.receiveNow) return bad(res, "Receive goods through the receiving action, not purchase editing", 409);
     const d = parse(purchaseInput, req.body, res); if (!d) return;
     const b = await build(d, res); if (!b) return;
     const upd = await store.purchases.update(po.id, { ...b, updatedAt: now() }); await audit(req, "purchase.update", po.number); res.json(upd);
@@ -131,7 +135,7 @@ export function stockRoutes({ store, audit }) {
   }));
   r.post("/purchases/:id/status", wrap(async (req, res) => {
     const po = await store.purchases.get(req.params.id); if (!po) return notFound(res, "Purchase order");
-    const status = req.body?.status, allowed = { draft: ["sent", "cancelled"], sent: ["cancelled"], partial: ["received"] };
+    const status = req.body?.status, allowed = { draft: ["sent", "cancelled"], sent: ["cancelled"], partial: [] };
     if (!(allowed[po.status] || []).includes(status)) return bad(res, `A ${po.status} purchase order cannot become ${status}`, 409);
     const upd = await store.purchases.update(po.id, { status, [status + "At"]: now(), updatedAt: now() });
     await logActivity(store, { entity: "purchase", entityId: po.id, text: `Marked ${status}`, by: by(req) });
@@ -139,6 +143,12 @@ export function stockRoutes({ store, audit }) {
   }));
   r.post("/purchases/:id/receive-all", wrap(async (req, res) => {
     const po = await store.purchases.get(req.params.id); if (!po) return notFound(res, "Purchase order");
+    if (!["draft", "sent", "partial"].includes(po.status)) return bad(res, `A ${po.status} purchase order cannot be received`, 409);
+    for (const it of po.items) {
+      const p = await store.products.get(it.productId);
+      if (!p) return bad(res, "A product on this purchase order no longer exists");
+      if (p.batchTracked && it.qty > (it.received || 0)) return bad(res, `${p.name} is batch tracked: receive it with batch details`);
+    }
     const billNumber = req.body?.billNumber || po.billNumber || "";
     const items = po.items.map((i) => ({ ...i }));
     for (const it of items) {
@@ -163,8 +173,15 @@ export function stockRoutes({ store, audit }) {
     if (!["sent", "partial", "draft"].includes(po.status)) return bad(res, `A ${po.status} purchase order cannot be received`, 409);
     const d = parse(receiveInput, req.body, res); if (!d) return;
     const items = po.items.map((i) => ({ ...i }));
-    for (const l of d.lines) { // check every line before any stock moves
+    const received = new Map();
+    for (const l of d.lines) { // validate all lines and aggregate repeats before any stock moves
+      const it = items.find((i) => i.productId === l.productId);
+      if (!it) return bad(res, "That product is not on this purchase order");
+      const qty = (received.get(l.productId) || 0) + l.qty;
+      if (qty > it.qty - (it.received || 0)) return bad(res, "Cannot receive more than the remaining purchase quantity");
+      received.set(l.productId, qty);
       const p = await store.products.get(l.productId);
+      if (!p) return bad(res, "A product on this purchase order no longer exists");
       if (p?.batchTracked && !l.batch) return bad(res, `${p.name} is batch tracked: enter the batch number and expiry`);
     }
     for (const l of d.lines) {

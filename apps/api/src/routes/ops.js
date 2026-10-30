@@ -8,10 +8,12 @@ import { PERMISSIONS, requirePerm, ROLES } from "../lib/permissions.js";
 import { DEFAULT_HOME, homeInput } from "../schemas.js";
 import { wrap } from "./public.js";
 import { bad, notFound, parse } from "./shared.js";
+import { atomicWrap } from "./atomic.js";
 
 /** Website content, automation settings and message log, look-up lists, and the owner's full backup. */
 export function opsRoutes({ cfg, store, audit, automation, notifier }) {
   const r = Router();
+  const backupWrap=fn=>atomicWrap(store,fn,{readSnapshot:true});
 
   r.get("/meta", (_req, res) => res.json({ states: STATES, gstRates: GST_RATES, roles: ROLES, permissions: PERMISSIONS, channels: channels(cfg) }));
 
@@ -56,11 +58,12 @@ export function opsRoutes({ cfg, store, audit, automation, notifier }) {
   }));
 
   // ---------- backup (owner): everything except password hashes and photos
-  r.get("/backup", requireOwner, wrap(async (req, res) => {
-    const names = ["settings", "categories", "products", "customers", "priceLists", "enquiries", "activities", "quotes", "orders", "invoices", "payments", "stockMoves", "suppliers", "purchases", "outbox", "audit"];
-    const out = { exportedAt: new Date().toISOString(), app: "hatikvah-care" };
+  r.get("/backup", requireOwner, backupWrap(async (req, res) => {
+    const names = ["settings", "categories", "products", "customers", "priceLists", "enquiries", "activities", "quotes", "orders", "invoices", "payments", "stockMoves", "suppliers", "purchases", "outbox", "audit", "ledger", "creditNotes", "inbox"];
+    const out = { formatVersion: 2, counters: await store.exportCounters(), mediaIncluded: false, exportedAt: new Date().toISOString(), app: "hatikvah-care" };
     for (const n of names) out[n] = await store[n].all();
-    out.admins = (await store.admins.all()).map(({ passwordHash, totpSecret, ...a }) => a);
+    out.accountingReconciliation = { legacyJournalIds: out.ledger.filter(j => !j.lines).map(j => j.id) };
+    out.admins = (await store.admins.all()).map(({ passwordHash, totpSecret, totpPending, ...a }) => a);
     await audit(req, "backup.download", "all");
     res.set({ "Content-Type": "application/json", "Content-Disposition": `attachment; filename="hatikvah-backup-${out.exportedAt.slice(0, 10)}.json"` }).send(JSON.stringify(out));
   }));

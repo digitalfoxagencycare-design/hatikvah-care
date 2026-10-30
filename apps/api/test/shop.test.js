@@ -87,7 +87,7 @@ describe("online shop", () => {
     assert.equal(link.notes.orderId, r.data.order.id); assert.match(link.callback_url, /\/account\?order=/);
     let o = await t.store.orders.get(r.data.order.id);
     assert.equal(o.invoiceId, ""); assert.equal(o.interState, true); assert.equal(link.amount, o.totals.total);
-    const body = JSON.stringify({ event: "payment_link.paid", payload: { payment_link: { entity: { notes: { orderId: o.id } } }, payment: { entity: { id: "pay_SHOP1", amount: o.totals.total } } } });
+    const body = JSON.stringify({ event: "payment_link.paid", payload: { payment_link: { entity: { id: o.payLink.id, currency: "INR", status: "paid", notes: { orderId: o.id } } }, payment: { entity: { id: "pay_SHOP1", amount: o.totals.total, currency: "INR", status: "captured" } } } });
     const sig = crypto.createHmac("sha256", "whsec_shop").update(body).digest("hex");
     const post = () => fetch(t.base + "/api/webhooks/razorpay", { method: "POST", headers: { "content-type": "application/json", "x-razorpay-signature": sig }, body });
     assert.equal((await post()).status, 200); assert.equal((await post()).status, 200); // retried webhook: no second payment

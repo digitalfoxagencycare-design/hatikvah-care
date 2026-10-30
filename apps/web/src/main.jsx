@@ -12,6 +12,7 @@ import About from "./pages/About.jsx";
 import Contact from "./pages/Contact.jsx";
 import NotFound from "./pages/NotFound.jsx";
 import "./styles.css";
+import ErrorBoundary from "./components/ErrorBoundary.jsx";
 
 const Admin = lazy(() => import("./admin/AdminApp.jsx"));
 const DocPage = lazy(() => import("./pages/DocPage.jsx"));
@@ -20,7 +21,7 @@ const Account = lazy(() => import("./buyer/BuyerPortal.jsx")); // buyer portal: 
 const wait = (el) => <Suspense fallback={<div className="center-note">Loading…</div>}>{el}</Suspense>;
 
 createRoot(document.getElementById("root")).render(
-  <BrowserRouter>
+  <ErrorBoundary><BrowserRouter>
     <Routes>
       <Route path="/doc/:kind/:token" element={<Suspense fallback={<div className="center-note">Loading…</div>}><DocPage /></Suspense>} />
       <Route path="/admin/*" element={<Suspense fallback={<div className="center-note">Loading…</div>}><Admin /></Suspense>} />
@@ -38,5 +39,5 @@ createRoot(document.getElementById("root")).render(
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
-  </BrowserRouter>,
+  </BrowserRouter></ErrorBoundary>,
 );

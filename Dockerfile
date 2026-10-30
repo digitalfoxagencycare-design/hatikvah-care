@@ -5,6 +5,7 @@ COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 RUN npm ci --no-audit --no-fund
+COPY apps/api/src/lib/gst.js apps/api/src/lib/money.js apps/api/src/lib/
 COPY apps/web apps/web
 RUN npm run build -w apps/web
 

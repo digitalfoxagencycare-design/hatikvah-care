@@ -8,7 +8,8 @@ import { shopFlags } from "../lib/notify.js";
 import { createPaymentLink } from "../lib/razorpay.js";
 import { balance, bucketOf, customerSnapshot, logActivity, now, priced, stockBuckets, tierPrice, token } from "../lib/sales.js";
 import { getSettings } from "../model.js";
-import { wrap } from "./public.js";
+import { wrap as plainWrap } from "./public.js";
+import { atomicWrap } from "./atomic.js";
 
 /**
  * Website shop: WhatsApp OTP sign-in for buyers, cart checkout into a sales order, Razorpay payment and "my orders".
@@ -34,6 +35,7 @@ const invalid = (res, message, field, status = 400) => res.status(status).json({
 
 export function shopRoutes({ cfg, store, automation, notifier, fetchImpl = globalThis.fetch }) {
   const r = Router();
+  const wrap = fn => atomicWrap(store, fn, { commitErrors: req => /(?:otp\/verify|auth\/verify-code)$/.test(req.path || "") });
   const flags = async () => shopFlags(cfg, await getSettings(store));
   const hashOtp = (phone, code) => crypto.createHmac("sha256", cfg.jwtSecret).update(`otp:${phone}:${code}`).digest("hex");
   const siteUrl = (req) => cfg.publicUrl || `${req.protocol}://${req.get("host")}`;
@@ -51,18 +53,27 @@ export function shopRoutes({ cfg, store, automation, notifier, fetchImpl = globa
     if (!p.success) return invalid(res, p.error.issues[0].message, "phone");
     const phone = digits10(p.data.phone);
     if (!mobileOk(phone)) return invalid(res, "Enter a 10-digit Indian mobile number", "phone");
+    const quotaKey='otp-send:'+phone;
+    const previous=await store.settings.findBy('key',quotaKey);
+    const requests=(previous?.requests||[]).filter(t=>Date.now()-Date.parse(t)<15*60000);
+    if(requests.length>=5)return res.status(429).json({error:'RATE_LIMITED',message:'Too many codes sent to this number. Please try again later.'});
+    if(previous)await store.settings.update(previous.id,{requests:[...requests,now()]});else await store.settings.insert({key:quotaKey,requests:[now()]});
     const old = (await store.otps.all()).filter((o) => o.phone === phone);
     if (old.some((o) => Date.now() - Date.parse(o.createdAt) < 60_000)) return res.status(429).json({ error: "RATE_LIMITED", message: "Please wait a minute before asking for another code" });
     for (const o of old) await store.otps.remove(o.id);
     const code = String(crypto.randomInt(100000, 1000000));
     const otp = await store.otps.insert({ phone, hash: hashOtp(phone, code), attempts: 0, expiresAt: new Date(Date.now() + OTP_MINUTES * 60_000).toISOString(), createdAt: now() });
     if (notifier.channels.otp === "off") return res.json({ ok: true, devCode: code }); // development only: shopFlags hides OTP in production without WhatsApp
-    try { await notifier.sendOtp(phone, code); } catch (e) {
-      await store.otps.remove(otp.id);
-      if (e.status === 429) return res.status(429).json({ error: "RATE_LIMITED", message: "Too many codes sent to this number. Please try again in a few minutes." });
-      return res.status(502).json({ error: "NOT_SENT", message: "We could not send the code on WhatsApp. Please try again." });
-    }
-    res.json({ ok: true });
+    const response = { ok: true };
+    await store.afterCommit(async () => {
+      try { await notifier.sendOtp(phone, code); }
+      catch (e) {
+        await store.otps.remove(otp.id); delete response.ok;
+        Object.assign(response, { error: e.status === 429 ? 'RATE_LIMITED' : 'NOT_SENT', message: e.status === 429 ? 'Too many codes sent to this number. Please try again in a few minutes.' : 'We could not send the code on WhatsApp. Please try again.' });
+        res.status(e.status === 429 ? 429 : 502);
+      }
+    });
+    res.json(response);
   }));
 
   r.post(["/otp/verify", "/auth/verify-code"], limit(15), wrap(async (req, res) => {
@@ -73,7 +84,7 @@ export function shopRoutes({ cfg, store, automation, notifier, fetchImpl = globa
     if (!otp || Date.parse(otp.expiresAt) < Date.now()) return invalid(res, "This code has expired. Please ask for a new one.", "code");
     if (otp.attempts >= OTP_TRIES) { await store.otps.remove(otp.id); return res.status(429).json({ error: "RATE_LIMITED", message: "Too many wrong codes. Please ask for a new one." }); }
     const want = Buffer.from(otp.hash), got = Buffer.from(hashOtp(phone, code));
-    if (!/^\d{6}$/.test(code) || !crypto.timingSafeEqual(want, got)) { await store.otps.update(otp.id, { attempts: otp.attempts + 1 }); return invalid(res, "That code is not right", "code"); }
+    if (!/^\d{6}$/.test(code) || (want.length !== got.length || !crypto.timingSafeEqual(want, got))) { await store.otps.update(otp.id, { attempts: otp.attempts + 1 }); return invalid(res, "That code is not right", "code"); }
     await store.otps.remove(otp.id);
     let c = await findCustomer(phone);
     if (!c) {
@@ -99,7 +110,7 @@ export function shopRoutes({ cfg, store, automation, notifier, fetchImpl = globa
   }));
 
   /** Online payment (again) for an unpaid website order. */
-  r.post("/orders/:id/pay", signedIn, wrap(async (req, res) => {
+  r.post("/orders/:id/pay", signedIn, plainWrap(async (req, res) => {
     const o = await store.orders.get(req.params.id);
     if (!o || o.customerId !== req.customer.id) return res.status(404).json({ error: "NOT_FOUND", message: "Order not found" });
     if (!(await flags()).online) return res.status(403).json({ error: "OFF", message: "Online payment is not available. Please contact us." });
@@ -114,10 +125,15 @@ export function shopRoutes({ cfg, store, automation, notifier, fetchImpl = globa
     const parsed = checkoutInput.safeParse(req.body);
     if (!parsed.success) { const i = parsed.error.issues[0]; return invalid(res, i.message, i.path.join(".")); }
     const d = parsed.data;
+    const checkoutFingerprint=crypto.createHash('sha256').update(JSON.stringify(d)).digest('hex');
+    const requestKey=String(req.get?.("idempotency-key")||"");
+    if(requestKey && !/^[A-Za-z0-9_-]{16,100}$/.test(requestKey))return invalid(res,"Invalid checkout request key");
+    if(requestKey){const old=await store.orders.findBy("checkoutKey",requestKey);if(old){if(!req.customer || old.customerId!==req.customer.id || old.checkoutFingerprint!==checkoutFingerprint)return invalid(res,"Checkout key conflict","",409);return res.status(200).json({ok:true,order:{id:old.id,number:old.number,total:old.totals.total},payUrl:old.payLink?.url||"",payError:""});}}
     if (d.payment === "online" && !f.online) return invalid(res, "Online payment is not available. Choose pay later.", "payment");
     if (d.payment === "later" && !f.payLater) return invalid(res, "Please pay online to place this order", "payment");
 
     let customer = req.customer;
+    if(customer?.id)customer=await store.customers.get(customer.id);
     if (!customer) {
       if (f.otp) return res.status(401).json({ error: "LOGIN_REQUIRED", message: "Please verify your mobile number first" });
       const phone = digits10(d.phone);
@@ -148,15 +164,16 @@ export function shopRoutes({ cfg, store, automation, notifier, fetchImpl = globa
     const doc = await priced(store, { items, customer: snap, placeOfSupply: d.stateCode });
     const order = await store.orders.insert({ number: await nextNumber(store, "SO"), token: token(), quoteId: "", quoteNumber: "", customerId: customer.id, customer: snap, ...doc,
       poNumber: "", status: "confirmed", expectedDate: "", notes: d.notes, dispatch: null, challanNumber: "", invoiceId: "",
-      source: "website", payment: d.payment, paymentStatus: d.payment === "online" ? "pending" : "unpaid", createdBy: "website", createdAt: now(), updatedAt: now() });
+      checkoutKey: requestKey || undefined, checkoutFingerprint, reservationExpiresAt: d.payment === "online" ? new Date(Date.now()+30*60000).toISOString() : "", source: "website", payment: d.payment, paymentStatus: d.payment === "online" ? "pending" : "unpaid", createdBy: "website", createdAt: now(), updatedAt: now() });
     await logActivity(store, { entity: "customer", entityId: customer.id, text: `Website order ${order.number} placed (${d.payment === "online" ? "online payment" : "pay later"})`, by: "website" });
     await automation.on.websiteOrder(order);
 
-    let payUrl = "", payError = "";
-    if (d.payment === "online") {
-      try { payUrl = await payLink(req, order); } catch (e) { payError = "We could not open the payment page. Your order is saved: pay from My account, or we will send you an invoice."; await logActivity(store, { entity: "order", entityId: order.id, text: `Payment link not created: ${e.message}` }); }
-    }
-    res.status(201).json({ ok: true, order: { id: order.id, number: order.number, total: order.totals.total }, payUrl, payError });
+    const response = { ok: true, order: { id: order.id, number: order.number, total: order.totals.total }, payUrl: '', payError: '' };
+    if (d.payment === 'online') await store.afterCommit(async () => {
+      try { response.payUrl = await payLink(req, order); }
+      catch { response.payError = 'Order saved. Open My account to retry payment or contact our team.'; }
+    });
+    res.status(201).json(response);
   }));
 
   async function payLink(req, order) {
@@ -179,7 +196,7 @@ export function setBuyerCookie(cfg, res, c) {
     { httpOnly: true, sameSite: "lax", secure: cfg.cookieSecure, maxAge: days * 86400_000, path: "/" }); // lax: the buyer comes back signed in from the Razorpay page
 }
 /** Reads the buyer cookie into req.customer (signed out when missing or expired). Writes need the same anti-CSRF header as the admin API. */
-export const buyerSession = ({ cfg, store }) => wrap(async (req, res, next) => {
+export const buyerSession = ({ cfg, store }) => plainWrap(async (req, res, next) => {
   if (!["GET", "HEAD"].includes(req.method) && req.get("x-requested-with") !== "hc-admin") return res.status(403).json({ error: "CSRF", message: "Missing request header" });
   const t = req.cookies?.[SHOP_COOKIE];
   if (t) {

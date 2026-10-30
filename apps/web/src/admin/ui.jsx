@@ -1,4 +1,6 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { parseRupees } from "../../../api/src/lib/money.js";
+import { calcTotals as exactTotals } from "../../../api/src/lib/gst.js";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, money } from "../api.js";
 import { WhatsAppMessageParser } from "./WhatsAppParser.jsx";
@@ -8,7 +10,7 @@ export const rs = (p) => (p == null ? "—" : money(p));
 export const fmtDate = (s) => (s ? new Date(s.length === 10 ? s + "T00:00:00" : s).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—");
 export const fmtTime = (s) => (s ? new Date(s).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "—");
 export const today = () => new Date(Date.now() + 5.5 * 3600_000).toISOString().slice(0, 10);
-export const toPaise = (s) => { if (String(s).trim() === "") return null; const n = Number(String(s).replace(/,/g, "")); return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : NaN; };
+export const toPaise = parseRupees;
 export const Pill = ({ s, children }) => <span className={"pill " + s}>{children || s}</span>;
 
 const MetaCtx = createContext(null);
@@ -65,10 +67,8 @@ export function Timeline({ entity, entityId, items = [], onAdded, followUp = fal
 
 /** Same GST arithmetic as the server (the server's figures are the ones saved). */
 export function calcTotals(items, interState) {
-  let taxable = 0, tax = 0, discount = 0;
-  for (const it of items) { const g = Math.round((Number(it.qty) || 0) * (it.rate || 0)), d = Math.round((g * (Number(it.discountPct) || 0)) / 100), t = g - d; taxable += t; discount += d; tax += Math.round((t * (Number(it.gstRate) || 0)) / 100); }
-  const exact = taxable + tax, total = Math.round(exact / 100) * 100;
-  return { taxable, discount, tax, cgst: interState ? 0 : Math.round(tax / 2), sgst: interState ? 0 : tax - Math.round(tax / 2), igst: interState ? tax : 0, roundOff: total - exact, total };
+  try { return exactTotals(items.map(it=>({...it,qty:Number(it.qty)||0,rate:it.rate||0,discountPct:Number(it.discountPct)||0,gstRate:Number(it.gstRate)||0})),interState).totals; }
+  catch { return { taxable:0,discount:0,tax:0,cgst:0,sgst:0,igst:0,roundOff:0,total:0,invalid:true }; }
 }
 
 export function Totals({ t, interState }) {
@@ -200,7 +200,8 @@ export function Bars({ rows, value, label, fmt = rs }) {
 /** Runs an action with a busy flag and a message line. */
 export function useAction() {
   const [st, setSt] = useState({ busy: false, error: null, ok: null });
-  const run = async (fn, ok = null) => { setSt({ busy: true, error: null, ok: null }); try { const r = await fn(); setSt({ busy: false, error: null, ok }); return r; } catch (e) { setSt({ busy: false, error: e.message, ok: null }); return undefined; } };
+  const inFlight=useRef(false);
+  const run = async (fn, ok = null) => { if(inFlight.current)return;inFlight.current=true;setSt({ busy: true, error: null, ok: null }); try { const r = await fn(); setSt({ busy: false, error: null, ok }); return r; } catch (e) { setSt({ busy: false, error: e.message, ok: null }); return undefined; } finally {inFlight.current=false;} };
   return [st, run, setSt];
 }
 export const Msg = ({ st }) => <>{st.error && <p className="alert" role="alert">{st.error}</p>}{st.ok && <p className="notice" role="status">{st.ok}</p>}</>;

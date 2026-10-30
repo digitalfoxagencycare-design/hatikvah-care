@@ -18,7 +18,7 @@ export function parseCsv(text) {
 }
 
 /** Cells starting with = + - @ are prefixed with ' so a spreadsheet never runs them as a formula (CSV injection). */
-const safe = (v) => { const s = v == null ? "" : String(v); return /^[=+\-@\t\r]/.test(s) ? "'" + s : s; };
+const safe = (v) => { const s = v == null ? "" : String(v); return /^(?:[\s\u0000-\u001f]*[=+\-@]|[\t\r\n])/.test(s) ? "'" + s : s; };
 export function toCsv(headers, rows) {
   const esc = (v) => { const s = safe(v); return /[",\n\r]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s; };
   return [headers.join(","), ...rows.map((r) => headers.map((h) => esc(r[h])).join(","))].join("\r\n") + "\r\n";

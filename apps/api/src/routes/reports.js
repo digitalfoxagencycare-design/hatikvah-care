@@ -3,7 +3,7 @@ import { toCsv } from "../csv.js";
 import { daysBetween, finYear, stateName, todayIST } from "../lib/gst.js";
 import { requirePerm } from "../lib/permissions.js";
 import { balance, stockLevels } from "../lib/sales.js";
-import { wrap } from "./public.js";
+import { atomicWrap } from "./atomic.js";
 import { csvHeaders, rupees } from "./shared.js";
 
 const ymd = (s, d) => (/^\d{4}-\d{2}-\d{2}$/.test(String(s || "")) ? String(s) : d);
@@ -12,6 +12,7 @@ const day = (iso) => (iso ? todayIST(new Date(iso)) : "");
 /** Business reports and accountant exports (GST sales register, HSN summary, payments, receivables). */
 export function reportRoutes({ store }) {
   const r = Router();
+  const wrap=fn=>atomicWrap(store,fn,{readSnapshot:true});
   const range = (req) => { const fy = finYear(); return { from: ymd(req.query.from, `${fy.slice(0, 4)}-04-01`), to: ymd(req.query.to, todayIST()) }; };
   const inRange = (d, { from, to }) => d >= from && d <= to;
 
@@ -19,6 +20,8 @@ export function reportRoutes({ store }) {
     const rg = range(req), today = todayIST();
     const [invoicesAll, payments, enquiries, quotes, orders, products, admins, customers] = await Promise.all([store.invoices.all(), store.payments.all(), store.enquiries.all(), store.quotes.all(), store.orders.all(), store.products.all(), store.admins.all(), store.customers.all()]);
     const invoices = invoicesAll.filter((i) => i.status !== "void" && inRange(i.date, rg));
+    const credits=(await store.creditNotes.all()).filter(c=>inRange(c.date,rg));
+    const creditSum=k=>credits.reduce((n,c)=>n+(c.totals[k]||0),0);
     const month = {}, byCustomer = {}, byCategory = {}, byProduct = {};
     for (const i of invoices) {
       const m = (month[i.date.slice(0, 7)] ||= { month: i.date.slice(0, 7), invoiced: 0, taxable: 0, tax: 0, received: 0, count: 0 });
@@ -30,7 +33,7 @@ export function reportRoutes({ store }) {
         const k = l.productId || l.name; const pr = (byProduct[k] ||= { name: l.name, sku: l.sku, qty: 0, taxable: 0 }); pr.qty += l.qty; pr.taxable += l.amount;
       }
     }
-    for (const p of payments.filter((x) => inRange(x.date, rg))) (month[p.date.slice(0, 7)] ||= { month: p.date.slice(0, 7), invoiced: 0, taxable: 0, tax: 0, received: 0, count: 0 }).received += p.amount;
+    for (const p of payments.filter((x) => !x.reversedAt && inRange(x.date, rg))) (month[p.date.slice(0, 7)] ||= { month: p.date.slice(0, 7), invoiced: 0, taxable: 0, tax: 0, received: 0, count: 0 }).received += p.amount;
     const cats = await store.categories.all();
     const aging = { current: 0, d30: 0, d60: 0, d90: 0, d90plus: 0 };
     for (const i of invoicesAll.filter((x) => ["unpaid", "partial"].includes(x.status))) {
@@ -46,10 +49,16 @@ export function reportRoutes({ store }) {
       quotes: qs.filter((q) => q.createdBy === a.email).length, quoteValue: qs.filter((q) => q.createdBy === a.email).reduce((n, q) => n + q.totals.total, 0),
       converted: qs.filter((q) => q.createdBy === a.email && ["accepted", "converted"].includes(q.status)).reduce((n, q) => n + q.totals.total, 0),
     })).filter((s) => s.enquiries || s.quotes);
-    const invoiced = invoices.reduce((n, i) => n + i.totals.total, 0);
+    for(const c of credits){
+      const m=(month[c.date.slice(0,7)] ||= {month:c.date.slice(0,7),invoiced:0,taxable:0,tax:0,received:0,count:0});m.invoiced-=c.totals.total;m.taxable-=c.totals.taxable;m.tax-=c.totals.tax;
+      const customer=(byCustomer[c.customerId] ||= {customerId:c.customerId,name:c.customer.name,taxable:0,total:0,invoices:0});customer.taxable-=c.totals.taxable;customer.total-=c.totals.total;
+      for(const l of c.items){const p=products.find(x=>x.id===l.productId),cat=p?.category||'other';(byCategory[cat] ||= {category:cat,taxable:0}).taxable-=l.amount;const k=l.productId||l.name,pr=(byProduct[k] ||= {name:l.name,sku:l.sku,qty:0,taxable:0});pr.taxable-=l.amount;if(c.reason!=='pricing_adjustment')pr.qty-=l.qty;}
+    }
+    const grossInvoiced = invoices.reduce((n,i)=>n+i.totals.total,0);
+    const invoiced = grossInvoiced-creditSum('total');
     res.json({
-      range: rg,
-      totals: { invoiced, taxable: invoices.reduce((n, i) => n + i.totals.taxable, 0), tax: invoices.reduce((n, i) => n + i.totals.tax, 0), received: payments.filter((p) => inRange(p.date, rg)).reduce((n, p) => n + p.amount, 0),
+      range: rg, basis: "Invoices less credit notes issued in the selected period; invoice register remains gross",
+      totals: { invoiced, grossInvoiced, credited: creditSum("total"), taxable: invoices.reduce((n, i) => n + i.totals.taxable, 0)-creditSum("taxable"), tax: invoices.reduce((n, i) => n + i.totals.tax, 0)-creditSum("tax"), received: payments.filter((p) => !p.reversedAt && inRange(p.date, rg)).reduce((n, p) => n + p.amount, 0),
         outstanding: Object.values(aging).reduce((a, b) => a + b, 0), invoices: invoices.length, avgInvoice: invoices.length ? Math.round(invoiced / invoices.length) : 0, customers: customers.length },
       months: Object.values(month).sort((a, b) => (a.month < b.month ? -1 : 1)),
       topCustomers: Object.values(byCustomer).sort((a, b) => b.total - a.total).slice(0, 15),
@@ -81,15 +90,19 @@ export function reportRoutes({ store }) {
   r.get("/reports/hsn-summary.csv", requirePerm("reports", "invoices"), wrap(async (req, res) => {
     const rg = range(req), hsn = {};
     for (const i of (await store.invoices.all()).filter((x) => x.status !== "void" && inRange(x.date, rg))) for (const l of i.items) {
-      const k = `${l.hsn || "-"}|${l.gstRate}`, h = (hsn[k] ||= { hsn: l.hsn || "", gst_rate: l.gstRate, uqc: l.unit, qty: 0, taxable: 0, tax: 0 });
+      const k = `${l.hsn || "-"}|${l.gstRate}|${l.unit}|${l.uom||"piece"}|${l.perUnit||1}`, h = (hsn[k] ||= { hsn: l.hsn || "", gst_rate: l.gstRate, uqc: l.unit, qty: 0, taxable: 0, tax: 0 });
       h.qty += l.qty; h.taxable += l.amount; h.tax += l.tax;
+    }
+    for(const c of (await store.creditNotes.all()).filter(c=>inRange(c.date,rg)))for(const l of c.items){
+      const k=`${l.hsn||'-'}|${l.gstRate}|${l.unit}|${l.uom||'piece'}|${l.perUnit||1}`,h=(hsn[k] ||= {hsn:l.hsn||'',gst_rate:l.gstRate,uqc:l.unit,qty:0,taxable:0,tax:0});
+      if(c.reason!=='pricing_adjustment')h.qty-=l.qty;h.taxable-=l.amount;h.tax-=l.tax;
     }
     const rows = Object.values(hsn).map((h) => ({ ...h, taxable: rupees(h.taxable), tax: rupees(h.tax) }));
     csvHeaders(res, `hsn-summary-${rg.from}-to-${rg.to}.csv`).send(toCsv(["hsn", "gst_rate", "uqc", "qty", "taxable", "tax"], rows));
   }));
   r.get("/reports/payments.csv", requirePerm("reports", "invoices"), wrap(async (req, res) => {
     const rg = range(req);
-    const rows = (await store.payments.all({ sort: { date: 1 } })).filter((p) => inRange(p.date, rg)).map((p) => ({ date: p.date, invoice_no: p.invoiceNumber, customer: p.customerName, amount: rupees(p.amount), mode: p.mode, reference: p.reference }));
+    const rows = (await store.payments.all({ sort: { date: 1 } })).filter((p) => !p.reversedAt && inRange(p.date, rg)).map((p) => ({ date: p.date, invoice_no: p.invoiceNumber, customer: p.customerName, amount: rupees(p.amount), mode: p.mode, reference: p.reference }));
     csvHeaders(res, `payments-${rg.from}-to-${rg.to}.csv`).send(toCsv(["date", "invoice_no", "customer", "amount", "mode", "reference"], rows));
   }));
   r.get("/reports/receivables.csv", requirePerm("reports", "invoices"), wrap(async (_req, res) => {

@@ -4,6 +4,8 @@
  * Providers are switched on by environment variables only. When a channel is not configured the message is kept as
  * "logged": it is visible in Admin > Automation with a click-to-send WhatsApp / email link, so staff can still send it by hand.
  */
+import crypto from "node:crypto";
+
 export const waNumber = (phone = "") => { const d = String(phone).replace(/\D/g, ""); return d.length === 10 ? "91" + d : d.replace(/^0+/, ""); };
 const emailOk = (s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s || "");
 const DAY_MS = 24 * 3600_000, WINDOW_MARGIN_MS = 30 * 60_000; // treat the last half hour of the window as closed: the send may queue or retry
@@ -25,7 +27,7 @@ export const WA_TEMPLATES = {
 };
 
 /** Meta refuses template variables containing new lines, tabs or more than four spaces in a row, and empty ones. */
-export const templateText = (v, max = 1000) => String(v ?? "").replace(/\s*[\r\n]+\s*/g, " · ").replace(/\t/g, " ").replace(/ {4,}/g, "   ").trim().slice(0, max) || "-";
+export const templateText = (v, max = 1000) => String(v ?? "").replace(/\s*[\r\n]+\s*/g, " · ").replace(/\t/g, " ").replace(/ {4,}/g, "   ").trim().slice(0, max).trim() || "-";
 
 /**
  * The Graph API (v21.0) message for an outbox row. inWindow: true / false from the inbox, or null when unknown (no inbound
@@ -34,7 +36,7 @@ export const templateText = (v, max = 1000) => String(v ?? "").replace(/\s*[\r\n
  */
 export function buildWhatsAppMessage(cfg, m, inWindow) {
   const base = { messaging_product: "whatsapp", recipient_type: "individual", to: m.to };
-  if (m.payload) return { payload: { ...base, ...m.payload }, via: "bot" }; // bot replies answer the customer, so the window is open
+  if (m.payload && inWindow === true) return { payload: { ...m.payload, ...base }, via: "bot" }; // bot replies answer the customer, so the window is open
   const freeForm = () => (m.button
     ? { payload: { ...base, type: "interactive", interactive: { type: "cta_url", body: { text: m.body.slice(0, 1024) }, action: { name: "cta_url", parameters: { display_text: m.button.label, url: m.button.url } } } }, via: "link" }
     : { payload: { ...base, type: "text", text: { preview_url: true, body: m.body } }, via: "text" });
@@ -48,7 +50,6 @@ export function buildWhatsAppMessage(cfg, m, inWindow) {
     return { payload: { ...base, type: "template", template: { name: named, language: lang, components } }, via: `template:${named}` };
   }
   if (cfg.waTemplate) return { payload: { ...base, type: "template", template: { name: cfg.waTemplate, language: lang, components: [{ type: "body", parameters: [{ type: "text", text: templateText(m.body) }] }] } }, via: `template:${cfg.waTemplate}` };
-  if (inWindow === null) return freeForm();
   return { manual: m.template
     ? `Outside WhatsApp's 24-hour window: set ${WA_TEMPLATES[m.template.kind].env} (or WHATSAPP_TEMPLATE) to an approved template, or send this by hand.`
     : "Outside WhatsApp's 24-hour window: set WHATSAPP_TEMPLATE to an approved template, or send this by hand." };
@@ -90,7 +91,7 @@ export function createNotifier({ cfg, store, fetchImpl = globalThis.fetch, log =
     const dest = channel === "whatsapp" ? waNumber(to) : String(to || "").trim();
     if (channel === "whatsapp" ? dest.length < 10 : !emailOk(dest)) return null; // no usable address: nothing to send
     const live = on[channel] !== "off";
-    const m = { channel, to: dest, subject, body: String(body).slice(0, 4000), event, ref, status: live ? "queued" : "logged", attempts: 0, error: "", createdAt: new Date().toISOString(), sentAt: null,
+    const m = { channel, to: dest, subject, body: String(body).slice(0, 4000), event, ref, status: live ? "queued" : "logged", attempts: 0, error: live ? "" : "Sending provider is not configured; send by hand.", createdAt: new Date().toISOString(), sentAt: null,
       ...(channel === "whatsapp" && button?.url ? { button: { label: String(button.label || "Open").slice(0, 20), url: button.url } } : {}), ...(channel === "whatsapp" && payload ? { payload } : {}),
       ...(channel === "whatsapp" && template && WA_TEMPLATES[template.kind] ? { template: { kind: template.kind, params: (template.params || []).map((p) => String(p ?? "")), button: String(template.button || "") } } : {}) };
     m.manualLink = manualLink(m);
@@ -100,35 +101,53 @@ export function createNotifier({ cfg, store, fetchImpl = globalThis.fetch, log =
   async function sendOne(m, inWindow = null) {
     if (m.channel === "email") {
       const r = await fetchImpl("https://api.resend.com/emails", {
-        method: "POST", headers: { Authorization: `Bearer ${cfg.resendKey}`, "Content-Type": "application/json" },
+        method: "POST", signal: AbortSignal.timeout(15000), headers: { Authorization: `Bearer ${cfg.resendKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({ from: cfg.mailFrom, to: [m.to], subject: m.subject || "HaTikvah Care", text: m.body, ...(cfg.mailReplyTo ? { reply_to: cfg.mailReplyTo } : {}) }),
       });
-      if (!r.ok) throw new Error(`Email provider said ${r.status}: ${(await r.text()).slice(0, 200)}`);
+      if (!r.ok) throw Object.assign(new Error(`Email provider said ${r.status}`), {knownResponse:true,retryable:r.status===429||r.status>=500});
       return {};
     }
     // WhatsApp Cloud API: free-form inside the customer's 24-hour window, an approved template outside it (buildWhatsAppMessage).
     const built = buildWhatsAppMessage(cfg, m, inWindow);
     if (built.manual) return { manual: built.manual };
     const payload = built.payload;
-    const r = await fetchImpl(`${graph()}/${cfg.waPhoneId}/messages`, { method: "POST", headers: { Authorization: `Bearer ${cfg.waToken}`, "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-    if (!r.ok) throw new Error(`WhatsApp said ${r.status}: ${(await r.text()).slice(0, 200)}`);
+    const r = await fetchImpl(`${graph()}/${cfg.waPhoneId}/messages`, { method: "POST", signal: AbortSignal.timeout(15000), headers: { Authorization: `Bearer ${cfg.waToken}`, "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    if (!r.ok) throw Object.assign(new Error(`WhatsApp said ${r.status}`), {knownResponse:true,retryable:r.status===429||r.status>=500});
     const data = await r.json().catch(() => ({}));
     return { waMessageId: data?.messages?.[0]?.id || "", via: built.via }; // status callbacks (sent / delivered / read) refer to this id
   }
 
-  async function flush() {
-    const queued = (await store.outbox.all({ sort: { createdAt: 1 } })).filter((m) => m.status === "queued" || (m.status === "failed" && m.attempts < 5));
+  let flushing = null, flushRequested = false;
+  function flush() {
+    if (store.inAtomic?.()) { store.afterCommit(() => flush()); return Promise.resolve(0); }
+    // One sender per process. Cross-instance durable claims are still needed on Cloud Run.
+    flushRequested = true;
+    if (!flushing) flushing = (async () => {
+      let sent = 0;
+      do { flushRequested = false; sent += await flushQueued(); } while (flushRequested);
+      return sent;
+    })().finally(() => { flushing = null; });
+    return flushing;
+  }
+  async function flushQueued() {
+    for (const old of (await store.outbox.all()).filter(m => m.status === 'sending' && Date.now()-Date.parse(m.claimedAt)>120000)) {
+      await store.outbox.compareAndUpdate(old.id, { status: 'sending', claim: old.claim }, { status: 'logged', error: 'Previous send was interrupted; reconcile provider delivery before retry' });
+    }
+    const queued = (await store.outbox.all({ sort: { createdAt: 1 } })).filter((m) => (m.status === "queued" || (m.status === "failed" && m.attempts < 5)) && (!m.retryAt || Date.parse(m.retryAt) <= Date.now()));
     let sent = 0;
     const inWindow = await windowCheck();
-    for (const m of queued.slice(0, 50)) {
-      if (on[m.channel] === "off") { await store.outbox.update(m.id, { status: "logged" }); continue; }
+    for (let m of queued.slice(0, 50)) {
+      const claim = crypto.randomUUID();
+      m = await store.atomic(async () => { const row=await store.outbox.get(m.id); if(!row || !["queued","failed"].includes(row.status) || row.attempts>=5)return null; return store.outbox.update(row.id,{status:"sending",claim,claimedAt:new Date().toISOString(),attempts:(row.attempts||0)+1}); });
+      if (!m) continue;
+      if (on[m.channel] === "off") { await store.outbox.update(m.id, { status: "logged", error: "Sending provider is not configured; send by hand." }); continue; }
       try {
-        const got = await sendOne(m, m.channel === "whatsapp" ? inWindow(m.to) : null);
+        const got = await sendOne(m, m.channel === "whatsapp" ? (await windowCheck())(m.to) : null);
         if (got.manual) { await store.outbox.update(m.id, { status: "logged", error: got.manual }); continue; } // staff send it with the manual link
-        await store.outbox.update(m.id, { status: "sent", sentAt: new Date().toISOString(), attempts: m.attempts + 1, error: "", ...(got?.via ? { via: got.via } : {}), ...(got?.waMessageId ? { waMessageId: got.waMessageId, deliveryStatus: "sent" } : {}) });
+        await store.outbox.update(m.id, { status: "sent", sentAt: new Date().toISOString(), attempts: m.attempts, error: "", ...(got?.via ? { via: got.via } : {}), ...(got?.waMessageId ? { waMessageId: got.waMessageId, deliveryStatus: "sent" } : {}) });
         sent++;
       }
-      catch (e) { await store.outbox.update(m.id, { status: "failed", attempts: m.attempts + 1, error: String(e.message).slice(0, 300) }); log.warn?.("Message not sent:", e.message); }
+      catch (e) { await store.outbox.update(m.id, { status: e.knownResponse ? "failed" : "logged", attempts: e.knownResponse && e.retryable ? m.attempts : 5, retryAt: new Date(Date.now() + Math.min(3600000, 30000 * 2 ** m.attempts)).toISOString(), error: e.knownResponse ? String(e.message).slice(0,300) : "Delivery outcome unknown; reconcile with provider before manual retry" }); log.warn?.("Message not sent:", e.message); }
     }
     return sent;
   }
@@ -143,7 +162,7 @@ export function createNotifier({ cfg, store, fetchImpl = globalThis.fetch, log =
       const k = waNumber(m.from), t = Date.parse(m.at);
       if (k && t && (!last[k] || t > last[k])) last[k] = t;
     }
-    return (to) => !!last[to] && now - last[to] < DAY_MS - WINDOW_MARGIN_MS;
+    return (to) => !!last[to] && now >= last[to] && now - last[to] < DAY_MS - WINDOW_MARGIN_MS;
   }
 
   /**
@@ -156,19 +175,20 @@ export function createNotifier({ cfg, store, fetchImpl = globalThis.fetch, log =
     if (on.otp === "off") throw new Error("WhatsApp is not connected");
     const to = waNumber(phone);
     if (on.otp === "nova") {
-      const r = await fetchImpl(`${cfg.novaUrl}/v2/integrations/whatsapp/otp`, { method: "POST",
+      const r = await fetchImpl(`${cfg.novaUrl}/v2/integrations/whatsapp/otp`, { method: "POST", signal: AbortSignal.timeout(15000),
         headers: { "X-Nova-Client-Key": cfg.novaKey, "Content-Type": "application/json", ...(cfg.novaSlug ? { "X-Tenant-Slug": cfg.novaSlug } : {}) }, body: JSON.stringify({ phone: to, code }) });
       if (r.ok) return;
       const err = new Error(`Nova said ${r.status}: ${(await r.text()).slice(0, 200)}`);
       err.status = r.status;
       throw err;
     }
+    if (!cfg.waOtpTemplate) throw new Error("Configure an approved authentication template (WHATSAPP_OTP_TEMPLATE)");
     const payload = cfg.waOtpTemplate
       ? { messaging_product: "whatsapp", to, type: "template", template: { name: cfg.waOtpTemplate, language: { code: cfg.waTemplateLang }, components: [
         { type: "body", parameters: [{ type: "text", text: code }] }, { type: "button", sub_type: "url", index: "0", parameters: [{ type: "text", text: code }] }] } }
       : { messaging_product: "whatsapp", to, type: "text", text: { body: `${code} is your HaTikvah Care login code. It expires in 10 minutes. Do not share it.` } };
-    const r = await fetchImpl(`${graph()}/${cfg.waPhoneId}/messages`, { method: "POST", headers: { Authorization: `Bearer ${cfg.waToken}`, "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-    if (!r.ok) throw new Error(`WhatsApp said ${r.status}: ${(await r.text()).slice(0, 200)}`);
+    const r = await fetchImpl(`${graph()}/${cfg.waPhoneId}/messages`, { method: "POST", signal: AbortSignal.timeout(15000), headers: { Authorization: `Bearer ${cfg.waToken}`, "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    if (!r.ok) throw Object.assign(new Error(`WhatsApp said ${r.status}`), {knownResponse:true,retryable:r.status===429||r.status>=500});
   }
 
   /** WhatsApp status callback: sent → delivered → read (never goes backwards); failed marks the outbox row failed with Meta's reason. */

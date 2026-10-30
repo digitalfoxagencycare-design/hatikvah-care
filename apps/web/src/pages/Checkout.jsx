@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, money } from "../api.js";
 import OtpLogin from "../components/OtpLogin.jsx";
@@ -14,6 +14,7 @@ export default function Checkout() {
   const [f, setF] = useState({ name: "", company: "", phone: "", email: "", gstin: "", address: "", city: "", pincode: "", stateCode: settings.stateCode || "36", notes: "", payment: shop.online ? "online" : "later" });
   const [st, setSt] = useState({ busy: false, error: null, field: null });
   const [done, setDone] = useState(null);
+  const placing = useRef(false), attempt = useRef(null);
 
   useEffect(() => { api("/api/shop/me").then(setMe).catch(() => setMe(null)); }, []);
   useEffect(() => { if (me) setF((x) => ({ ...x, name: x.name || me.name, company: x.company || me.company, email: x.email || me.email, gstin: x.gstin || me.gstin, city: x.city || me.city, stateCode: me.stateCode || x.stateCode })); }, [me]);
@@ -35,13 +36,21 @@ export default function Checkout() {
   const sub = lines.reduce((n, l) => n + l.amount, 0), gst = lines.reduce((n, l) => n + l.tax, 0);
   async function place(e) {
     e.preventDefault();
+    if (placing.current) return; placing.current = true;
     setSt({ busy: true, error: null, field: null });
     try {
-      const r = await api("/api/shop/checkout", { method: "POST", body: { ...f, items: lines.map(({ productId, qty, variant }) => ({ productId, qty, variant: variant || "" })) } });
+      const body = { ...f, items: lines.map(({ productId, qty, variant }) => ({ productId, qty, variant: variant || "" })) };
+      const bytes = new TextEncoder().encode(JSON.stringify(body));
+      const fingerprint = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))).map(b=>b.toString(16).padStart(2,'0')).join('');
+      let saved=attempt.current; try { saved=JSON.parse(sessionStorage.getItem('hc_checkout_attempt')) || saved; } catch { /* private browsing */ }
+      attempt.current=saved?.fingerprint===fingerprint?saved:{fingerprint,key:crypto.randomUUID()};
+      try { sessionStorage.setItem('hc_checkout_attempt',JSON.stringify(attempt.current)); } catch { /* keep in memory */ }
+      const r = await api("/api/shop/checkout", { method: "POST", body, idempotencyKey: attempt.current.key });
+      try { sessionStorage.removeItem('hc_checkout_attempt'); } catch { /* private browsing */ }
       clear();
       if (r.payUrl) { window.location.assign(r.payUrl); return; }
       setDone({ ...r.order, payError: r.payError });
-    } catch (err) { setSt({ busy: false, error: err.message, field: err.field || null }); }
+    } catch (err) { setSt({ busy: false, error: err.message, field: err.field || null }); } finally { placing.current=false; }
   }
   const fld = (k, label, props = {}) => <label className={"field" + (st.field === k ? " bad" : "")}><span>{label}</span><input value={f[k]} onChange={set(k)} aria-invalid={st.field === k} {...props} /></label>;
 

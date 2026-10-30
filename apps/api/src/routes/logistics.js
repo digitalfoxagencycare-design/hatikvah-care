@@ -1,4 +1,5 @@
 import express, { Router } from "express";
+import crypto from "node:crypto";
 import { requirePerm } from "../lib/permissions.js";
 import { logActivity, now } from "../lib/sales.js";
 import { getSettings } from "../model.js";
@@ -6,6 +7,7 @@ import { shipmentInput } from "../schemas.js";
 import { checkServiceability, createPickup, parseWebhook, pincodeOf, shadowfaxOn, webhookAuthorised } from "../services/delivery_shadowfax.js";
 import { wrap } from "./public.js";
 import { bad, notFound, parse } from "./shared.js";
+import { atomicWrap } from "./atomic.js";
 
 /** Books a Shadowfax pickup for a dispatched order and keeps the AWB / tracking link on it. Shared by dispatch and the retry button. */
 export async function bookShipment({ cfg, store, fetchImpl }, order, d, by) {
@@ -13,8 +15,20 @@ export async function bookShipment({ cfg, store, fetchImpl }, order, d, by) {
   const pickupPincode = d.pickupPincode || cfg.sfxPickupPincode || pincodeOf(company.address);
   const dropPincode = d.dropPincode || pincodeOf(order.customer.shippingAddress || order.customer.billingAddress);
   if (!/^\d{6}$/.test(pickupPincode) || !/^\d{6}$/.test(dropPincode)) throw Object.assign(new Error("Pickup and delivery PIN codes are needed for Shadowfax"), { userError: true, status: 400 });
-  const shipment = await createPickup(cfg, { order, company, pickupPincode, dropPincode, weightKg: d.weightKg || 1, packages: d.packages || 1 }, fetchImpl ? { fetchImpl } : {});
-  const upd = await store.orders.update(order.id, { shipment, dispatch: { ...(order.dispatch || {}), transporter: order.dispatch?.transporter || "Shadowfax", trackingNo: shipment.awb || order.dispatch?.trackingNo || "" }, updatedAt: now() });
+  const claim=crypto.randomUUID();
+  order=await store.atomic(async()=>{
+    const fresh=await store.orders.get(order.id);
+    if(!fresh || fresh.status!=='dispatched' || ['pending','reconcile','booked'].includes(fresh.shipmentBooking?.status) || (fresh.shipment?.awb && !['cancelled','returned'].includes(fresh.shipment.status)))throw Object.assign(new Error('Pickup already exists or needs provider reconciliation'),{userError:true,status:409});
+    return store.orders.update(fresh.id,{shipmentBooking:{claim,status:'pending',at:now()}});
+  });
+  let shipment;
+  try {
+    shipment=await createPickup(cfg, { order, company, pickupPincode, dropPincode, weightKg: d.weightKg || 1, packages: d.packages || 1 }, fetchImpl ? { fetchImpl } : {});
+    if(!shipment.awb&&!shipment.sfxOrderId)throw new Error('Provider did not return a booking identity');
+  } catch(e) {
+    await store.orders.update(order.id,{shipmentBooking:{claim,status:e.status>=400&&e.status<500&&!([408,429].includes(e.status))?'failed':'reconcile',at:now(),reason:'Confirm provider booking outcome before retry'}});throw e;
+  }
+  const upd = await store.orders.update(order.id, { shipment, shipmentBooking:{claim,status:'booked',at:now()}, dispatch: { ...(order.dispatch || {}), transporter: order.dispatch?.transporter || "Shadowfax", trackingNo: shipment.awb || order.dispatch?.trackingNo || "" }, updatedAt: now() });
   await logActivity(store, { entity: "order", entityId: order.id, text: `Shadowfax pickup booked${shipment.awb ? ` (AWB ${shipment.awb})` : ""}`, by });
   return upd;
 }
@@ -43,12 +57,20 @@ export function logisticsRoutes({ cfg, store, audit, fetchImpl }) {
 /** Shadowfax status callbacks: POST /api/webhooks/shadowfax with header X-Shadowfax-Token. */
 export function logisticsWebhook({ cfg, store, automation, log = console }) {
   const r = Router();
-  r.post("/api/webhooks/shadowfax", express.json({ limit: "100kb" }), wrap(async (req, res) => {
+  r.post("/api/webhooks/shadowfax", express.json({ limit: "100kb" }), atomicWrap(store, async (req, res) => {
     if (!webhookAuthorised(cfg, req.get("x-shadowfax-token"))) return res.status(401).json({ error: "UNAUTHORIZED" });
     const ev = parseWebhook(req.body);
     const orders = await store.orders.all();
     const o = orders.find((x) => x.shipment && ((ev.awb && x.shipment.awb === ev.awb) || (ev.clientOrderId && (x.challanNumber === ev.clientOrderId || x.number === ev.clientOrderId))));
     if (!o) return res.json({ ok: true, ignored: "unknown shipment" });
+    if(ev.awb && o.shipment.awb && ev.awb!==o.shipment.awb)return res.status(400).json({error:'SHIPMENT_IDENTITY_MISMATCH'});
+    const rank = { created: 0, assigned: 1, picked: 2, in_transit: 3, out_for_delivery: 4, delivered: 5 };
+    const current = o.shipment.status;
+    if (["returned", "cancelled"].includes(current) ||
+        (current === "delivered" && ev.status !== "returned") ||
+        (ev.status in rank && current in rank && rank[ev.status] < rank[current])) {
+      return res.json({ ok: true, ignored: "stale shipment status" });
+    }
     if (o.shipment.history?.some((h) => h.status === ev.status)) return res.json({ ok: true, duplicate: true });
     const shipment = { ...o.shipment, status: ev.status, rawStatus: ev.rawStatus, riderName: ev.riderName || o.shipment.riderName, riderPhone: ev.riderPhone || o.shipment.riderPhone,
       trackingUrl: ev.trackingUrl || o.shipment.trackingUrl, history: [...(o.shipment.history || []), { status: ev.status, raw: ev.rawStatus, at: ev.at }].slice(-30) };

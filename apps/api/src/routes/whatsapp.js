@@ -5,6 +5,7 @@ import { logActivity, now } from "../lib/sales.js";
 import { getSettings } from "../model.js";
 import { wrap } from "./public.js";
 import { bad, notFound } from "./shared.js";
+import { atomicWrap } from "./atomic.js";
 
 /**
  * WhatsApp Cloud API webhook (Meta app > WhatsApp > Configuration > Callback URL https://YOUR-DOMAIN/api/webhooks/whatsapp,
@@ -17,7 +18,7 @@ const GREETING = /^\s*(hi+|hello|hey|hai|namaste|menu|start|help)\b/i;
 
 /** X-Hub-Signature-256: "sha256=" + HMAC-SHA256 of the raw body with the Meta app secret. */
 export function verifyMetaSignature(raw, header, secret) {
-  if (!secret || typeof header !== "string" || !header.startsWith("sha256=")) return false;
+  if (!secret || typeof header !== "string" || !/^sha256=[a-f0-9]{64}$/.test(header)) return false;
   const want = "sha256=" + crypto.createHmac("sha256", secret).update(raw).digest("hex");
   return want.length === header.length && crypto.timingSafeEqual(Buffer.from(want), Buffer.from(header));
 }
@@ -52,7 +53,7 @@ export function whatsappWebhook({ cfg, store, automation, notifier, log = consol
     res.status(403).end();
   });
 
-  r.post("/api/webhooks/whatsapp", express.raw({ type: () => true, limit: "1mb" }), wrap(async (req, res) => {
+  r.post("/api/webhooks/whatsapp", express.raw({ type: () => true, limit: "1mb" }), atomicWrap(store, async (req, res) => {
     // Signed by Meta when the app secret is set (always in production: config.js refuses to start without it)
     if ((cfg.waAppSecret || cfg.prod) && !verifyMetaSignature(req.body, req.get("x-hub-signature-256"), cfg.waAppSecret)) return res.status(401).json({ error: "BAD_SIGNATURE" });
     let ev; try { ev = JSON.parse(req.body.toString("utf8")); } catch { return res.status(400).end(); }
@@ -83,8 +84,10 @@ export function whatsappWebhook({ cfg, store, automation, notifier, log = consol
   const recentMsgIds = new Set();
   async function incoming(msg, profileName) {
     if (!msg.waMessageId || recentMsgIds.has(msg.waMessageId) || await store.inbox.findBy("waMessageId", msg.waMessageId)) return; // Meta retries deliveries
-    recentMsgIds.add(msg.waMessageId);
-    setTimeout(() => recentMsgIds.delete(msg.waMessageId), 60_000).unref?.();
+    await store.afterCommit(() => {
+      recentMsgIds.add(msg.waMessageId);
+      setTimeout(() => recentMsgIds.delete(msg.waMessageId), 60_000).unref?.();
+    });
     const { customer, isNew } = await customerFor(msg.from, profileName);
     const row = await store.inbox.insert({ ...msg, name: profileName, customerId: customer.id, customerName: customer.name, readAt: null, enquiryId: "", direction: "in" });
     await logActivity(store, { entity: "customer", entityId: customer.id, kind: "whatsapp", text: `WhatsApp: ${msg.text || (msg.items.length ? `catalogue order (${msg.items.length} items)` : msg.type)}`.slice(0, 2000), by: "whatsapp" });

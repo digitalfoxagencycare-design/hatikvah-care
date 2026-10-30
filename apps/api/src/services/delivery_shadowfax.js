@@ -13,7 +13,7 @@ const headers = (cfg) => ({ Authorization: `Token ${cfg.sfxToken}`, "Content-Typ
 export const pincodeOf = (address = "") => (String(address).match(/\b\d{6}\b/g) || []).pop() || "";
 
 async function call(cfg, fetchImpl, method, path, body) {
-  const r = await fetchImpl(`${cfg.sfxBaseUrl}${path}`, { method, headers: headers(cfg), ...(body ? { body: JSON.stringify(body) } : {}) });
+  const r = await fetchImpl(`${cfg.sfxBaseUrl}${path}`, { method, signal: AbortSignal.timeout(15000), headers: headers(cfg), ...(body ? { body: JSON.stringify(body) } : {}) });
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw Object.assign(new Error(data?.message || data?.errors?.[0] || data?.error || `Shadowfax said ${r.status}`), { status: r.status });
   return data;

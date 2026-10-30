@@ -1,9 +1,11 @@
 import { Router } from "express";
+import { atomicWrap } from "./atomic.js";
+import { invoiceLines } from "../lib/accounting.js";
 import { addDays, todayIST } from "../lib/gst.js";
 import { channels } from "../lib/notify.js";
 import { requirePerm } from "../lib/permissions.js";
 import { createPaymentLink } from "../lib/razorpay.js";
-import { balance, createCreditNote, createInvoice, createOrderFromQuote, customerSnapshot, deductForInvoice, logActivity, moveStock, now, priced, rateFor, recordPayment, refreshInvoice, refundDue, removePaymentLedger, token } from "../lib/sales.js";
+import { balance, createCreditNote, createInvoice, createOrderFromQuote, customerSnapshot, deductForInvoice, logActivity, moveStock, now, priced, rateFor, recordPayment, refreshInvoice, refundDue, removePaymentLedger, postLedger, assertStockAvailable, consumeStock, token } from "../lib/sales.js";
 import { measureLabel, pieces, uomOptions } from "../lib/units.js";
 import { nextNumber } from "../lib/gst.js";
 import { getSettings } from "../model.js";
@@ -27,10 +29,10 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
     const out = [];
     for (const p of await store.products.all({ sort: { order: 1 } })) {
       const rVal = await rateFor(store, c, p);
-      const rate = rVal || p.price || 0;
+      const rate = rVal ?? p.price ?? 0;
       out.push({ productId: p.id, sku: p.sku, name: p.name, pack: p.pack || measureLabel(p.measure), hsn: p.hsn || "", gstRate: p.gstRate ?? 18, unit: p.unit || "pcs", rate, price: p.price, pricePaise: p.price, priceTiers: p.priceTiers || [], active: p.active,
         // piece / box / carton with pieces per unit and the default rate (customer's piece rate scaled; own box / carton prices win when no price list applies)
-        uoms: uomOptions(rVal !== p.price && rVal ? { ...p, packPrices: {} } : p, rate) });
+        uoms: uomOptions(rVal != null && rVal !== p.price ? { ...p, packPrices: {} } : p, rate) });
     }
     res.json(out);
   }));
@@ -104,6 +106,9 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
   }));
   r.post("/quotes/:id/invoice", requirePerm("invoices"), wrap(async (req, res) => {
     const q = await store.quotes.get(req.params.id); if (!q) return notFound(res, "Quote");
+    if (!["draft", "sent", "accepted", "converted"].includes(q.status)) return bad(res, `A ${q.status} quote cannot become an invoice`, 409);
+    const order = q.orderId ? await store.orders.get(q.orderId) : null;
+    if (order?.invoiceId) return bad(res, "This quote's order already has an invoice", 409);
     if (q.invoiceId) return bad(res, "This quote already has an invoice", 409);
     const c = await customerOr404(q.customerId, res); if (!c) return;
     const inv = await createInvoice(store, {
@@ -112,6 +117,7 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
       placeOfSupply: q.placeOfSupply,
       notes: q.notes,
       poNumber: "",
+      quoteId: q.id,
       orderId: q.orderId || "",
       orderNumber: q.orderNumber || "",
       by: by(req),
@@ -151,25 +157,27 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
     res.json(rows);
   }));
   r.get("/orders/:id", requirePerm("orders"), wrap(async (req, res) => { const o = await store.orders.get(req.params.id); if (!o) return notFound(res, "Order"); res.json(await withActivity(o)); }));
-  r.post("/orders", requirePerm("orders"), wrap(async (req, res) => {
+  r.post("/orders", requirePerm("orders"), atomicWrap(store, async (req, res) => {
     const d = parse(orderInput, req.body, res); if (!d) return;
     const c = await customerOr404(d.customerId, res); if (!c) return;
     const doc = await priced(store, { items: d.items, customer: c, placeOfSupply: d.placeOfSupply });
+    await assertStockAvailable(store, doc.items);
     const o = await store.orders.insert({ number: await nextNumber(store, "SO"), token: token(), quoteId: "", quoteNumber: "", customerId: c.id, customer: customerSnapshot(c), ...doc,
       poNumber: d.poNumber, status: "confirmed", expectedDate: d.expectedDate, notes: d.notes, dispatch: null, challanNumber: "", invoiceId: "", createdBy: by(req), createdAt: now(), updatedAt: now() });
     await logActivity(store, { entity: "customer", entityId: c.id, text: `Order ${o.number} created`, by: by(req) });
     await audit(req, "order.create", o.number); res.status(201).json(o);
   }));
-  r.put("/orders/:id", requirePerm("orders"), wrap(async (req, res) => {
+  r.put("/orders/:id", requirePerm("orders"), atomicWrap(store, async (req, res) => {
     const o = await store.orders.get(req.params.id); if (!o) return notFound(res, "Order");
     if (!["confirmed", "packed"].includes(o.status) || o.invoiceId) return bad(res, "Only orders not yet dispatched or invoiced can be edited", 409);
     const d = parse(orderInput, req.body, res); if (!d) return;
     const c = await customerOr404(d.customerId, res); if (!c) return;
     const doc = await priced(store, { items: d.items, customer: c, placeOfSupply: d.placeOfSupply });
+    await assertStockAvailable(store, doc.items, o.id);
     const upd = await store.orders.update(o.id, { customerId: c.id, customer: customerSnapshot(c), ...doc, poNumber: d.poNumber, expectedDate: d.expectedDate, notes: d.notes, updatedAt: now() });
     await audit(req, "order.update", o.number); res.json(upd);
   }));
-  r.post("/orders/:id/status", requirePerm("orders"), wrap(async (req, res) => {
+  r.post("/orders/:id/status", requirePerm("orders"), atomicWrap(store, async (req, res) => {
     const o = await store.orders.get(req.params.id); if (!o) return notFound(res, "Order");
     const status = req.body?.status;
     const allowed = { confirmed: ["packed", "cancelled"], packed: ["confirmed", "cancelled"], dispatched: ["delivered"], delivered: [], cancelled: [] };
@@ -180,20 +188,18 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
     await audit(req, "order." + status, o.number); res.json(upd);
   }));
   r.post("/orders/:id/dispatch", requirePerm("orders"), wrap(async (req, res) => {
-    const o = await store.orders.get(req.params.id); if (!o) return notFound(res, "Order");
-    if (!["confirmed", "packed"].includes(o.status)) return bad(res, `An order that is ${o.status} cannot be dispatched`, 409);
     const d = parse(dispatchInput, req.body || {}, res); if (!d) return;
-    const challanNumber = await nextNumber(store, "DC");
-    // If not already deducted by an earlier invoice, deduct on dispatch
-    if (!o.invoiceId) {
-      for (const it of o.items) {
-        const p = it.productId ? await store.products.get(it.productId) : null;
-        if (p?.stockTracked) await moveStock(store, { productId: p.id, sku: p.sku, qty: -pieces(it), kind: "out", ref: o.number, note: "Dispatched", by: by(req) });
-      }
-    }
     const { courier, dropPincode, weightKg, packages, ...dispatch } = d;
-    let upd = await store.orders.update(o.id, { status: "dispatched", dispatch: { ...dispatch, date: d.date || todayIST() }, challanNumber, dispatchedAt: now(), updatedAt: now() });
-    await logActivity(store, { entity: "order", entityId: o.id, text: `Dispatched (challan ${challanNumber})${d.transporter ? " via " + d.transporter : ""}`, by: by(req) });
+    let upd=await store.atomic(async()=>{
+      const o=await store.orders.get(req.params.id);if(!o)throw Object.assign(new Error('Order not found'),{userError:true,status:404});
+      if(!['confirmed','packed'].includes(o.status))throw Object.assign(new Error('Order cannot be dispatched from its current state'),{userError:true,status:409});
+      const challanNumber=await nextNumber(store,'DC');
+      const invoice=o.invoiceId?await store.invoices.get(o.invoiceId):null;
+      const stockAllocations=invoice?.stockAllocations || await consumeStock(store,o.items,{ref:o.number,by:by(req),excludeOrderId:o.id});
+      const result=await store.orders.update(o.id,{status:'dispatched',dispatch:{...dispatch,date:d.date||todayIST()},challanNumber,stockConsumedAt:now(),stockAllocations,dispatchedAt:now(),updatedAt:now()});
+      await logActivity(store,{entity:'order',entityId:o.id,text:'Dispatched (challan '+challanNumber+')',by:by(req)});return result;
+    });
+    const o=upd, challanNumber=upd.challanNumber;
     if (courier === "shadowfax") { // the challan stands even if the courier booking fails: staff can retry from the order
       if (!shadowfaxOn(cfg)) await logActivity(store, { entity: "order", entityId: o.id, text: "Shadowfax pickup not booked: Shadowfax is not connected", by: by(req) });
       else try { upd = await bookShipment({ cfg, store, fetchImpl }, upd, { dropPincode, weightKg, packages }, by(req)); }
@@ -214,7 +220,7 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
   async function afterInvoice(req, inv) {
     let out = inv;
     await deductForInvoice(store, inv, by(req)); // the order's reservation ends here: the goods leave stock
-    if (channels(cfg).payments !== "off") { try { out = await store.invoices.update(inv.id, { payLink: await createPaymentLink(cfg, inv) }); } catch (e) { await logActivity(store, { entity: "invoice", entityId: inv.id, text: `Payment link not created: ${e.message}` }); } }
+    if (channels(cfg).payments !== "off") { try { out = await store.invoices.update(inv.id, { payLink: await createPaymentLink(cfg, inv, { fetchImpl }) }); } catch (e) { await logActivity(store, { entity: "invoice", entityId: inv.id, text: `Payment link not created: ${e.message}` }); } }
     await logActivity(store, { entity: "customer", entityId: inv.customerId, text: `Invoice ${inv.number} raised`, by: by(req) });
     await automation.on.invoiceCreated(out); await audit(req, "invoice.create", inv.number, { total: inv.totals.total });
     return out;
@@ -235,19 +241,21 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
     const inv = await createInvoice(store, { customer: c, ...d, by: by(req) });
     res.status(201).json(await afterInvoice(req, inv));
   }));
-  r.post("/invoices/:id/void", requirePerm("invoices"), wrap(async (req, res) => {
+  r.post("/invoices/:id/void", requirePerm("invoices"), atomicWrap(store, async (req, res) => {
     const i = await store.invoices.get(req.params.id); if (!i) return notFound(res, "Invoice");
     if (i.status === "void") return bad(res, "Already void", 409);
     if (i.amountPaid > 0) return bad(res, "Remove the payments on this invoice first, or issue a credit note instead", 409);
     if (i.creditedAmount > 0) return bad(res, "This invoice has credit notes, so it cannot be voided", 409);
     const reason = String(req.body?.reason || "").slice(0, 300);
+    const journalLines = invoiceLines(i.totals, true);
+    if (journalLines.length) await postLedger(store, { sourceKey: "invoice-void:" + i.id, lines: journalLines, kind: "invoice_void", account: "accounts_receivable", amount: i.totals.total, invoiceId: i.id, ref: i.number, by: by(req) });
     const upd = await store.invoices.update(i.id, { status: "void", voidReason: reason, voidedAt: now(), updatedAt: now() });
     if (i.orderId) await store.orders.update(i.orderId, { invoiceId: "", invoiceNumber: "" });
     // Restore stock if it was deducted by this invoice
     let dispatched = false;
     if (i.orderId) {
       const ord = await store.orders.get(i.orderId);
-      if (ord && ord.status === "dispatched") dispatched = true;
+      if (ord && ["dispatched", "delivered"].includes(ord.status)) dispatched = true;
     }
     if (!dispatched) {
       for (const it of i.items || []) {
@@ -268,7 +276,7 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
     const i = await store.invoices.get(req.params.id); if (!i) return notFound(res, "Invoice");
     if (channels(cfg).payments === "off") return bad(res, "Online payments are not set up yet (Razorpay keys are needed)", 409);
     if (balance(i) <= 0) return bad(res, "Nothing left to pay on this invoice", 409);
-    try { res.json(await store.invoices.update(i.id, { payLink: await createPaymentLink(cfg, i) })); } catch (e) { bad(res, e.message, 502); }
+    try { res.json(await store.invoices.update(i.id, { payLink: await createPaymentLink(cfg, i, { fetchImpl }) })); } catch (e) { bad(res, e.message, 502); }
   }));
   r.post("/invoices/:id/payments", requirePerm("invoices"), wrap(async (req, res) => {
     const i = await store.invoices.get(req.params.id); if (!i) return notFound(res, "Invoice");
@@ -298,10 +306,10 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
     res.status(201).json({ ...out.creditNote, invoice: { id: inv.id, number: inv.number, balance: balance(out.invoice), refundDue: refundDue(out.invoice), status: out.invoice.status } });
   }));
 
-  r.get("/payments", requirePerm("invoices"), wrap(async (_req, res) => res.json(await store.payments.all({ sort: { createdAt: -1 } }))));
-  r.delete("/payments/:id", requirePerm("invoices"), wrap(async (req, res) => {
+  r.get("/payments", requirePerm("invoices"), wrap(async (_req, res) => res.json((await store.payments.all({ sort: { createdAt: -1 } })).filter(p => !p.reversedAt))));
+  r.delete("/payments/:id", requirePerm("invoices"), atomicWrap(store, async (req, res) => {
     const p = await store.payments.get(req.params.id); if (!p) return notFound(res, "Payment");
-    await store.payments.remove(p.id); await removePaymentLedger(store, p.id); await refreshInvoice(store, p.invoiceId);
+    await removePaymentLedger(store, p.id, by(req)); await refreshInvoice(store, p.invoiceId);
     await logActivity(store, { entity: "invoice", entityId: p.invoiceId, text: `Payment of ₹${(p.amount / 100).toFixed(2)} removed`, by: by(req) });
     await audit(req, "payment.delete", p.invoiceNumber, { amount: p.amount }); res.status(204).end();
   }));

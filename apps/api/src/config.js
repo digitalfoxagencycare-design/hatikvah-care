@@ -43,6 +43,9 @@ export function loadConfig(env = process.env) {
   };
   if (!cfg.jwtSecret && !prod) cfg.jwtSecret = "dev-only-secret-change-me-dev-only-secret-change-me";
   const problems = [];
+  if (cfg.sessionHours !== 12) problems.push("SESSION_HOURS must be exactly 12 for admin/staff sessions");
+  if (prod && (cfg.razorpayKeyId || cfg.waToken) && !/^https:\/\//.test(cfg.publicUrl)) problems.push('PUBLIC_URL must be an HTTPS origin for payment and messaging integrations');
+  if (prod && cfg.sfxToken && !/^https:\/\//.test(cfg.sfxBaseUrl)) problems.push('SHADOWFAX_BASE_URL must use HTTPS');
   if (prod && !cfg.mongoUri) problems.push("MONGODB_URI is required in production (the file store is for development only)");
   if (cfg.jwtSecret.length < 32) problems.push("JWT_SECRET must be at least 32 characters");
   if (prod && /dev-only|change-me|replace/i.test(cfg.jwtSecret)) problems.push("JWT_SECRET looks like a placeholder");
@@ -55,7 +58,7 @@ export function loadConfig(env = process.env) {
   if (!/^[a-z]{2,3}(_[A-Z]{2})?$/.test(cfg.waTemplateLang)) problems.push("WHATSAPP_TEMPLATE_LANG must be a WhatsApp language code like en or en_US");
   if (cfg.waVerifyToken && cfg.waVerifyToken.length < 16) problems.push("WHATSAPP_WEBHOOK_VERIFY_TOKEN must be at least 16 characters");
   if (cfg.sfxWebhookToken && cfg.sfxWebhookToken.length < 24) problems.push("SHADOWFAX_WEBHOOK_TOKEN must be at least 24 characters");
-  if (!(Number.isInteger(cfg.buyerSessionDays) && cfg.buyerSessionDays >= 1 && cfg.buyerSessionDays <= 90)) problems.push("BUYER_SESSION_DAYS must be a whole number from 1 to 90");
+  if (cfg.buyerSessionDays !== 30) problems.push("BUYER_SESSION_DAYS must equal 30");
   if (cfg.cronSecret && cfg.cronSecret.length < 24) problems.push("CRON_SECRET must be at least 24 characters");
   if (problems.length) throw new Error("Unsafe configuration: " + problems.join("; "));
   return cfg;

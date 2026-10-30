@@ -6,6 +6,7 @@ import { hashPassword } from "../src/auth.js";
 import { loadConfig, REPO_ROOT } from "../src/config.js";
 import { seedIfEmpty } from "../src/seed.js";
 import { createStore } from "../src/store/index.js";
+import { registerApp } from "./in-process-http.js";
 
 export const PW = "Correct-Horse-91";
 
@@ -17,6 +18,10 @@ export async function boot({ seed = true, owner = true, env = {}, fetchImpl } = 
   if (seed) await seedIfEmpty(store, path.join(REPO_ROOT, "data", "catalog.json"), { info() {}, warn() {} });
   if (owner) await store.admins.insert({ email: "owner@example.com", name: "Owner", role: "owner", passwordHash: await hashPassword(PW), active: true, tokenVersion: 0, createdAt: "x" });
   const app = createApp({ cfg, store, log: { error() {}, warn() {} }, ...(fetchImpl ? { fetchImpl } : {}) });
+  if (process.env.HC_TEST_TRANSPORT === "in-process") {
+    const transport = registerApp(app);
+    return { base: transport.base, store, cfg, dir, close: async () => { transport.close(); await store.close(); await fs.rm(dir, { recursive: true, force: true }); } };
+  }
   const server = await new Promise((r) => { const s = app.listen(0, "127.0.0.1", () => r(s)); });
   const base = `http://127.0.0.1:${server.address().port}`;
   return { base, store, cfg, dir, close: async () => { server.close(); await store.close(); await fs.rm(dir, { recursive: true, force: true }); } };
