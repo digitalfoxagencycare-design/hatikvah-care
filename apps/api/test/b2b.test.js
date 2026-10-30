@@ -25,7 +25,7 @@ const wait = (ms = 60) => new Promise((r) => setTimeout(r, ms));
 
 before(async () => {
   t = await boot({ fetchImpl: fakeFetch, env: {
-    WHATSAPP_TOKEN: "wa_test", WHATSAPP_PHONE_ID: "1368252233043035", WHATSAPP_WEBHOOK_VERIFY_TOKEN: VERIFY, WHATSAPP_APP_SECRET: APP_SECRET,
+    WHATSAPP_TOKEN: "wa_test", WHATSAPP_PHONE_ID: "1368252233043036", WHATSAPP_WEBHOOK_VERIFY_TOKEN: VERIFY, WHATSAPP_APP_SECRET: APP_SECRET,
     RAZORPAY_KEY_ID: "rzp_test", RAZORPAY_KEY_SECRET: "secret", RAZORPAY_WEBHOOK_SECRET: "whsec_b2b",
     SHADOWFAX_API_TOKEN: "sfx_test", SHADOWFAX_BASE_URL: "https://staging.shadowfax.example", SHADOWFAX_WEBHOOK_TOKEN: SFX_HOOK, SHADOWFAX_PICKUP_PINCODE: "500084",
   } });
@@ -126,7 +126,7 @@ describe("roles", () => {
 describe("WhatsApp webhook", () => {
   const sign = (body) => "sha256=" + crypto.createHmac("sha256", APP_SECRET).update(body).digest("hex");
   const post = (payload, sig) => { const body = JSON.stringify(payload); return fetch(t.base + "/api/webhooks/whatsapp", { method: "POST", headers: { "content-type": "application/json", "x-hub-signature-256": sig ?? sign(body) }, body }); };
-  const msg = (id, from, m) => ({ object: "whatsapp_business_account", entry: [{ changes: [{ value: { metadata: { phone_number_id: "1368252233043035" }, contacts: [{ wa_id: from, profile: { name: "Dr. Mehta" } }], messages: [{ id, from, timestamp: "1790000000", ...m }] } }] }] });
+  const msg = (id, from, m) => ({ object: "whatsapp_business_account", entry: [{ changes: [{ value: { metadata: { phone_number_id: "1368252233043036" }, contacts: [{ wa_id: from, profile: { name: "Dr. Mehta" } }], messages: [{ id, from, timestamp: "1790000000", ...m }] } }] }] });
 
   it("answers Meta's verification", async () => {
     const ok = await fetch(`${t.base}/api/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=${VERIFY}&hub.challenge=12345`);
