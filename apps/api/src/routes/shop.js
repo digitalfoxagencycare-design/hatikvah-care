@@ -167,18 +167,28 @@ export function shopRoutes({ cfg, store, automation, notifier, fetchImpl = globa
   return r;
 }
 
-/** Buyer session: httpOnly cookie for SESSION_HOURS (12 by default), shared by /api/shop and /api/buyer. */
+/**
+ * Buyer session (website shoppers and the buyer portal): httpOnly cookie for BUYER_SESSION_DAYS (30 by default), shared by
+ * /api/shop and /api/buyer. It slides: a session older than a day is re-issued on the next request, so a buyer who keeps
+ * using the site is not asked for a WhatsApp code again, and one who stays away for the whole period is.
+ */
+const RENEW_AFTER_S = 86_400;
 export function setBuyerCookie(cfg, res, c) {
-  const hours = cfg.sessionHours || 12;
-  res.cookie(SHOP_COOKIE, jwt.sign({ sub: c.id }, cfg.jwtSecret, { algorithm: "HS256", audience: "shop", expiresIn: `${hours}h` }),
-    { httpOnly: true, sameSite: "lax", secure: cfg.cookieSecure, maxAge: hours * 3600_000, path: "/" }); // lax: the buyer comes back signed in from the Razorpay page
+  const days = cfg.buyerSessionDays || 30;
+  res.cookie(SHOP_COOKIE, jwt.sign({ sub: c.id }, cfg.jwtSecret, { algorithm: "HS256", audience: "shop", expiresIn: `${days}d` }),
+    { httpOnly: true, sameSite: "lax", secure: cfg.cookieSecure, maxAge: days * 86400_000, path: "/" }); // lax: the buyer comes back signed in from the Razorpay page
 }
 /** Reads the buyer cookie into req.customer (signed out when missing or expired). Writes need the same anti-CSRF header as the admin API. */
 export const buyerSession = ({ cfg, store }) => wrap(async (req, res, next) => {
   if (!["GET", "HEAD"].includes(req.method) && req.get("x-requested-with") !== "hc-admin") return res.status(403).json({ error: "CSRF", message: "Missing request header" });
   const t = req.cookies?.[SHOP_COOKIE];
   if (t) {
-    try { const c = jwt.verify(t, cfg.jwtSecret, { algorithms: ["HS256"], audience: "shop" }); req.customer = await store.customers.get(c.sub); } catch { /* expired: treat as signed out */ }
+    let c = null;
+    try { c = jwt.verify(t, cfg.jwtSecret, { algorithms: ["HS256"], audience: "shop" }); } catch { /* expired or tampered: treat as signed out */ }
+    if (c) {
+      req.customer = await store.customers.get(c.sub);
+      if (req.customer && Date.now() / 1000 - c.iat > RENEW_AFTER_S) setBuyerCookie(cfg, res, req.customer);
+    }
   }
   next();
 });

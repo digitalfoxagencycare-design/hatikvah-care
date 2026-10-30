@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
+import jwt from "jsonwebtoken";
 import { boot, client, login } from "./helpers.js";
 
 let t, owner, a, b, priced, porProduct, quoteA, quoteB, links = [];
@@ -37,9 +38,17 @@ before(async () => {
 after(async () => { await t.close(); });
 
 describe("buyer portal", () => {
-  it("needs a signed-in buyer, and the session lasts 12 hours", async () => {
+  it("needs a signed-in buyer, and the session lasts 30 days, renewed while in use", async () => {
     assert.equal((await client(t.base).get("/api/buyer/quotes")).status, 401);
-    assert.match(a.setCookie, /hc_shop=.*Max-Age=43200.*HttpOnly/i);
+    assert.match(a.setCookie, /hc_shop=.*Max-Age=2592000.*HttpOnly/i);
+    const call = (tok) => fetch(t.base + "/api/buyer/quotes", { headers: { cookie: `hc_shop=${tok}` } });
+    const sub = jwt.decode(a.setCookie.match(/hc_shop=([^;]+)/)[1]).sub;
+    const fresh = await call(jwt.sign({ sub }, t.cfg.jwtSecret, { algorithm: "HS256", audience: "shop", expiresIn: "30d" }));
+    assert.equal(fresh.status, 200); assert.equal(fresh.headers.getSetCookie().length, 0, "a session under a day old is not re-issued");
+    const old = await call(jwt.sign({ sub, iat: Math.floor(Date.now() / 1000) - 2 * 86400 }, t.cfg.jwtSecret, { algorithm: "HS256", audience: "shop", expiresIn: "30d" }));
+    assert.equal(old.status, 200); assert.match(old.headers.getSetCookie().join(";"), /hc_shop=.*Max-Age=2592000/, "an older one slides forward");
+    const expired = await call(jwt.sign({ sub, iat: Math.floor(Date.now() / 1000) - 31 * 86400 }, t.cfg.jwtSecret, { algorithm: "HS256", audience: "shop", expiresIn: "30d" }));
+    assert.equal(expired.status, 401, "after 30 days away the buyer signs in again");
     assert.equal((await client(t.base).post("/api/shop/auth/verify-code", { phone: "9876543210", code: "12" })).status, 400, "codes are validated");
   });
 

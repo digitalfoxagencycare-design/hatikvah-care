@@ -20,6 +20,8 @@ export function loadConfig(env = process.env) {
     cookieSecure: prod,
     trustProxy: env.TRUST_PROXY ? Number(env.TRUST_PROXY) : prod ? 1 : 0,
     sessionHours: Number(env.SESSION_HOURS || 12),
+    // Website shoppers and buyer-portal customers (WhatsApp code sign-in): sliding session, renewed once a day while in use.
+    buyerSessionDays: Number(env.BUYER_SESSION_DAYS || 30),
     // Automations run every N minutes inside the server (0 = off; on Cloud Run also point Cloud Scheduler at POST /api/internal/cron).
     automationEveryMin: Number(env.AUTOMATION_INTERVAL_MIN ?? (env.NODE_ENV === "test" ? 0 : 5)),
     cronSecret: env.CRON_SECRET || "",
@@ -47,6 +49,7 @@ export function loadConfig(env = process.env) {
   if (prod && cfg.waVerifyToken && !cfg.waAppSecret) problems.push("WHATSAPP_APP_SECRET is required with WHATSAPP_WEBHOOK_VERIFY_TOKEN (it proves webhook calls come from Meta)");
   if (cfg.waVerifyToken && cfg.waVerifyToken.length < 16) problems.push("WHATSAPP_WEBHOOK_VERIFY_TOKEN must be at least 16 characters");
   if (cfg.sfxWebhookToken && cfg.sfxWebhookToken.length < 24) problems.push("SHADOWFAX_WEBHOOK_TOKEN must be at least 24 characters");
+  if (!(Number.isInteger(cfg.buyerSessionDays) && cfg.buyerSessionDays >= 1 && cfg.buyerSessionDays <= 90)) problems.push("BUYER_SESSION_DAYS must be a whole number from 1 to 90");
   if (cfg.cronSecret && cfg.cronSecret.length < 24) problems.push("CRON_SECRET must be at least 24 characters");
   if (problems.length) throw new Error("Unsafe configuration: " + problems.join("; "));
   return cfg;
