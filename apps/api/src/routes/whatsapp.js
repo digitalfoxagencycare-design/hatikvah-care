@@ -80,8 +80,11 @@ export function whatsappWebhook({ cfg, store, automation, notifier, log = consol
     return { customer, isNew: true };
   }
 
+  const recentMsgIds = new Set();
   async function incoming(msg, profileName) {
-    if (!msg.waMessageId || await store.inbox.findBy("waMessageId", msg.waMessageId)) return; // Meta retries deliveries
+    if (!msg.waMessageId || recentMsgIds.has(msg.waMessageId) || await store.inbox.findBy("waMessageId", msg.waMessageId)) return; // Meta retries deliveries
+    recentMsgIds.add(msg.waMessageId);
+    setTimeout(() => recentMsgIds.delete(msg.waMessageId), 60_000).unref?.();
     const { customer, isNew } = await customerFor(msg.from, profileName);
     const row = await store.inbox.insert({ ...msg, name: profileName, customerId: customer.id, customerName: customer.name, readAt: null, enquiryId: "", direction: "in" });
     await logActivity(store, { entity: "customer", entityId: customer.id, kind: "whatsapp", text: `WhatsApp: ${msg.text || (msg.items.length ? `catalogue order (${msg.items.length} items)` : msg.type)}`.slice(0, 2000), by: "whatsapp" });
@@ -133,6 +136,26 @@ export function whatsappWebhook({ cfg, store, automation, notifier, log = consol
       const enq = await enquiry(customer, msg, { message: msg.text.trim() });
       await store.inbox.update(row.id, { enquiryId: enq.id });
       return reply(to, `Thank you! Your quote request is noted (ref ${enq.ref}). We will send the quotation with GST shortly, with a link to view and approve it online.`, null, enq.ref);
+    }
+    const txt = (msg.text || "").trim().toLowerCase();
+    if (msg.type === "text" && /^(catalog|catalogue|products|items|brochure|price list|pricelist)$/i.test(txt)) {
+      const url = `${site()}/catalog`;
+      await reply(to, "catalogue", link("Browse our full range of hotel amenities, hygiene consumables, and clinic supplies online:", "Open catalogue", url));
+      return reply(to, "next", buttons("Would you like a quotation?", [["quote", "Request a quote"], ["agent", "Talk to our team"]]));
+    }
+    if (msg.type === "text" && /^(track|tracking|shipment|status|where is my order)$/i.test(txt)) {
+      const ph = digits10(to);
+      const orders = (await store.orders.all()).filter((o) => o.customerId === customer.id || (o.customer?.phone && digits10(o.customer.phone) === ph));
+      const latest = orders.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""))[0];
+      if (latest) {
+        let text = `Your latest order ${latest.number} is ${latest.status.toUpperCase()}.`;
+        if (latest.shipment?.awb) {
+          text += `\nCourier: ${latest.shipment.provider || "Shadowfax"}\nAWB: ${latest.shipment.awb}\nStatus: ${latest.shipment.status}`;
+          if (latest.shipment.trackingUrl) text += `\nTrack: ${latest.shipment.trackingUrl}`;
+        }
+        return reply(to, text);
+      }
+      return reply(to, "We could not find any active orders for this number. If you need help, please tap below:", buttons("How can we help?", [["quote", "Request a quote"], ["agent", "Talk to our team"]]));
     }
     // Menu on a greeting, for a new contact, or when the last menu is a day old. Other messages wait for the team in the inbox.
     if (isNew || GREETING.test(msg.text) || !customer.waMenuAt || Date.now() - Date.parse(customer.waMenuAt) > 24 * 3600_000) {
