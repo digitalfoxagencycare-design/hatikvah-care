@@ -6,7 +6,7 @@ import { z } from "zod";
 import { nextNumber } from "../lib/gst.js";
 import { shopFlags } from "../lib/notify.js";
 import { createPaymentLink } from "../lib/razorpay.js";
-import { balance, customerSnapshot, logActivity, now, priced, stockLevels, tierPrice, token } from "../lib/sales.js";
+import { balance, bucketOf, customerSnapshot, logActivity, now, priced, stockBuckets, tierPrice, token } from "../lib/sales.js";
 import { getSettings } from "../model.js";
 import { wrap } from "./public.js";
 
@@ -128,7 +128,8 @@ export function shopRoutes({ cfg, store, automation, notifier, fetchImpl = globa
         priceListId: "", paymentTermsDays: 0, reorderDays: 0, tags: ["website"], notes: "", assignedTo: "", followUpAt: "", source: "website", createdAt: now(), updatedAt: now() });
     }
 
-    const [products, lv] = await Promise.all([store.products.all(), stockLevels(store)]);
+    const [products, buckets] = await Promise.all([store.products.all(), stockBuckets(store)]);
+    const lv = Object.fromEntries(products.map((p) => [p.id, bucketOf(buckets, p.id).available])); // stock held for open orders cannot be sold again
     const items = [];
     for (const it of d.items) {
       const p = products.find((x) => x.id === it.productId && x.active);

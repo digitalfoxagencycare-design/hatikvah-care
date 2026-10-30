@@ -45,16 +45,24 @@ export default function OrderDetail() {
           <div className="row-between"><h1>Order {o.number}</h1>
             <div className="btn-row">
               {o.challanNumber && <a className="btn ghost" href={`/doc/challan/${o.token}`} target="_blank" rel="noopener noreferrer">Delivery challan</a>}
+              {o.challanNumber && <a className="btn ghost" href={`/doc/packing/${o.token}`} target="_blank" rel="noopener noreferrer">Packing slip</a>}
+              {o.challanNumber && <a className="btn ghost" href={`/doc/gatepass/${o.token}`} target="_blank" rel="noopener noreferrer">Gate pass</a>}
               {["confirmed", "packed"].includes(o.status) && !o.invoiceId && <button className="btn ghost" onClick={() => setEditing(true)}>Edit</button>}
-              {["confirmed", "packed"].includes(o.status) && <button className="btn" onClick={() => setDispatch({ transporter: "", trackingNo: "", vehicleNo: "", date: today(), notes: "" })}>Dispatch</button>}
+              {["confirmed", "packed"].includes(o.status) && <button className="btn" onClick={() => setDispatch({ transporter: "", trackingNo: "", vehicleNo: "", date: today(), notes: "", courier: "", dropPincode: "", weightKg: 1, packages: 1 })}>Dispatch</button>}
             </div></div>
           <Msg st={st} />
           <DocView d={o} extraInfo={<p className="muted small-print">{o.quoteNumber && <>From quote <Link to={`/admin/quotes/${o.quoteId}`}>{o.quoteNumber}</Link><br /></>}{o.poNumber && <>Customer PO {o.poNumber}<br /></>}{o.expectedDate && <>Expected {fmtDate(o.expectedDate)}<br /></>}
             {o.dispatch && <>Dispatched {fmtDate(o.dispatch.date)} {o.dispatch.transporter} {o.dispatch.trackingNo}<br />Challan {o.challanNumber}</>}</p>} />
+          {o.shipment && (
+            <div className="panel"><div className="row-between"><h2>Shadowfax shipment</h2>{o.shipment.trackingUrl && <a href={o.shipment.trackingUrl} target="_blank" rel="noopener noreferrer">Live tracking ↗</a>}</div>
+              <p>AWB <strong>{o.shipment.awb || "—"}</strong> · {o.shipment.status.replace(/_/g, " ")}{o.shipment.riderName && <> · rider {o.shipment.riderName} {o.shipment.riderPhone && <a href={`tel:${o.shipment.riderPhone}`}>{o.shipment.riderPhone}</a>}</>}</p>
+              <p className="muted small-print">{(o.shipment.history || []).map((h) => `${h.raw || h.status} ${fmtDate(h.at)}`).join(" → ")}</p></div>
+          )}
           <div className="btn-row">
             {o.status === "confirmed" && <button className="btn ghost" onClick={() => status("packed")}>Mark packed</button>}
             {o.status === "packed" && <button className="btn ghost" onClick={() => status("confirmed")}>Back to confirmed</button>}
             {o.status === "dispatched" && <button className="btn ghost" onClick={() => status("delivered")}>Mark delivered</button>}
+            {o.status === "dispatched" && (!o.shipment?.awb || ["cancelled", "returned"].includes(o.shipment.status)) && <button className="btn ghost" onClick={() => run(async () => { await api(`/api/admin/orders/${id}/shipment`, { method: "POST", body: {} }); s.reload(); }, "Shadowfax pickup booked ✓")}>Book Shadowfax pickup</button>}
             {can(me, "invoices") && !o.invoiceId && o.status !== "cancelled" && <button className="btn" onClick={() => run(async () => { const inv = await api(`/api/admin/orders/${id}/invoice`, { method: "POST" }); nav(`/admin/invoices/${inv.id}`); })}>Create GST invoice</button>}
             {o.invoiceId && <Link className="btn" to={`/admin/invoices/${o.invoiceId}`}>Invoice {o.invoiceNumber}</Link>}
             {["confirmed", "packed"].includes(o.status) && <button className="link danger" onClick={() => window.confirm("Cancel this order?") && status("cancelled")}>Cancel order</button>}
@@ -68,6 +76,12 @@ export default function OrderDetail() {
                   <label className="field"><span>Date</span><input type="date" value={dispatch.date} onChange={(e) => setDispatch({ ...dispatch, date: e.target.value })} /></label>
                 </div>
                 <label className="field"><span>Notes</span><input maxLength={500} value={dispatch.notes} onChange={(e) => setDispatch({ ...dispatch, notes: e.target.value })} /></label>
+                <div className="checks"><label><input type="checkbox" checked={dispatch.courier === "shadowfax"} onChange={(e) => setDispatch({ ...dispatch, courier: e.target.checked ? "shadowfax" : "", transporter: e.target.checked ? "Shadowfax" : dispatch.transporter })} /> Book Shadowfax pickup (customer gets the live tracking link on WhatsApp)</label></div>
+                {dispatch.courier === "shadowfax" && <div className="grid3">
+                  <label className="field"><span>Delivery PIN (blank = from address)</span><input inputMode="numeric" maxLength={6} value={dispatch.dropPincode} onChange={(e) => setDispatch({ ...dispatch, dropPincode: e.target.value.replace(/\D/g, "") })} /></label>
+                  <label className="field"><span>Weight kg</span><input type="number" min="0.1" step="any" value={dispatch.weightKg} onChange={(e) => setDispatch({ ...dispatch, weightKg: Number(e.target.value) || 1 })} /></label>
+                  <label className="field"><span>Packages</span><input type="number" min="1" value={dispatch.packages} onChange={(e) => setDispatch({ ...dispatch, packages: Number(e.target.value) || 1 })} /></label>
+                </div>}
                 <p className="muted small-print">Stock is reduced for products whose stock is tracked.</p>
                 <button className="btn" disabled={st.busy}>Confirm dispatch</button>
               </form>

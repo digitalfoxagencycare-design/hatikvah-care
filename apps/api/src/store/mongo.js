@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { MongoClient, Binary } from "mongodb";
 
-const COLLECTIONS = ["products", "categories", "enquiries", "admins", "audit", "settings", "customers", "activities", "priceLists", "quotes", "orders", "invoices", "payments", "stockMoves", "suppliers", "purchases", "outbox", "otps"];
+const COLLECTIONS = ["products", "categories", "enquiries", "admins", "audit", "settings", "customers", "activities", "priceLists", "quotes", "orders", "invoices", "payments", "stockMoves", "suppliers", "purchases", "outbox", "otps", "ledger", "inbox"];
 
 /** Production store (MongoDB Atlas). Same interface as the file store; documents use a string `id` as `_id`. */
 export async function createMongoStore(uri, dbName) {
@@ -60,6 +60,10 @@ export async function createMongoStore(uri, dbName) {
     db.collection("stockMoves").createIndex({ productId: 1 }),
     db.collection("payments").createIndex({ invoiceId: 1 }),
     db.collection("outbox").createIndex({ status: 1, createdAt: -1 }),
+    db.collection("outbox").createIndex({ waMessageId: 1 }),
+    db.collection("ledger").createIndex({ date: -1 }),
+    db.collection("ledger").createIndex({ paymentId: 1 }),
+    db.collection("inbox").createIndex({ waMessageId: 1 }),
   ]);
   return store;
 }

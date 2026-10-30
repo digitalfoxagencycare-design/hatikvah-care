@@ -19,13 +19,14 @@ const P = {
   Purchases: page(() => import("./Purchases.jsx")), PurchaseDetail: page(() => import("./PurchaseDetail.jsx")), Suppliers: page(() => import("./Suppliers.jsx")),
   Reports: page(() => import("./Reports.jsx")), Content: page(() => import("./Content.jsx")), Automation: page(() => import("./Automation.jsx")),
   Settings: page(() => import("./Settings.jsx")), Team: page(() => import("./Team.jsx")), Audit: page(() => import("./Audit.jsx")), Account: page(() => import("./Account.jsx")),
+  POS: page(() => import("./POS.jsx")), WhatsApp: page(() => import("./WhatsApp.jsx")), Ledger: page(() => import("./Ledger.jsx")),
 };
 // [path, label, permission, component, extra routes]
 const NAV = [
-  ["Sell", [["enquiries", "Enquiries", "enquiries", "Enquiries"], ["customers", "Customers", "customers", "Customers"], ["quotes", "Quotations", "quotes", "Quotes"], ["invoices", "Invoices & Payments", "invoices", "Invoices"], ["orders", "Sales orders", "orders", "Orders"]]],
+  ["Sell", [["pos", "Counter billing", "pos", "POS"], ["whatsapp", "WhatsApp inbox", "enquiries", "WhatsApp"], ["enquiries", "Enquiries", "enquiries", "Enquiries"], ["customers", "Customers", "customers", "Customers"], ["quotes", "Quotations", "quotes", "Quotes"], ["invoices", "Invoices & Payments", "invoices", "Invoices"], ["orders", "Sales orders", "orders", "Orders"]]],
   ["Catalogue", [["products", "Products", "catalog", "Products"], ["price-lists", "Offers & Discounts", "customers", "PriceLists"]]],
   ["Stock", [["stock", "Stock Levels", "stock", "Stock"], ["purchases", "Purchase Orders / Bills", "stock", "Purchases"], ["suppliers", "Suppliers", "stock", "Suppliers"]]],
-  ["Business", [["reports", "Reports", "reports", "Reports"], ["automation", "Automation & messages", "automation", "Automation"], ["content", "Website content", "content", "Content"]]],
+  ["Business", [["ledger", "Cash & bank book", "ledger", "Ledger"], ["reports", "Reports", "reports", "Reports"], ["automation", "Automation & messages", "automation", "Automation"], ["content", "Website content", "content", "Content"]]],
   ["Admin", [["settings", "Company & GST", "settings", "Settings"], ["team", "Team", "team", "Team"], ["audit", "Activity log", "audit", "Audit"]]],
 ];
 const DETAIL = [["products/new", "catalog", "ProductForm"], ["products/:id", "catalog", "ProductForm"], ["customers/:id", "customers", "CustomerDetail"], ["quotes/:id", "quotes", "QuoteDetail"],

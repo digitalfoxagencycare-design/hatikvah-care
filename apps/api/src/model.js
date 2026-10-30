@@ -10,6 +10,21 @@ export async function uniqueSlug(rows, base, selfId) {
 const imageUrl = z.string().max(200).regex(/^(\/catalog\/[\w.-]+\.(jpe?g|png|webp)|\/media\/[0-9a-f-]{36})$/, "Image must be an uploaded or catalogue image");
 const paise = z.number().int().min(0).max(100_000_000).nullable();
 const text = (max) => z.string().trim().max(max);
+const size = z.number().positive().max(1_000_000);
+
+/** What one piece physically is: a volume, a weight, a size (length x width) or a plain count. */
+export const measureInput = z.discriminatedUnion("domain", [
+  z.object({ domain: z.literal("volume"), unit: z.enum(["ml", "l"]), value: size }).strict(),
+  z.object({ domain: z.literal("weight"), unit: z.enum(["g", "kg"]), value: size }).strict(),
+  z.object({ domain: z.literal("dimensions"), unit: z.enum(["inch", "cm"]), length: size, width: size }).strict(),
+  z.object({ domain: z.literal("count"), unit: z.enum(["pcs", "rolls", "pairs"]), value: size.default(1) }).strict(),
+]);
+/** Piece → inner pack (qty pieces) → master carton (qty inner packs). */
+export const packagingInput = z.object({
+  baseUnit: text(20).min(1).default("piece"),
+  innerPack: z.object({ name: text(20).min(1).default("box"), qty: z.number().int().min(2).max(100_000) }).strict().nullable().default(null),
+  masterCarton: z.object({ name: text(20).min(1).default("carton"), qty: z.number().int().min(1).max(10_000) }).strict().nullable().default(null),
+}).strict().refine((p) => !p.masterCarton || p.innerPack, "A master carton needs an inner pack size");
 
 export const productInput = z.object({
   name: text(160).min(2),
@@ -46,6 +61,11 @@ export const productInput = z.object({
   dispatchInfo: text(80).default(""),
   returnable: z.boolean().default(true),
   specs: z.array(z.object({ label: text(60).min(1), value: text(200).min(1) }).strict()).max(20).default([]),
+  // Structured measurement and B2B packaging (see lib/units.js). Box / carton prices are per box / carton; blank = piece price x pieces.
+  measure: measureInput.nullable().default(null),
+  packaging: packagingInput.nullable().default(null),
+  packPrices: z.object({ box: paise.default(null), carton: paise.default(null) }).strict().default({ box: null, carton: null }),
+  batchTracked: z.boolean().default(false), // chemicals, cosmetics, sanitisers: stock received with batch, mfg and expiry dates
 }).strict();
 export const productPatch = productInput.partial().strict();
 
@@ -115,5 +135,6 @@ export function publicProduct(p, settings, level) {
     priceTiers: showPrice ? p.priceTiers || [] : [], packSize: p.packSize || 1, minQty: p.minQty || 0, gstRate: p.gstRate ?? 18, unit: p.unit || "pcs",
     dispatchInfo: p.dispatchInfo || "", returnable: p.returnable !== false, specs: p.specs || [],
     stock: p.stockTracked ? ((level || 0) > 0 ? "in" : "out") : null,
+    measure: p.measure || null, packaging: p.packaging || null, packPrices: showPrice ? p.packPrices || { box: null, carton: null } : { box: null, carton: null },
   };
 }

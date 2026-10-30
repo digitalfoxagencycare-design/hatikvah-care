@@ -3,15 +3,18 @@ import { addDays, todayIST } from "../lib/gst.js";
 import { channels } from "../lib/notify.js";
 import { requirePerm } from "../lib/permissions.js";
 import { createPaymentLink } from "../lib/razorpay.js";
-import { balance, createInvoice, createOrderFromQuote, customerSnapshot, logActivity, moveStock, now, priced, rateFor, recordPayment, refreshInvoice, token } from "../lib/sales.js";
+import { balance, createInvoice, createOrderFromQuote, customerSnapshot, deductForInvoice, logActivity, moveStock, now, priced, rateFor, recordPayment, refreshInvoice, removePaymentLedger, token } from "../lib/sales.js";
+import { measureLabel, pieces, uomOptions } from "../lib/units.js";
 import { nextNumber } from "../lib/gst.js";
 import { getSettings } from "../model.js";
+import { shadowfaxOn } from "../services/delivery_shadowfax.js";
+import { bookShipment } from "./logistics.js";
 import { dispatchInput, invoiceInput, orderInput, paymentInput, quoteInput } from "../schemas.js";
 import { wrap } from "./public.js";
 import { bad, notFound, parse } from "./shared.js";
 
 /** Quotations → sales orders → GST invoices → payments. Numbers are per financial year (Q/2026-27/0001, SO/…, INV/…, DC/…). */
-export function salesRoutes({ cfg, store, audit, automation }) {
+export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
   const r = Router();
   const by = (req) => req.admin.email;
   const customerOr404 = async (id, res) => { const c = await store.customers.get(id); if (!c) notFound(res, "Customer"); return c; };
@@ -24,7 +27,10 @@ export function salesRoutes({ cfg, store, audit, automation }) {
     const out = [];
     for (const p of await store.products.all({ sort: { order: 1 } })) {
       const rVal = await rateFor(store, c, p);
-      out.push({ productId: p.id, sku: p.sku, name: p.name, pack: p.pack, hsn: p.hsn || "", gstRate: p.gstRate ?? 18, unit: p.unit || "pcs", rate: rVal || p.price || 0, price: p.price, pricePaise: p.price, priceTiers: p.priceTiers || [], active: p.active });
+      const rate = rVal || p.price || 0;
+      out.push({ productId: p.id, sku: p.sku, name: p.name, pack: p.pack || measureLabel(p.measure), hsn: p.hsn || "", gstRate: p.gstRate ?? 18, unit: p.unit || "pcs", rate, price: p.price, pricePaise: p.price, priceTiers: p.priceTiers || [], active: p.active,
+        // piece / box / carton with pieces per unit and the default rate (customer's piece rate scaled; own box / carton prices win when no price list applies)
+        uoms: uomOptions(rVal !== p.price && rVal ? { ...p, packPrices: {} } : p, rate) });
     }
     res.json(out);
   }));
@@ -115,6 +121,18 @@ export function salesRoutes({ cfg, store, audit, automation }) {
     await logActivity(store, { entity: "quote", entityId: q.id, text: `Converted directly to Tax Invoice ${inv.number}`, by: by(req) });
     res.status(201).json(await afterInvoice(req, inv));
   }));
+  // Razorpay link for the quote total: paying it accepts the quote and raises the order and GST invoice (webhook).
+  r.post("/quotes/:id/paylink", requirePerm("quotes"), wrap(async (req, res) => {
+    const q = await store.quotes.get(req.params.id); if (!q) return notFound(res, "Quote");
+    if (channels(cfg).payments === "off") return bad(res, "Online payments are not set up yet (Razorpay keys are needed)", 409);
+    if (!["draft", "sent", "accepted"].includes(q.status) || q.invoiceId) return bad(res, `A ${q.status} quote cannot be paid online`, 409);
+    try {
+      const link = await createPaymentLink(cfg, q, { ...(fetchImpl ? { fetchImpl } : {}), notes: { quoteId: q.id }, reference: `${q.number}-${Date.now().toString(36)}` });
+      const upd = await store.quotes.update(q.id, { payLink: link, updatedAt: now() });
+      await logActivity(store, { entity: "quote", entityId: q.id, text: `Payment link created (${link.url})`, by: by(req) });
+      await audit(req, "quote.paylink", q.number); res.json(upd);
+    } catch (e) { bad(res, e.message, 502); }
+  }));
   r.post("/quotes/:id/duplicate", requirePerm("quotes"), wrap(async (req, res) => {
     const q = await store.quotes.get(req.params.id); if (!q) return notFound(res, "Quote");
     req.body = { customerId: q.customerId, items: q.items.map(({ amount, tax, total, ...l }) => l), notes: q.notes, terms: q.terms, placeOfSupply: q.placeOfSupply };
@@ -170,11 +188,17 @@ export function salesRoutes({ cfg, store, audit, automation }) {
     if (!o.invoiceId) {
       for (const it of o.items) {
         const p = it.productId ? await store.products.get(it.productId) : null;
-        if (p?.stockTracked) await moveStock(store, { productId: p.id, sku: p.sku, qty: -it.qty, kind: "out", ref: o.number, note: "Dispatched", by: by(req) });
+        if (p?.stockTracked) await moveStock(store, { productId: p.id, sku: p.sku, qty: -pieces(it), kind: "out", ref: o.number, note: "Dispatched", by: by(req) });
       }
     }
-    const upd = await store.orders.update(o.id, { status: "dispatched", dispatch: { ...d, date: d.date || todayIST() }, challanNumber, dispatchedAt: now(), updatedAt: now() });
+    const { courier, dropPincode, weightKg, packages, ...dispatch } = d;
+    let upd = await store.orders.update(o.id, { status: "dispatched", dispatch: { ...dispatch, date: d.date || todayIST() }, challanNumber, dispatchedAt: now(), updatedAt: now() });
     await logActivity(store, { entity: "order", entityId: o.id, text: `Dispatched (challan ${challanNumber})${d.transporter ? " via " + d.transporter : ""}`, by: by(req) });
+    if (courier === "shadowfax") { // the challan stands even if the courier booking fails: staff can retry from the order
+      if (!shadowfaxOn(cfg)) await logActivity(store, { entity: "order", entityId: o.id, text: "Shadowfax pickup not booked: Shadowfax is not connected", by: by(req) });
+      else try { upd = await bookShipment({ cfg, store, fetchImpl }, upd, { dropPincode, weightKg, packages }, by(req)); }
+      catch (e) { await logActivity(store, { entity: "order", entityId: o.id, text: `Shadowfax pickup not booked: ${e.message}`, by: by(req) }); }
+    }
     await automation.on.orderDispatched(upd); await audit(req, "order.dispatch", o.number, { challanNumber }); res.json(upd);
   }));
   r.post("/orders/:id/invoice", requirePerm("invoices"), wrap(async (req, res) => {
@@ -189,23 +213,7 @@ export function salesRoutes({ cfg, store, audit, automation }) {
   // ---------- invoices and payments
   async function afterInvoice(req, inv) {
     let out = inv;
-    // Auto-minus stock on invoice creation if not already dispatched
-    let alreadyDispatched = false;
-    if (inv.orderId) {
-      const ord = await store.orders.get(inv.orderId);
-      if (ord && ord.status === "dispatched") alreadyDispatched = true;
-    }
-    if (!alreadyDispatched) {
-      for (const it of inv.items || []) {
-        if (it.productId) {
-          const p = await store.products.get(it.productId);
-          if (p) {
-            if (!p.stockTracked) await store.products.update(p.id, { stockTracked: true });
-            await moveStock(store, { productId: p.id, sku: p.sku, qty: -Math.abs(it.qty), kind: "out", ref: inv.number, note: `Sale invoice ${inv.number}`, by: by(req) });
-          }
-        }
-      }
-    }
+    await deductForInvoice(store, inv, by(req)); // the order's reservation ends here: the goods leave stock
     if (channels(cfg).payments !== "off") { try { out = await store.invoices.update(inv.id, { payLink: await createPaymentLink(cfg, inv) }); } catch (e) { await logActivity(store, { entity: "invoice", entityId: inv.id, text: `Payment link not created: ${e.message}` }); } }
     await logActivity(store, { entity: "customer", entityId: inv.customerId, text: `Invoice ${inv.number} raised`, by: by(req) });
     await automation.on.invoiceCreated(out); await audit(req, "invoice.create", inv.number, { total: inv.totals.total });
@@ -243,7 +251,7 @@ export function salesRoutes({ cfg, store, audit, automation }) {
       for (const it of i.items || []) {
         if (it.productId) {
           const p = await store.products.get(it.productId);
-          if (p) await moveStock(store, { productId: p.id, sku: p.sku, qty: Math.abs(it.qty), kind: "in", ref: i.number, note: `Voided invoice ${i.number}`, by: by(req) });
+          if (p) await moveStock(store, { productId: p.id, sku: p.sku, qty: Math.abs(pieces(it)), kind: "in", ref: i.number, note: `Voided invoice ${i.number}`, by: by(req) });
         }
       }
     }
@@ -272,7 +280,7 @@ export function salesRoutes({ cfg, store, audit, automation }) {
   r.get("/payments", requirePerm("invoices"), wrap(async (_req, res) => res.json(await store.payments.all({ sort: { createdAt: -1 } }))));
   r.delete("/payments/:id", requirePerm("invoices"), wrap(async (req, res) => {
     const p = await store.payments.get(req.params.id); if (!p) return notFound(res, "Payment");
-    await store.payments.remove(p.id); await refreshInvoice(store, p.invoiceId);
+    await store.payments.remove(p.id); await removePaymentLedger(store, p.id); await refreshInvoice(store, p.invoiceId);
     await logActivity(store, { entity: "invoice", entityId: p.invoiceId, text: `Payment of ₹${(p.amount / 100).toFixed(2)} removed`, by: by(req) });
     await audit(req, "payment.delete", p.invoiceNumber, { amount: p.amount }); res.status(204).end();
   }));

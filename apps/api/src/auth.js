@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { isOwner } from "./lib/permissions.js";
 
 export const COOKIE = "hc_session";
 export const hashPassword = (pw) => bcrypt.hash(pw, 12);
@@ -44,4 +45,4 @@ export function authenticate(cfg, store) {
 }
 
 export const requireOwner = (req, res, next) =>
-  req.admin?.role === "owner" ? next() : res.status(403).json({ error: "FORBIDDEN", message: "Only the owner can do this" });
+  isOwner(req.admin) ? next() : res.status(403).json({ error: "FORBIDDEN", message: "Only the owner can do this" });

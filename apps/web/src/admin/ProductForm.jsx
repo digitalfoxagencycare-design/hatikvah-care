@@ -4,7 +4,21 @@ import { api } from "../api.js";
 import { Loader, useLoad } from "./hooks.jsx";
 
 const EMPTY = { name: "", sku: "", category: "", collection: "", pack: "", variants: [], description: "", images: [], price: null, priceUnit: "", minOrder: "", active: true, featured: false, hsn: "", gstRate: 18, unit: "pcs",
-  brand: "", manufacturer: "", shortDescription: "", variantLabel: "", priceTiers: [], packSize: 1, minQty: 0, dispatchInfo: "", returnable: true, specs: [] };
+  brand: "", manufacturer: "", shortDescription: "", variantLabel: "", priceTiers: [], packSize: 1, minQty: 0, dispatchInfo: "", returnable: true, specs: [],
+  measure: null, packaging: null, packPrices: { box: null, carton: null }, batchTracked: false };
+const UNITS = { volume: ["ml", "l"], weight: ["g", "kg"], dimensions: ["inch", "cm"], count: ["pcs", "rolls", "pairs"] };
+const DOMAINS = [["", "Not set"], ["volume", "Volume (liquids, gels)"], ["weight", "Weight (soaps, detergents, sachets)"], ["dimensions", "Size (linen, towels)"], ["count", "Count (pieces, rolls, pairs)"]];
+/** Form strings → the API's measure / packaging objects (null when not filled in). */
+function measureOut(m) {
+  if (!m?.domain) return null;
+  const n = (v) => Number(v) || 0;
+  return m.domain === "dimensions" ? { domain: m.domain, unit: m.unit, length: n(m.length), width: n(m.width) } : { domain: m.domain, unit: m.unit, value: n(m.value) || 1 };
+}
+function packagingOut(k) {
+  const inner = Number(k.inner) || 0, carton = Number(k.carton) || 0;
+  if (!inner) return null;
+  return { baseUnit: k.baseUnit || "piece", innerPack: { name: k.innerName || "box", qty: inner }, masterCarton: carton ? { name: k.cartonName || "carton", qty: carton } : null };
+}
 const rupeesIn = (v) => { const n = Number(String(v).replace(/,/g, "")); return String(v).trim() === "" || !Number.isFinite(n) || n < 0 ? null : Math.round(n * 100); };
 
 export default function ProductForm() {
@@ -20,7 +34,14 @@ export default function ProductForm() {
   useEffect(() => {
     if (!all.data || !cats.data) return;
     const cur = id ? all.data.find((p) => p.id === id) : { ...EMPTY, category: cats.data[0]?.slug || "" };
-    if (cur) { setF({ ...EMPTY, ...cur, priceTiers: (cur.priceTiers || []).map((t) => ({ minQty: String(t.minQty), price: String(t.price / 100) })) }); setPrice(cur.price == null ? "" : String(cur.price / 100)); }
+    if (cur) {
+      const k = cur.packaging || {}, pp = cur.packPrices || {};
+      setF({ ...EMPTY, ...cur, priceTiers: (cur.priceTiers || []).map((t) => ({ minQty: String(t.minQty), price: String(t.price / 100) })),
+        measure: cur.measure ? { length: "", width: "", value: "", ...cur.measure } : { domain: "", unit: "", value: "", length: "", width: "" },
+        pk: { baseUnit: k.baseUnit || "piece", innerName: k.innerPack?.name || "box", inner: k.innerPack?.qty ? String(k.innerPack.qty) : "", cartonName: k.masterCarton?.name || "carton", carton: k.masterCarton?.qty ? String(k.masterCarton.qty) : "",
+          boxPrice: pp.box == null ? "" : String(pp.box / 100), cartonPrice: pp.carton == null ? "" : String(pp.carton / 100) } });
+      setPrice(cur.price == null ? "" : String(cur.price / 100));
+    }
   }, [all.data, cats.data, id]);
 
   const loading = (all.loading && !all.data) || (cats.loading && !cats.data);
@@ -44,7 +65,9 @@ export default function ProductForm() {
       hsn: f.hsn || "", gstRate: Number(f.gstRate ?? 18), unit: f.unit || "pcs",
       brand: f.brand, manufacturer: f.manufacturer, shortDescription: f.shortDescription, variantLabel: f.variantLabel, packSize: Number(f.packSize) || 1, minQty: Number(f.minQty) || 0,
       dispatchInfo: f.dispatchInfo, returnable: f.returnable, specs: f.specs.filter((x) => x.label.trim() && x.value.trim()),
-      priceTiers: f.priceTiers.filter((t) => String(t.minQty).trim()).map((t) => ({ minQty: Number(t.minQty), price: rupeesIn(t.price) })) };
+      priceTiers: f.priceTiers.filter((t) => String(t.minQty).trim()).map((t) => ({ minQty: Number(t.minQty), price: rupeesIn(t.price) })),
+      measure: measureOut(f.measure), packaging: packagingOut(f.pk), batchTracked: !!f.batchTracked,
+      packPrices: { box: f.pk.inner ? rupeesIn(f.pk.boxPrice) : null, carton: f.pk.inner && f.pk.carton ? rupeesIn(f.pk.cartonPrice) : null } };
     if (body.priceTiers.some((t) => !Number.isInteger(t.minQty) || t.price == null)) return setSt({ busy: false, error: "Each bulk price needs a whole quantity and a price in rupees", saved: false, field: "priceTiers" });
     setSt({ busy: true, error: null, saved: false, field: null });
     try {
@@ -79,6 +102,28 @@ export default function ProductForm() {
               <label className="field"><span>GST rate</span><select value={f.gstRate ?? 18} onChange={(e) => set("gstRate", Number(e.target.value))}>{[0, 5, 12, 18, 28].map((g) => <option key={g} value={g}>{g}%</option>)}</select></label>
               <label className="field"><span>Unit (on documents)</span><input maxLength={20} value={f.unit || "pcs"} onChange={(e) => set("unit", e.target.value)} placeholder="pcs / pack / kg" /></label>
             </div>
+            <h2>Measurement & packaging</h2>
+            <p className="muted small-print">What one piece is, and how pieces are packed for B2B orders. Quotes, orders, invoices and the counter can then sell by the piece, box or carton; stock is always counted in pieces.</p>
+            <div className="grid3">
+              <label className="field"><span>Measured as</span><select value={f.measure.domain} onChange={(e) => set("measure", { ...f.measure, domain: e.target.value, unit: UNITS[e.target.value]?.[0] || "" })}>{DOMAINS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+              {f.measure.domain === "dimensions" ? <>
+                <label className="field"><span>Length × width</span><span className="btn-row"><input className="w-sm" type="number" min="0" step="any" aria-label="Length" value={f.measure.length} onChange={(e) => set("measure", { ...f.measure, length: e.target.value })} /> × <input className="w-sm" type="number" min="0" step="any" aria-label="Width" value={f.measure.width} onChange={(e) => set("measure", { ...f.measure, width: e.target.value })} /></span></label>
+              </> : f.measure.domain && <label className="field"><span>{f.measure.domain === "count" ? "Per piece (e.g. 1 pair)" : "Size of one piece"}</span><input type="number" min="0" step="any" value={f.measure.value} onChange={(e) => set("measure", { ...f.measure, value: e.target.value })} placeholder={f.measure.domain === "volume" ? "e.g. 30" : "e.g. 15"} /></label>}
+              {f.measure.domain && <label className="field"><span>Unit</span><select value={f.measure.unit} onChange={(e) => set("measure", { ...f.measure, unit: e.target.value })}>{UNITS[f.measure.domain].map((u) => <option key={u}>{u}</option>)}</select></label>}
+            </div>
+            <div className="grid3">
+              <label className="field"><span>Single unit is called</span><input maxLength={20} value={f.pk.baseUnit} onChange={(e) => set("pk", { ...f.pk, baseUnit: e.target.value })} placeholder="piece / bottle / sachet" /></label>
+              <label className="field"><span>Inner pack: pieces per {f.pk.innerName || "box"}</span><span className="btn-row"><input className="w-sm" maxLength={20} aria-label="Inner pack name" value={f.pk.innerName} onChange={(e) => set("pk", { ...f.pk, innerName: e.target.value })} /><input className="w-sm" type="number" min="2" aria-label="Pieces per inner pack" value={f.pk.inner} onChange={(e) => set("pk", { ...f.pk, inner: e.target.value })} placeholder="e.g. 50" /></span></label>
+              <label className="field"><span>Master carton: {f.pk.innerName || "box"}es per {f.pk.cartonName || "carton"}</span><span className="btn-row"><input className="w-sm" maxLength={20} aria-label="Carton name" value={f.pk.cartonName} onChange={(e) => set("pk", { ...f.pk, cartonName: e.target.value })} /><input className="w-sm" type="number" min="1" disabled={!f.pk.inner} aria-label="Inner packs per carton" value={f.pk.carton} onChange={(e) => set("pk", { ...f.pk, carton: e.target.value })} placeholder="e.g. 10" /></span></label>
+            </div>
+            {Number(f.pk.inner) > 0 && (
+              <div className="grid3">
+                <label className="field"><span>Price per {f.pk.innerName || "box"} of {f.pk.inner} (₹, blank = piece price × {f.pk.inner})</span><input inputMode="decimal" value={f.pk.boxPrice} onChange={(e) => set("pk", { ...f.pk, boxPrice: e.target.value })} /></label>
+                {Number(f.pk.carton) > 0 && <label className="field"><span>Price per {f.pk.cartonName || "carton"} of {Number(f.pk.inner) * Number(f.pk.carton)} (₹)</span><input inputMode="decimal" value={f.pk.cartonPrice} onChange={(e) => set("pk", { ...f.pk, cartonPrice: e.target.value })} /></label>}
+                <p className="muted small-print">1 {f.pk.cartonName || "carton"} = {Number(f.pk.carton) || "—"} {f.pk.innerName || "box"}es = {Number(f.pk.inner) * (Number(f.pk.carton) || 0) || "—"} {f.pk.baseUnit || "pieces"}</p>
+              </div>
+            )}
+            <div className="checks"><label><input type="checkbox" checked={!!f.batchTracked} onChange={(e) => set("batchTracked", e.target.checked)} /> Track batch, manufacturing and expiry dates (chemicals, cosmetics, sanitisers)</label></div>
             <label className="field"><span>Product Description (shown on website & landing page)</span><textarea rows="4" maxLength={2000} placeholder="Describe product features, quality, materials, fragrances, dimensions, suitability for hotels/hospitals, etc." value={f.description} onChange={(e) => set("description", e.target.value)} /></label>
             <h2>Online shop</h2>
             <div className="grid2">

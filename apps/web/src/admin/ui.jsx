@@ -100,11 +100,20 @@ export function DocEditor({ initial, kind, onSave, busy, error, extra }) {
   const setLine = (i, k, v) => setF((x) => ({ ...x, items: x.items.map((l, j) => (j === i ? { ...l, [k]: v } : l)) }));
   const addProduct = (label) => {
     const r = rates.data?.find((x) => `${x.sku} · ${x.name}` === label); if (!r) return;
-    setF((x) => ({ ...x, items: [...x.items, { productId: r.productId, sku: r.sku, name: r.name, hsn: r.hsn, unit: r.unit, qty: 1, rate: r.rate, discountPct: 0, gstRate: r.gstRate }] })); setPick("");
+    setF((x) => ({ ...x, items: [...x.items, { productId: r.productId, sku: r.sku, name: r.name, hsn: r.hsn, unit: r.unit, qty: 1, rate: r.rate, discountPct: 0, gstRate: r.gstRate, uom: "piece", perUnit: 1 }] })); setPick("");
   };
+  const uomsOf = (l) => (l.productId && rates.data?.find((x) => x.productId === l.productId)?.uoms) || [];
+  /** Piece / box / carton: the line keeps the ordered unit; the server fixes pieces per unit from the product. */
+  const setUom = (i, uom) => setF((x) => ({ ...x, items: x.items.map((l, j) => {
+    if (j !== i) return l;
+    const o = uomsOf(l).find((u) => u.uom === uom); if (!o) return l;
+    const r = rates.data.find((y) => y.productId === l.productId);
+    return { ...l, uom, perUnit: o.perUnit, unit: uom === "piece" ? r.unit : o.label, rate: o.rate ?? l.rate };
+  }) }));
   const submit = (e) => {
     e.preventDefault();
-    onSave({ ...f, items: f.items.map((l) => ({ productId: l.productId || "", sku: l.sku || "", name: l.name, hsn: l.hsn || "", unit: l.unit || "pcs", qty: Number(l.qty), rate: l.rate, discountPct: Number(l.discountPct) || 0, gstRate: Number(l.gstRate) })) });
+    onSave({ ...f, items: f.items.map((l) => ({ productId: l.productId || "", sku: l.sku || "", name: l.name, hsn: l.hsn || "", unit: l.unit || "pcs", qty: Number(l.qty), rate: l.rate, discountPct: Number(l.discountPct) || 0, gstRate: Number(l.gstRate),
+      uom: l.uom || "piece", perUnit: l.perUnit || 1 })) });
   };
   return (
     <form className="panel form" onSubmit={submit}>
@@ -125,7 +134,9 @@ export function DocEditor({ initial, kind, onSave, busy, error, extra }) {
                 <td><input className="wide" required value={l.name} maxLength={200} onChange={(e) => setLine(i, "name", e.target.value)} aria-label="Item name" />{l.sku && <small>{l.sku}</small>}</td>
                 <td><input className="w-sm" value={l.hsn} maxLength={8} inputMode="numeric" onChange={(e) => setLine(i, "hsn", e.target.value.replace(/\D/g, ""))} aria-label="HSN" /></td>
                 <td><input className="w-sm" type="number" min="0.001" step="any" required value={l.qty} onChange={(e) => setLine(i, "qty", e.target.value)} aria-label="Quantity" /></td>
-                <td><input className="w-xs" value={l.unit} maxLength={20} onChange={(e) => setLine(i, "unit", e.target.value)} aria-label="Unit" /></td>
+                <td>{uomsOf(l).length > 1
+                  ? <><select value={l.uom || "piece"} onChange={(e) => setUom(i, e.target.value)} aria-label="Sell by">{uomsOf(l).map((u) => <option key={u.uom} value={u.uom}>{u.label}</option>)}</select>{(l.perUnit || 1) > 1 && <small>= {((Number(l.qty) || 0) * l.perUnit).toLocaleString("en-IN")} pcs</small>}</>
+                  : <input className="w-xs" value={l.unit} maxLength={20} onChange={(e) => setLine(i, "unit", e.target.value)} aria-label="Unit" />}</td>
                 <td><RateInput value={l.rate} onChange={(v) => setLine(i, "rate", v)} /></td>
                 <td><input className="w-xs" type="number" min="0" max="100" step="any" value={l.discountPct} onChange={(e) => setLine(i, "discountPct", e.target.value)} aria-label="Discount %" /></td>
                 <td><select value={l.gstRate} onChange={(e) => setLine(i, "gstRate", Number(e.target.value))} aria-label="GST %">{meta.gstRates.map((g) => <option key={g} value={g}>{g}%</option>)}</select></td>

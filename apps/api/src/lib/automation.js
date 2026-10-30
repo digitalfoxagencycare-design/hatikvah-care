@@ -1,5 +1,5 @@
 import { addDays, daysBetween, todayIST } from "./gst.js";
-import { balance, createOrderFromQuote, logActivity, now, stockLevels } from "./sales.js";
+import { balance, createOrderFromQuote, logActivity, now, stockBuckets } from "./sales.js";
 import { getSettings } from "../model.js";
 
 /** Every automation the business runs. "event" rules fire when something happens; the others run on the schedule (every few minutes, or daily). */
@@ -15,6 +15,8 @@ export const RULES = [
   { id: "quoteAccepted", group: "Quotes", when: "event", label: "Quote accepted: create the sales order and tell the team" },
   { id: "websiteOrder", group: "Orders", when: "event", label: "Website order placed: confirm to the customer and alert the team" },
   { id: "orderDispatched", group: "Orders", when: "event", label: "Order dispatched: send the customer the challan and tracking details" },
+  { id: "shipmentUpdate", group: "Orders", when: "event", label: "Courier update (Shadowfax): send the customer the live tracking link when the rider picks up, and when delivered" },
+  { id: "waBot", group: "WhatsApp", when: "event", label: "Customer messages on WhatsApp: reply with the quick menu (quote request, hotel amenities, clinic supplies) and log the lead" },
   { id: "invoiceSend", group: "Payments", when: "event", label: "Invoice created: send the customer the invoice link (with payment link when Razorpay is on)" },
   { id: "paymentReceipt", group: "Payments", when: "event", label: "Payment received: send a thank-you receipt" },
   { id: "invoiceOverdue", group: "Payments", when: "schedule", label: "Invoice overdue: reminders after the set days past due" },
@@ -49,7 +51,7 @@ export function createAutomation({ cfg, store, notifier, log = console }) {
     return t;
   }
   const toCustomer = (c) => [c.email && { channel: "email", to: c.email }, c.phone && { channel: "whatsapp", to: c.phone }].filter(Boolean);
-  async function send(targets, { subject, body, event, ref }) { for (const t of targets) await notifier.queue({ ...t, subject, body, event, ref }); }
+  async function send(targets, { subject, body, event, ref, button = null }) { for (const t of targets) await notifier.queue({ ...t, subject, body, event, ref, button }); }
 
   // ---------- events
   async function enquiryCreated(enq) {
@@ -69,7 +71,7 @@ export function createAutomation({ cfg, store, notifier, log = console }) {
         await send(await teamTargets(a, company, patch.assignedTo), { event: "enquiryAlert", ref: enq.ref, subject: `New enquiry ${enq.ref} from ${enq.name}`,
           body: `New enquiry ${enq.ref}\n${enq.name}${enq.company ? ", " + enq.company : ""}\nPhone: ${enq.phone}${enq.email ? "\nEmail: " + enq.email : ""}${items ? "\n" + items : ""}${enq.message ? "\nMessage: " + enq.message : ""}\nOpen: ${base()}/admin/enquiries` });
       }
-      if (isOn(a, "enquiryAck")) {
+      if (isOn(a, "enquiryAck") && enq.source?.channel !== "whatsapp") { // WhatsApp leads get their reference from the bot
         await send(toCustomer(enq), { event: "enquiryAck", ref: enq.ref, subject: `We received your enquiry (${enq.ref})`,
           body: `Dear ${enq.name},\nThank you for contacting ${company.name}. Your enquiry reference is ${enq.ref}. Our team will get back to you shortly with availability and pricing.\n${company.phone ? "Call us: " + company.phone : ""}\n– ${company.name}` });
       }
@@ -81,7 +83,8 @@ export function createAutomation({ cfg, store, notifier, log = console }) {
     const [a, company] = await Promise.all([config(), getSettings(store)]);
     if (!isOn(a, "quoteSend")) return;
     await send(toCustomer(q.customer), { event: "quoteSend", ref: q.number, subject: `Quotation ${q.number} from ${company.name}`,
-      body: `Dear ${q.customer.contactName || q.customer.name},\nPlease find our quotation ${q.number} for ${money(q.totals.total)} (incl. GST)${q.validUntil ? `, valid until ${q.validUntil}` : ""}.\nView and accept online: ${docLink("quote", q.token)}\n– ${company.name}` });
+      body: `Dear ${q.customer.contactName || q.customer.name},\nPlease find our quotation ${q.number} for ${money(q.totals.total)} (incl. GST)${q.validUntil ? `, valid until ${q.validUntil}` : ""}.\nView and accept online: ${docLink("quote", q.token)}${q.payLink?.url ? `\nPay now to confirm: ${q.payLink.url}` : ""}\n– ${company.name}`,
+      button: { label: "View & approve", url: docLink("quote", q.token) } });
     await notifier.flush();
   }
 
@@ -111,7 +114,20 @@ export function createAutomation({ cfg, store, notifier, log = console }) {
     if (!isOn(a, "orderDispatched")) return;
     const d = o.dispatch || {};
     await send(toCustomer(o.customer), { event: "orderDispatched", ref: o.number, subject: `Your order ${o.number} has been dispatched`,
-      body: `Dear ${o.customer.contactName || o.customer.name},\nYour order ${o.number} has been dispatched${d.transporter ? ` via ${d.transporter}` : ""}${d.trackingNo ? ` (tracking ${d.trackingNo})` : ""}.\nDelivery challan: ${docLink("challan", o.token)}\n– ${company.name}` });
+      body: `Dear ${o.customer.contactName || o.customer.name},\nYour order ${o.number} has been dispatched${d.transporter ? ` via ${d.transporter}` : ""}${d.trackingNo ? ` (tracking ${d.trackingNo})` : ""}.${o.shipment?.trackingUrl ? `\nLive tracking: ${o.shipment.trackingUrl}` : ""}\nDelivery challan: ${docLink("challan", o.token)}\n– ${company.name}`,
+      button: o.shipment?.trackingUrl ? { label: "Track delivery", url: o.shipment.trackingUrl } : { label: "Delivery challan", url: docLink("challan", o.token) } });
+    await notifier.flush();
+  }
+
+  /** Courier status from Shadowfax: tell the customer when the rider has picked up (with live tracking) and when it is delivered. */
+  async function shipmentUpdate(o, status) {
+    const [a, company] = await Promise.all([config(), getSettings(store)]);
+    if (!isOn(a, "shipmentUpdate") || !["picked", "out_for_delivery", "delivered"].includes(status)) return;
+    const t = o.shipment?.trackingUrl || "";
+    const what = status === "delivered" ? "has been delivered. Thank you for your business!" : status === "picked" ? "has been picked up by our delivery partner." : "is out for delivery today.";
+    await send(toCustomer(o.customer).filter((x) => x.channel === "whatsapp"), { event: "shipmentUpdate", ref: o.number, subject: `Order ${o.number}: ${status}`,
+      body: `Dear ${o.customer.contactName || o.customer.name},\nYour order ${o.number} ${what}${t && status !== "delivered" ? `\nLive tracking: ${t}` : ""}${o.shipment?.awb ? `\nAWB: ${o.shipment.awb}` : ""}\n– ${company.name}`,
+      button: t && status !== "delivered" ? { label: "Track rider", url: t } : null });
     await notifier.flush();
   }
 
@@ -119,7 +135,8 @@ export function createAutomation({ cfg, store, notifier, log = console }) {
     const [a, company] = await Promise.all([config(), getSettings(store)]);
     if (!isOn(a, "invoiceSend")) return;
     await send(toCustomer(inv.customer), { event: "invoiceSend", ref: inv.number, subject: `Invoice ${inv.number} from ${company.name}`,
-      body: `Dear ${inv.customer.contactName || inv.customer.name},\nInvoice ${inv.number} for ${money(inv.totals.total)} is due on ${inv.dueDate}.\nView: ${docLink("invoice", inv.token)}${inv.payLink?.url ? `\nPay online: ${inv.payLink.url}` : ""}${company.upiId ? `\nUPI: ${company.upiId}` : ""}\n– ${company.name}` });
+      body: `Dear ${inv.customer.contactName || inv.customer.name},\nInvoice ${inv.number} for ${money(inv.totals.total)} is due on ${inv.dueDate}.\nView / download: ${docLink("invoice", inv.token)}${inv.payLink?.url ? `\nPay online: ${inv.payLink.url}` : ""}${company.upiId ? `\nUPI: ${company.upiId}` : ""}\n– ${company.name}`,
+      button: inv.payLink?.url && balance(inv) > 0 ? { label: "Pay now", url: inv.payLink.url } : { label: "View invoice", url: docLink("invoice", inv.token) } });
     await notifier.flush();
   }
 
@@ -169,10 +186,10 @@ export function createAutomation({ cfg, store, notifier, log = console }) {
       }
     }
     if (isOn(a, "lowStock")) {
-      const lv = await stockLevels(store), low = [];
+      const b = await stockBuckets(store), lv = Object.fromEntries(Object.entries(b).map(([id, x]) => [id, x.available])), low = [];
       for (const p of (await store.products.all()).filter((x) => x.stockTracked)) {
         const q = lv[p.id] || 0, isLow = q <= (p.reorderLevel || 0);
-        if (isLow && !p.lowStockAlertedAt) { low.push(`• ${p.name} (${p.sku}): ${q} left, reorder level ${p.reorderLevel}`); await store.products.update(p.id, { lowStockAlertedAt: now() }); }
+        if (isLow && !p.lowStockAlertedAt) { low.push(`• ${p.name} (${p.sku}): ${q} available, reorder level ${p.reorderLevel}`); await store.products.update(p.id, { lowStockAlertedAt: now() }); }
         if (!isLow && p.lowStockAlertedAt) await store.products.update(p.id, { lowStockAlertedAt: null });
       }
       if (low.length) { await send(await teamTargets(a, company), { event: "lowStock", subject: `Low stock: ${low.length} item(s)`, body: `These items are at or below their reorder level:\n${low.join("\n")}\nCreate purchase orders: ${base()}/admin/stock` }); count("lowStock", low.length); }
@@ -222,5 +239,5 @@ export function createAutomation({ cfg, store, notifier, log = console }) {
     return res;
   }
 
-  return { config, run, on: { enquiryCreated, quoteSent, quoteAccepted, websiteOrder, orderDispatched, invoiceCreated, paymentReceived } };
+  return { config, run, on: { enquiryCreated, quoteSent, quoteAccepted, websiteOrder, orderDispatched, shipmentUpdate, invoiceCreated, paymentReceived } };
 }

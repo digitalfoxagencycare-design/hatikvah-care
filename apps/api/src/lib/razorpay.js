@@ -5,7 +5,7 @@ export async function createPaymentLink(cfg, invoice, { fetchImpl = globalThis.f
   const due = invoice.totals.total - (invoice.amountPaid || 0); // works for a sales order too (no amountPaid)
   const body = {
     amount: due, currency: "INR", accept_partial: false, reference_id: (reference || invoice.number).slice(0, 40),
-    description: `${notes?.orderId ? "Order" : "Invoice"} ${invoice.number}`.slice(0, 2048),
+    description: `${notes?.orderId ? "Order" : notes?.quoteId ? "Quotation" : "Invoice"} ${invoice.number}`.slice(0, 2048),
     customer: { name: invoice.customer.name.slice(0, 100), ...(invoice.customer.email ? { email: invoice.customer.email } : {}), ...(invoice.customer.phone ? { contact: invoice.customer.phone } : {}) },
     notify: { sms: false, email: false }, reminder_enable: false, notes: notes || { invoiceId: invoice.id },
     ...(callbackUrl ? { callback_url: callbackUrl, callback_method: "get" } : {}), // website checkout: bring the buyer back after paying

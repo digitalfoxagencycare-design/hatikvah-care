@@ -1,10 +1,13 @@
 import crypto from "node:crypto";
 import { addDays, calcTotals, nextNumber, stateName, todayIST } from "./gst.js";
 import { getSettings } from "../model.js";
+import { expandLines, pieces } from "./units.js";
 
 /** Shared business rules for quotes, orders, invoices, payments and stock. Routes and automations both call these. */
 export const now = () => new Date().toISOString();
 export const token = () => crypto.randomBytes(18).toString("base64url");
+/** A mistake in what was sent (shown to the person as a 400), as opposed to a server fault. */
+export const userError = (message, status = 400) => Object.assign(new Error(message), { status, userError: true });
 
 export function customerSnapshot(c) {
   return { name: c.name, contactName: c.contactName || "", phone: c.phone || "", email: c.email || "", gstin: c.gstin || "", stateCode: c.stateCode || "", state: stateName(c.stateCode || ""), billingAddress: c.billingAddress || "", shippingAddress: c.shippingAddress || c.billingAddress || "" };
@@ -15,7 +18,11 @@ export async function priced(store, { items, customer, placeOfSupply }) {
   const s = await getSettings(store);
   const pos = placeOfSupply || customer.stateCode || s.stateCode;
   const interState = pos !== s.stateCode;
-  const { lines, totals } = calcTotals(items, interState);
+  const ids = [...new Set(items.map((i) => i.productId).filter(Boolean))];
+  const byId = Object.fromEntries((await Promise.all(ids.map((id) => store.products.get(id)))).filter(Boolean).map((p) => [p.id, p]));
+  const ex = expandLines(items, byId);
+  if (ex.error) throw userError(ex.error);
+  const { lines, totals } = calcTotals(ex.items, interState);
   return { items: lines, totals, interState, placeOfSupply: pos, placeOfSupplyName: stateName(pos) };
 }
 
@@ -34,6 +41,7 @@ export function tierPrice(product, qty) {
   return rate;
 }
 
+/** Physical stock (pieces on the warehouse floor) per product, from the ledger of movements. */
 export async function stockLevels(store) {
   const moves = await store.stockMoves.all();
   const lv = {};
@@ -41,8 +49,65 @@ export async function stockLevels(store) {
   return lv;
 }
 
-export async function moveStock(store, { productId, sku, qty, kind, ref = "", note = "", by = "system" }) {
-  return store.stockMoves.insert({ productId, sku, qty, kind, ref, note, by, at: now() });
+/** Orders that hold stock: confirmed or packed, not cancelled, not yet invoiced or dispatched (those take the stock out). */
+export const reservesStock = (o) => ["confirmed", "packed"].includes(o.status) && !o.invoiceId;
+
+/** physical, reserved (in open sales orders) and available = physical - reserved, in pieces, per product id. */
+export async function stockBuckets(store) {
+  const [physical, orders] = await Promise.all([stockLevels(store), store.orders.all()]);
+  const reserved = {};
+  for (const o of orders.filter(reservesStock)) for (const it of o.items) if (it.productId) reserved[it.productId] = (reserved[it.productId] || 0) + pieces(it);
+  const out = {};
+  for (const id of new Set([...Object.keys(physical), ...Object.keys(reserved)])) {
+    const ph = physical[id] || 0, rs = reserved[id] || 0;
+    out[id] = { physical: ph, reserved: rs, available: ph - rs };
+  }
+  return out;
+}
+export const bucketOf = (b, id) => b[id] || { physical: 0, reserved: 0, available: 0 };
+/** Low stock is judged on what can still be sold (available), not on what is on the floor. */
+export const isLow = (p, b) => !!p.stockTracked && bucketOf(b, p.id).available <= (p.reorderLevel || 0);
+
+export async function moveStock(store, { productId, sku, qty, kind, ref = "", note = "", by = "system", batch = null }) {
+  return store.stockMoves.insert({ productId, sku, qty, kind, ref, note, by, at: now(), ...(batch ? { batch } : {}) });
+}
+
+/**
+ * Batch stock (batch number, mfg and expiry dates) from the movements. Stock received with a batch adds to it; a stock-out
+ * naming a batch takes from it; any other stock-out is taken first-expiring-first-out (FEFO).
+ */
+export function batchLevels(moves, today = todayIST()) {
+  const byProduct = {};
+  const key = (b) => b.batchNumber;
+  for (const m of [...moves].sort((a, b) => (a.at < b.at ? -1 : 1))) {
+    const list = (byProduct[m.productId] ||= []);
+    if (m.qty > 0 && m.batch) {
+      let b = list.find((x) => key(x) === key(m.batch));
+      if (!b) list.push(b = { ...m.batch, qty: 0 });
+      b.qty += m.qty;
+    } else if (m.qty < 0) {
+      let left = -m.qty;
+      const named = m.batch ? list.filter((x) => key(x) === key(m.batch)) : [];
+      const fefo = list.filter((x) => x.qty > 0 && !named.includes(x)).sort((a, b) => (a.expDate || "9999") < (b.expDate || "9999") ? -1 : 1);
+      for (const b of [...named, ...fefo]) { const take = Math.min(b.qty, left); b.qty -= take; left -= take; if (!left) break; }
+    }
+  }
+  const out = [];
+  for (const [productId, list] of Object.entries(byProduct)) for (const b of list) if (b.qty > 0) {
+    out.push({ productId, ...b, daysToExpiry: b.expDate ? Math.round((Date.parse(b.expDate) - Date.parse(today)) / 86400_000) : null });
+  }
+  return out.sort((a, b) => (a.expDate || "9999") < (b.expDate || "9999") ? -1 : 1);
+}
+
+/** Takes an invoice's goods out of stock (in pieces) unless its order was already dispatched, which took them out then. */
+export async function deductForInvoice(store, inv, by) {
+  if (inv.orderId && (await store.orders.get(inv.orderId))?.status === "dispatched") return;
+  for (const it of inv.items || []) {
+    const p = it.productId ? await store.products.get(it.productId) : null;
+    if (!p) continue;
+    if (!p.stockTracked) await store.products.update(p.id, { stockTracked: true });
+    await moveStock(store, { productId: p.id, sku: p.sku, qty: -Math.abs(pieces(it)), kind: "out", ref: inv.number, note: `Sale invoice ${inv.number}`, by });
+  }
 }
 
 export async function logActivity(store, { entity, entityId, kind = "system", text, by = "system" }) {
@@ -82,7 +147,7 @@ export async function invoiceWebsiteOrder(store, order) {
     orderId: order.id, orderNumber: order.number, by: "website" });
   for (const it of order.items) {
     const p = it.productId ? await store.products.get(it.productId) : null;
-    if (p?.stockTracked) await moveStock(store, { productId: p.id, sku: p.sku, qty: -it.qty, kind: "out", ref: inv.number, note: `Website order ${order.number}`, by: "website" });
+    if (p?.stockTracked) await moveStock(store, { productId: p.id, sku: p.sku, qty: -pieces(it), kind: "out", ref: inv.number, note: `Website order ${order.number}`, by: "website" });
   }
   return inv;
 }
@@ -98,8 +163,20 @@ export async function refreshInvoice(store, invoiceId) {
 
 export async function recordPayment(store, inv, { amount, date, mode, reference = "", notes = "", by, external = "" }) {
   const p = await store.payments.insert({ invoiceId: inv.id, invoiceNumber: inv.number, customerId: inv.customerId, customerName: inv.customer.name, amount, date: date || todayIST(), mode, reference, notes, external, by, createdAt: now() });
+  await postLedger(store, { date: p.date, account: ledgerAccount(mode), kind: "receipt", amount, ref: inv.number, paymentId: p.id, invoiceId: inv.id, party: inv.customer.name, narration: `${mode}${reference ? " " + reference : ""}`, by });
   await logActivity(store, { entity: "invoice", entityId: inv.id, text: `Payment ₹${(amount / 100).toFixed(2)} received (${mode}${reference ? " " + reference : ""})`, by });
   return { payment: p, invoice: await refreshInvoice(store, inv.id) };
+}
+
+/** Cash and bank book. Every payment received posts a receipt; removing the payment posts nothing but deletes its entry. */
+export const ledgerAccount = (mode) => (mode === "cash" ? "cash" : mode === "razorpay" ? "razorpay" : "bank");
+export async function postLedger(store, e) {
+  return store.ledger.insert({ date: e.date || todayIST(), account: e.account, kind: e.kind, amount: e.amount, ref: e.ref || "", paymentId: e.paymentId || "", invoiceId: e.invoiceId || "",
+    party: e.party || "", narration: e.narration || "", by: e.by || "system", createdAt: now() });
+}
+export async function removePaymentLedger(store, paymentId) {
+  const e = await store.ledger.findBy("paymentId", paymentId);
+  if (e) await store.ledger.remove(e.id);
 }
 
 export const balance = (inv) => (inv.status === "void" ? 0 : inv.totals.total - (inv.amountPaid || 0));

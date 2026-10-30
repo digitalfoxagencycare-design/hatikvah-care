@@ -27,7 +27,14 @@ async function contract(store) {
   const seqs = await Promise.all([1, 2, 3, 4, 5].map(() => store.nextSeq("t")));
   assert.deepEqual(seqs.sort(), [1, 2, 3, 4, 5], "sequence numbers are unique under concurrency");
   assert.equal(await store.nextSeq("other"), 1);
-  for (const n of ["customers", "quotes", "orders", "invoices", "payments", "stockMoves", "suppliers", "purchases", "outbox", "activities", "priceLists"]) assert.equal(typeof store[n].insert, "function", n);
+  for (const n of ["customers", "quotes", "orders", "invoices", "payments", "stockMoves", "suppliers", "purchases", "outbox", "activities", "priceLists", "ledger", "inbox"]) assert.equal(typeof store[n].insert, "function", n);
+  const msg = await store.outbox.insert({ channel: "whatsapp", waMessageId: "wamid.X1", status: "sent" });
+  assert.equal((await store.outbox.findBy("waMessageId", "wamid.X1")).id, msg.id, "outbox found by WhatsApp message id (status callbacks)");
+  const le = await store.ledger.insert({ account: "bank", amount: 500, paymentId: "p1", date: "2026-10-01" });
+  assert.equal((await store.ledger.findBy("paymentId", "p1")).id, le.id);
+  const nested = await store.products.insert({ slug: "n", packaging: { innerPack: { name: "box", qty: 50 }, masterCarton: { name: "carton", qty: 10 } }, measure: { domain: "volume", unit: "ml", value: 30 } });
+  assert.deepEqual((await store.products.get(nested.id)).packaging.masterCarton, { name: "carton", qty: 10 }, "nested packaging survives");
+  await store.products.remove(nested.id);
   const id = await store.saveMedia(Buffer.from([1, 2, 3, 4]), "image/png");
   const m = await store.getMedia(id);
   assert.deepEqual([...m.data], [1, 2, 3, 4]); assert.equal(m.contentType, "image/png");

@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api, money } from "../api.js";
+const DispatchSlip = lazy(() => import("./DispatchSlip.jsx")); // the QR library loads only for slips
 import "./doc.css";
 
-const TITLES = { quote: "QUOTATION", invoice: "TAX INVOICE", challan: "DELIVERY CHALLAN" };
+const TITLES = { quote: "QUOTATION", invoice: "TAX INVOICE", challan: "DELIVERY CHALLAN", packing: "PACKING SLIP", gatepass: "GATE PASS" };
 
 function fmtDate(s) {
   if (!s) return "—";
@@ -26,7 +27,7 @@ export default function DocPage() {
 
   useEffect(() => {
     if (s.data) {
-      document.title = `${TITLES[kind] || "Document"} ${kind === "challan" ? s.data.doc.challanNumber : s.data.doc.number} | ${s.data.company.legalName || s.data.company.name}`;
+      document.title = `${TITLES[kind] || "Document"} ${["challan", "packing", "gatepass"].includes(kind) ? s.data.doc.challanNumber : s.data.doc.number} | ${s.data.company.legalName || s.data.company.name}`;
     }
   }, [s.data, kind]);
 
@@ -34,6 +35,7 @@ export default function DocPage() {
   if (s.error) return <p className="doc-note">{s.error}</p>;
 
   const { doc: d, company: c } = s.data;
+  if (kind === "packing" || kind === "gatepass") return <Suspense fallback={<p className="doc-note">Loading…</p>}><DispatchSlip kind={kind} token={token} d={d} c={c} /></Suspense>;
   const challan = kind === "challan";
   const quote = kind === "quote";
   const invoice = kind === "invoice";

@@ -4,15 +4,18 @@ import { authenticate, checkPassword, hashPassword, passwordProblem, requireOwne
 import { parseCsv, toCsv } from "../csv.js";
 import { categoryInput, getSettings, productInput, productPatch, settingsInput, slugify, uniqueSlug } from "../model.js";
 import { z } from "zod";
-import { can, requirePerm, ROLES } from "../lib/permissions.js";
+import { can, FULL_CONTROL, isOwner, requirePerm, ROLES } from "../lib/permissions.js";
 import { newSecret, otpauthUrl, verifyCode } from "../lib/totp.js";
-import { balance, stockLevels } from "../lib/sales.js";
-import { todayIST } from "../lib/gst.js";
+import { balance, batchLevels, isLow, reservesStock, stockBuckets } from "../lib/sales.js";
+import { daysBetween, todayIST } from "../lib/gst.js";
 import { userInput, userPatch } from "../schemas.js";
 import { wrap } from "./public.js";
 import { crmRoutes } from "./crm.js";
 import { opsRoutes } from "./ops.js";
 import { reportRoutes } from "./reports.js";
+import { posRoutes } from "./pos.js";
+import { logisticsRoutes } from "./logistics.js";
+import { whatsappAdminRoutes } from "./whatsapp.js";
 import { salesRoutes } from "./sales.js";
 import { stockRoutes } from "./stock.js";
 
@@ -24,7 +27,18 @@ const toPaise = (s) => { if (s === "" || s == null) return null; const n = Numbe
 const IMG_TYPES = { "image/jpeg": [[0xff, 0xd8, 0xff]], "image/png": [[0x89, 0x50, 0x4e, 0x47]], "image/webp": [[0x52, 0x49, 0x46, 0x46]], "application/pdf": [[0x25, 0x50, 0x44, 0x46, 0x2d]] };
 const sniff = (buf) => Object.entries(IMG_TYPES).find(([, sigs]) => sigs.some((s) => s.every((b, i) => buf[i] === b)))?.[0];
 
-export function adminRoutes({ cfg, store, automation, notifier }) {
+/** Receivables by days past due: not yet due, 1-30, 31-60, 61-90, over 90. */
+function agingBuckets(open, today) {
+  const b = [["current", "Not yet due"], ["d30", "1–30 days"], ["d60", "31–60 days"], ["d90", "61–90 days"], ["d90plus", "Over 90 days"]].map(([key, label]) => ({ key, label, amount: 0, count: 0 }));
+  for (const i of open) {
+    const late = daysBetween(i.dueDate, today);
+    const k = late <= 0 ? 0 : late <= 30 ? 1 : late <= 60 ? 2 : late <= 90 ? 3 : 4;
+    b[k].amount += balance(i); b[k].count++;
+  }
+  return b;
+}
+
+export function adminRoutes({ cfg, store, automation, notifier, fetchImpl }) {
   const r = Router();
   const audit = (req, action, target, detail) => store.audit.insert({ at: now(), by: req.admin?.email || "system", action, target, detail: detail ?? null });
 
@@ -93,8 +107,8 @@ export function adminRoutes({ cfg, store, automation, notifier }) {
   // ---------- dashboard
   r.get("/dashboard", wrap(async (req, res) => {
     const [products, cats, enquiries, quotes, orders, invoices, payments, lv] = await Promise.all([store.products.all(), store.categories.all(), store.enquiries.all({ sort: { createdAt: -1 } }),
-      store.quotes.all(), store.orders.all(), store.invoices.all(), store.payments.all(), stockLevels(store)]);
-    const today = todayIST(), month = today.slice(0, 7), mine = (e) => !e.assignedTo || e.assignedTo === req.admin.id || req.admin.role === "owner";
+      store.quotes.all(), store.orders.all(), store.invoices.all(), store.payments.all(), stockBuckets(store)]);
+    const today = todayIST(), month = today.slice(0, 7), mine = (e) => !e.assignedTo || e.assignedTo === req.admin.id || isOwner(req.admin);
     const open = invoices.filter((i) => ["unpaid", "partial"].includes(i.status));
     const out = {
       products: products.length, active: products.filter((p) => p.active).length, withoutPrice: products.filter((p) => p.active && p.price == null).length,
@@ -103,13 +117,28 @@ export function adminRoutes({ cfg, store, automation, notifier }) {
       followUps: enquiries.filter((e) => e.followUpAt && e.followUpAt <= today && !["won", "closed"].includes(e.status) && mine(e)).slice(0, 10),
     };
     if (can(req.admin, "quotes")) Object.assign(out, { openQuotes: quotes.filter((q) => q.status === "sent").length, openQuoteValue: quotes.filter((q) => q.status === "sent").reduce((n, q) => n + q.totals.total, 0) });
-    if (can(req.admin, "orders")) Object.assign(out, { toDispatch: orders.filter((o) => ["confirmed", "packed"].includes(o.status)).length });
+    if (can(req.admin, "orders")) {
+      const queue = orders.filter((o) => ["confirmed", "packed"].includes(o.status)).sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
+      Object.assign(out, { toDispatch: queue.length, dispatchQueue: queue.slice(0, 10).map((o) => ({ id: o.id, number: o.number, customer: o.customer.name, status: o.status, createdAt: o.createdAt,
+        expectedDate: o.expectedDate || "", total: o.totals.total, paymentStatus: o.paymentStatus || "", reserved: reservesStock(o) })),
+        inTransit: orders.filter((o) => o.status === "dispatched").length });
+    }
     if (can(req.admin, "invoices")) Object.assign(out, {
       salesThisMonth: invoices.filter((i) => i.status !== "void" && i.date.startsWith(month)).reduce((n, i) => n + i.totals.total, 0),
       receivedThisMonth: payments.filter((p) => p.date.startsWith(month)).reduce((n, p) => n + p.amount, 0),
       outstanding: open.reduce((n, i) => n + balance(i), 0), overdue: open.filter((i) => i.dueDate < today).reduce((n, i) => n + balance(i), 0), overdueCount: open.filter((i) => i.dueDate < today).length,
+      aging: agingBuckets(open, today),
     });
-    if (can(req.admin, "stock")) out.lowStock = products.filter((p) => p.stockTracked && (lv[p.id] || 0) <= (p.reorderLevel || 0)).length;
+    if (can(req.admin, "stock")) {
+      const low = products.filter((p) => isLow(p, lv));
+      const expiring = batchLevels(await store.stockMoves.all(), today).filter((b) => b.daysToExpiry != null && b.daysToExpiry <= 60);
+      Object.assign(out, { lowStock: low.length, lowStockItems: low.slice(0, 10).map((p) => ({ id: p.id, sku: p.sku, name: p.name, unit: p.unit || "pcs", reorderLevel: p.reorderLevel || 0, ...lv[p.id] || { physical: 0, reserved: 0, available: 0 } })),
+        expiringBatches: expiring.length, expiringItems: expiring.slice(0, 10).map((b) => ({ ...b, name: products.find((p) => p.id === b.productId)?.name || "" })) });
+    }
+    if (can(req.admin, "automation")) {
+      out.outbox = (await store.outbox.all({ sort: { createdAt: -1 }, limit: 8 })).map(({ id, channel, to, event, ref, status, deliveryStatus, createdAt, error }) => ({ id, channel, to, event, ref, status, deliveryStatus: deliveryStatus || "", createdAt, error }));
+      out.inboxUnread = (await store.inbox.all()).filter((m) => !m.readAt).length;
+    }
     res.json(out);
   }));
 
@@ -278,7 +307,7 @@ export function adminRoutes({ cfg, store, automation, notifier }) {
   r.patch("/users/:id", requireOwner, wrap(async (req, res) => {
     const p = userPatch.safeParse(req.body); if (!p.success) return bad(res, p.error.issues[0]);
     const u = await store.admins.get(req.params.id); if (!u) return res.status(404).json({ error: "NOT_FOUND", message: "User not found" });
-    if (u.id === req.admin.id && (p.data.active === false || (p.data.role && p.data.role !== "owner"))) return bad(res, "You cannot lock yourself out");
+    if (u.id === req.admin.id && (p.data.active === false || (p.data.role && !FULL_CONTROL.includes(p.data.role)))) return bad(res, "You cannot lock yourself out");
     const patch = {};
     if (p.data.active !== undefined) patch.active = p.data.active;
     if (p.data.role) patch.role = p.data.role;
@@ -291,7 +320,7 @@ export function adminRoutes({ cfg, store, automation, notifier }) {
 
   r.get("/audit", requireOwner, wrap(async (_req, res) => res.json(await store.audit.all({ sort: { at: -1 }, limit: 300 }))));
 
-  const ctx = { cfg, store, audit, automation, notifier };
-  r.use(crmRoutes(ctx)); r.use(salesRoutes(ctx)); r.use(stockRoutes(ctx)); r.use(reportRoutes(ctx)); r.use(opsRoutes(ctx));
+  const ctx = { cfg, store, audit, automation, notifier, fetchImpl };
+  r.use(crmRoutes(ctx)); r.use(salesRoutes(ctx)); r.use(posRoutes(ctx)); r.use(logisticsRoutes(ctx)); r.use(whatsappAdminRoutes(ctx)); r.use(stockRoutes(ctx)); r.use(reportRoutes(ctx)); r.use(opsRoutes(ctx));
   return r;
 }

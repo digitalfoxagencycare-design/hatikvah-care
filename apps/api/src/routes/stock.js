@@ -1,24 +1,35 @@
 import { Router } from "express";
 import { nextNumber } from "../lib/gst.js";
 import { requirePerm } from "../lib/permissions.js";
-import { logActivity, moveStock, now, stockLevels, token } from "../lib/sales.js";
+import { batchLevels, bucketOf, isLow, logActivity, moveStock, now, stockBuckets, token } from "../lib/sales.js";
+import { measureLabel } from "../lib/units.js";
 import { purchaseInput, receiveInput, stockAdjustInput, supplierInput } from "../schemas.js";
 import { wrap } from "./public.js";
 import { bad, notFound, parse } from "./shared.js";
 
-/** Stock levels (from a ledger of movements), suppliers, purchase orders and goods received. */
+/**
+ * Stock levels (from a ledger of movements, in pieces), suppliers, purchase orders and goods received.
+ * Each product has physical stock, reserved stock (in open sales orders) and available = physical - reserved.
+ */
 export function stockRoutes({ store, audit }) {
   const r = Router();
   r.use(["/stock", "/suppliers", "/purchases"], requirePerm("stock"));
   const by = (req) => req.admin.email;
 
   r.get("/stock", wrap(async (_req, res) => {
-    const [lv, products, purchases] = await Promise.all([stockLevels(store), store.products.all({ sort: { order: 1 } }), store.purchases.all()]);
+    const [b, products, purchases] = await Promise.all([stockBuckets(store), store.products.all({ sort: { order: 1 } }), store.purchases.all()]);
     const onOrder = {};
     for (const po of purchases.filter((p) => ["sent", "partial"].includes(p.status))) for (const it of po.items) onOrder[it.productId] = (onOrder[it.productId] || 0) + Math.max(0, it.qty - (it.received || 0));
-    res.json(products.map((p) => ({ id: p.id, sku: p.sku, name: p.name, pack: p.pack, unit: p.unit || "pcs", category: p.category, stockTracked: !!p.stockTracked, qty: lv[p.id] || 0,
-      reorderLevel: p.reorderLevel || 0, reorderQty: p.reorderQty || 0, supplierId: p.supplierId || "", costPrice: p.costPrice ?? null, onOrder: onOrder[p.id] || 0,
-      low: !!p.stockTracked && (lv[p.id] || 0) <= (p.reorderLevel || 0) })));
+    res.json(products.map((p) => { const x = bucketOf(b, p.id); return { id: p.id, sku: p.sku, name: p.name, pack: p.pack || measureLabel(p.measure), unit: p.unit || "pcs", category: p.category, stockTracked: !!p.stockTracked,
+      qty: x.physical, physical: x.physical, reserved: x.reserved, available: x.available, batchTracked: !!p.batchTracked, packaging: p.packaging || null,
+      reorderLevel: p.reorderLevel || 0, reorderQty: p.reorderQty || 0, supplierId: p.supplierId || "", costPrice: p.costPrice ?? null, onOrder: onOrder[p.id] || 0, low: isLow(p, b) }; }));
+  }));
+  // Batch stock with expiry (FEFO), soonest expiry first. ?days=60 lists only batches expiring within 60 days (or already expired).
+  r.get("/stock/batches", wrap(async (req, res) => {
+    const [moves, products] = await Promise.all([store.stockMoves.all(), store.products.all()]);
+    const names = Object.fromEntries(products.map((p) => [p.id, { name: p.name, sku: p.sku }]));
+    const id = String(req.query.productId || ""), days = req.query.days != null ? Number(req.query.days) : null;
+    res.json(batchLevels(moves).filter((x) => (!id || x.productId === id) && (days == null || (x.daysToExpiry != null && x.daysToExpiry <= days))).map((x) => ({ ...x, ...names[x.productId] })));
   }));
   r.get("/stock/moves", wrap(async (req, res) => {
     const id = String(req.query.productId || "");
@@ -28,15 +39,16 @@ export function stockRoutes({ store, audit }) {
     const d = parse(stockAdjustInput, req.body, res); if (!d) return;
     const p = await store.products.get(d.productId); if (!p) return notFound(res, "Product");
     const qty = d.kind === "out" ? -Math.abs(d.qty) : d.kind === "in" ? Math.abs(d.qty) : d.qty;
+    if (p.batchTracked && qty > 0 && !d.batch) return bad(res, `${p.name} is batch tracked: enter the batch number and expiry`);
     if (!p.stockTracked) await store.products.update(p.id, { stockTracked: true });
-    const m = await moveStock(store, { productId: p.id, sku: p.sku, qty, kind: d.kind, note: d.note, ref: "manual", by: by(req) });
+    const m = await moveStock(store, { productId: p.id, sku: p.sku, qty, kind: d.kind, note: d.note, ref: "manual", by: by(req), batch: d.batch || null });
     await audit(req, "stock.adjust", p.sku, { qty, note: d.note }); res.status(201).json(m);
   }));
   r.patch("/stock/:productId", wrap(async (req, res) => {
     const p = await store.products.get(req.params.productId); if (!p) return notFound(res, "Product");
-    const allow = ["stockTracked", "reorderLevel", "reorderQty", "supplierId", "costPrice"], patch = {};
+    const allow = ["stockTracked", "batchTracked", "reorderLevel", "reorderQty", "supplierId", "costPrice"], patch = {};
     for (const k of allow) if (k in (req.body || {})) patch[k] = req.body[k];
-    if ("stockTracked" in patch && typeof patch.stockTracked !== "boolean") return bad(res, "stockTracked must be true or false");
+    for (const k of ["stockTracked", "batchTracked"]) if (k in patch && typeof patch[k] !== "boolean") return bad(res, `${k} must be true or false`);
     for (const k of ["reorderLevel", "reorderQty"]) if (k in patch && !(Number.isFinite(patch[k]) && patch[k] >= 0 && patch[k] <= 10_000_000)) return bad(res, `${k} must be a number`);
     if ("costPrice" in patch && patch.costPrice !== null && !(Number.isInteger(patch.costPrice) && patch.costPrice >= 0)) return bad(res, "costPrice must be paise or null");
     if ("supplierId" in patch && patch.supplierId && !(await store.suppliers.get(String(patch.supplierId)))) return bad(res, "Unknown supplier");
@@ -102,7 +114,7 @@ export function stockRoutes({ store, audit }) {
     const upd = await store.purchases.update(po.id, { ...b, updatedAt: now() }); await audit(req, "purchase.update", po.number); res.json(upd);
   }));
   r.post("/purchases/from-low-stock", wrap(async (req, res) => {
-    const lv = await stockLevels(store), groups = {}, skipped = [];
+    const b = await stockBuckets(store), lv = Object.fromEntries(Object.entries(b).map(([id, x]) => [id, x.available])), groups = {}, skipped = [];
     const open = new Set((await store.purchases.all()).filter((p) => ["draft", "sent", "partial"].includes(p.status)).flatMap((p) => p.items.map((i) => i.productId)));
     for (const p of await store.products.all()) {
       if (!p.stockTracked || (lv[p.id] || 0) > (p.reorderLevel || 0) || open.has(p.id)) continue;
@@ -151,12 +163,16 @@ export function stockRoutes({ store, audit }) {
     if (!["sent", "partial", "draft"].includes(po.status)) return bad(res, `A ${po.status} purchase order cannot be received`, 409);
     const d = parse(receiveInput, req.body, res); if (!d) return;
     const items = po.items.map((i) => ({ ...i }));
+    for (const l of d.lines) { // check every line before any stock moves
+      const p = await store.products.get(l.productId);
+      if (p?.batchTracked && !l.batch) return bad(res, `${p.name} is batch tracked: enter the batch number and expiry`);
+    }
     for (const l of d.lines) {
       const it = items.find((i) => i.productId === l.productId); if (!it) return bad(res, "That product is not on this purchase order");
       it.received = (it.received || 0) + l.qty;
       const p = await store.products.get(it.productId);
       if (p && !p.stockTracked) await store.products.update(p.id, { stockTracked: true });
-      await moveStock(store, { productId: it.productId, sku: it.sku, qty: l.qty, kind: "in", ref: po.number, note: "Goods received", by: by(req) });
+      await moveStock(store, { productId: it.productId, sku: it.sku, qty: l.qty, kind: "in", ref: po.number, note: "Goods received", by: by(req), batch: l.batch || null });
     }
     const full = items.every((i) => (i.received || 0) >= i.qty);
     const upd = await store.purchases.update(po.id, { items, status: full ? "received" : "partial", ...(full ? { receivedAt: now() } : {}), updatedAt: now() });

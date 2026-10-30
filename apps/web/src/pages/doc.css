@@ -434,3 +434,16 @@
     display: none !important;
   }
 }
+
+/* Packing slip and gate pass */
+.slip .slip-head { display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: start; }
+.slip h1 { text-align: center; letter-spacing: .12em; font-size: 1.2rem; margin: 12px 0; }
+.slip h2 { margin: 0; font-size: 1.05rem; }
+.slip-qr svg { width: 110px; height: 110px; display: block; }
+.slip table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+.slip th, .slip td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; vertical-align: top; }
+.slip-meta th { width: 16%; background: #f8fafc; font-weight: 600; }
+.slip-items thead th, .slip-items tfoot td { background: #f8fafc; font-weight: 600; }
+.slip .num { text-align: right; }
+.slip-sign { display: flex; justify-content: space-between; gap: 16px; margin-top: 56px; }
+.slip-sign span { flex: 1; border-top: 1px solid #94a3b8; padding-top: 6px; text-align: center; font-size: .8rem; color: #475569; }

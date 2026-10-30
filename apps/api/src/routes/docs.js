@@ -3,7 +3,7 @@ import express, { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { amountInWords, stateName } from "../lib/gst.js";
 import { verifyWebhook } from "../lib/razorpay.js";
-import { balance, invoiceWebsiteOrder, logActivity, now, recordPayment } from "../lib/sales.js";
+import { balance, createInvoice, createOrderFromQuote, deductForInvoice, invoiceWebsiteOrder, logActivity, now, recordPayment } from "../lib/sales.js";
 import { getSettings } from "../model.js";
 import { wrap } from "./public.js";
 
@@ -16,13 +16,14 @@ export function docRoutes({ cfg, store, automation }) {
   const limiter = rateLimit({ windowMs: 15 * 60_000, limit: 120, standardHeaders: true, legacyHeaders: false });
   const find = async (kind, t) => {
     if (!/^[\w-]{20,40}$/.test(t)) return null;
-    const col = { quote: store.quotes, invoice: store.invoices, challan: store.orders }[kind];
+    // packing slip and gate pass are print views of the delivery challan
+    const col = { quote: store.quotes, invoice: store.invoices, challan: store.orders, packing: store.orders, gatepass: store.orders }[kind];
     return col ? col.findBy("token", t) : null;
   };
 
   r.get("/api/public/doc/:kind/:token", limiter, wrap(async (req, res) => {
     const d = await find(req.params.kind, req.params.token);
-    if (!d || (req.params.kind === "challan" && !d.challanNumber)) return res.status(404).json({ error: "NOT_FOUND", message: "This document link is not valid" });
+    if (!d || (["challan", "packing", "gatepass"].includes(req.params.kind) && !d.challanNumber)) return res.status(404).json({ error: "NOT_FOUND", message: "This document link is not valid" });
     res.set({ "Cache-Control": "no-store", "X-Robots-Tag": "noindex" });
     const extra = req.params.kind === "invoice" ? { balance: balance(d), amountInWords: amountInWords(d.totals.total) } : req.params.kind === "quote" ? { amountInWords: amountInWords(d.totals.total) } : {};
     res.json({ kind: req.params.kind, doc: { ...strip(d), ...extra }, company: company(await getSettings(store)) });
@@ -49,6 +50,8 @@ export function docRoutes({ cfg, store, automation }) {
     const link = ev.payload?.payment_link?.entity, pay = ev.payload?.payment?.entity;
     if (pay?.id && (await store.payments.all()).some((p) => p.external === pay.id)) return res.json({ ok: true, duplicate: true }); // Razorpay retries webhooks
     let inv = link?.notes?.invoiceId ? await store.invoices.get(String(link.notes.invoiceId)) : null;
+    const quote = !inv && link?.notes?.quoteId ? await store.quotes.get(String(link.notes.quoteId)) : null;
+    if (quote && pay?.id) inv = await invoicePaidQuote(quote, pay.id);
     const order = !inv && link?.notes?.orderId ? await store.orders.get(String(link.notes.orderId)) : null;
     if (order && pay?.id) { // website checkout: the GST invoice is raised now that the money is in
       const fresh = !order.invoiceId;
@@ -62,6 +65,24 @@ export function docRoutes({ cfg, store, automation }) {
     if (amount > 0) { const out = await recordPayment(store, inv, { amount, mode: "razorpay", reference: pay.id, by: "razorpay", external: pay.id }); await automation.on.paymentReceived(out.invoice, out.payment); }
     res.json({ ok: true });
   }));
+
+  /** A quote paid by its payment link: accept it, raise the sales order and the GST invoice (stock leaves the warehouse), once. */
+  async function invoicePaidQuote(q, payId) {
+    if (q.invoiceId) return store.invoices.get(q.invoiceId);
+    if (!["accepted", "converted"].includes(q.status)) q = await store.quotes.update(q.id, { status: "accepted", acceptedAt: now(), customerResponse: { name: q.customer.name, note: "Paid online", at: now() }, updatedAt: now() });
+    const order = q.orderId ? await store.orders.get(q.orderId) : await createOrderFromQuote(store, q, "razorpay");
+    if (order.invoiceId) return store.invoices.get(order.invoiceId);
+    const customer = { ...(await store.customers.get(q.customerId)), id: q.customerId, paymentTermsDays: 0 };
+    const inv = await createInvoice(store, { customer, items: order.items.map(({ amount, tax, total, ...l }) => l), placeOfSupply: order.placeOfSupply, notes: order.notes,
+      orderId: order.id, orderNumber: order.number, by: "razorpay" });
+    await deductForInvoice(store, inv, "razorpay");
+    await store.orders.update(order.id, { paymentStatus: "paid", updatedAt: now() });
+    await store.quotes.update(q.id, { invoiceId: inv.id, invoiceNumber: inv.number, updatedAt: now() });
+    if (q.enquiryId) await store.enquiries.update(q.enquiryId, { status: "won" });
+    await logActivity(store, { entity: "quote", entityId: q.id, text: `Paid online (${payId}); order ${order.number}, invoice ${inv.number}`, by: "razorpay" });
+    await automation.on.invoiceCreated(inv);
+    return inv;
+  }
 
   // External scheduler (Cloud Scheduler / cron-job.org): POST with header X-Cron-Secret.
   r.post("/api/internal/cron", wrap(async (req, res) => {

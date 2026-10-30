@@ -5,7 +5,7 @@ import { Loader, useLoad } from "./hooks.jsx";
 export default function Team() {
   const s = useLoad("/api/admin/users");
   const [n, setN] = useState({ name: "", email: "", role: "sales", password: "", phone: "", receivesLeads: false });
-  const roles = ["owner", "manager", "sales", "accounts", "warehouse", "staff"];
+  const roles = ["owner", "admin", "manager", "billing_executive", "warehouse_manager", "sales_representative", "sales", "accounts", "warehouse", "staff"];
   const [msg, setMsg] = useState(null);
   const act = async (fn) => { setMsg(null); try { await fn(); s.reload(); } catch (e) { setMsg(e.message); } };
   return (

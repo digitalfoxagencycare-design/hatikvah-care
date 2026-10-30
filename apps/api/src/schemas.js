@@ -33,6 +33,8 @@ export const lineInput = z.object({
   productId: id.default(""), sku: text(30).default(""), name: text(200).min(1), hsn: z.string().trim().regex(/^\d{0,8}$/, "HSN code: up to 8 digits").default(""),
   unit: text(20).default("pcs"), qty: z.number().positive().max(10_000_000), rate: paise, discountPct: z.number().min(0).max(100).default(0),
   gstRate: z.number().refine((v) => GST_RATES.includes(v), "GST rate must be 0, 5, 12, 18 or 28").default(18),
+  // Ordered by the piece, box or carton; perUnit (pieces per ordered unit) is fixed from the product on the server.
+  uom: z.enum(["piece", "box", "carton"]).default("piece"), perUnit: z.number().int().min(1).max(10_000_000).default(1),
 }).strict();
 const lines = z.array(lineInput).min(1, "Add at least one item").max(150);
 
@@ -46,6 +48,9 @@ export const orderInput = z.object({
 }).strict();
 export const dispatchInput = z.object({
   transporter: text(100).default(""), trackingNo: text(100).default(""), vehicleNo: text(30).default(""), date: optDate, notes: text(500).default(""),
+  // "shadowfax" books the courier pickup as soon as the challan is made (live tracking link goes to the customer)
+  courier: z.enum(["", "shadowfax"]).default(""), dropPincode: z.union([z.literal(""), z.string().regex(/^\d{6}$/, "PIN code is 6 digits")]).default(""),
+  weightKg: z.number().positive().max(1000).default(1), packages: z.number().int().min(1).max(500).default(1),
 }).strict();
 
 export const invoiceInput = z.object({
@@ -57,8 +62,11 @@ export const paymentInput = z.object({
   reference: text(100).default(""), notes: text(500).default(""),
 }).strict();
 
+export const batchInput = z.object({ batchNumber: text(40).min(1, "Enter the batch number"), mfgDate: optDate, expDate: optDate }).strict()
+  .refine((b) => !b.mfgDate || !b.expDate || b.mfgDate < b.expDate, "Expiry must be after the manufacturing date");
 export const stockAdjustInput = z.object({
   productId: id.min(1), qty: z.number().refine((v) => v !== 0 && Math.abs(v) <= 10_000_000, "Quantity cannot be zero"), kind: z.enum(["in", "out", "adjust"]).default("adjust"), note: text(300).default(""),
+  batch: batchInput.optional(),
 }).strict();
 
 export const supplierInput = z.object({
@@ -69,7 +77,19 @@ export const purchaseInput = z.object({
   supplierId: id.min(1, "Choose a supplier"), expectedDate: optDate, notes: text(1000).default(""), billNumber: text(80).default(""), receiveNow: z.boolean().default(false),
   items: z.array(z.object({ productId: id.min(1), qty: z.number().positive().max(10_000_000), rate: paise.default(0) }).strict()).min(1, "Add at least one item").max(150),
 }).strict();
-export const receiveInput = z.object({ lines: z.array(z.object({ productId: id.min(1), qty: z.number().positive().max(10_000_000) }).strict()).min(1) }).strict();
+export const receiveInput = z.object({ lines: z.array(z.object({ productId: id.min(1), qty: z.number().positive().max(10_000_000), batch: batchInput.optional() }).strict()).min(1) }).strict();
+
+/** Counter sale: invoice and (optionally) payment in one step. No customer = walk-in, found or created by phone. */
+export const posInput = z.object({
+  customerId: id.default(""), walkIn: z.object({ name: text(160).min(2), phone, gstin, stateCode }).strict().optional(),
+  items: lines, placeOfSupply: stateCode, notes: text(500).default(""),
+  payment: z.object({ mode: z.enum(["cash", "upi", "card", "bank", "cheque"]), reference: text(100).default(""), amount: paise.optional() }).strict().nullable().default(null),
+}).strict().refine((d) => d.customerId || d.walkIn, "Choose a customer or enter the walk-in buyer's name");
+
+export const shipmentInput = z.object({
+  pickupPincode: z.string().regex(/^\d{6}$/, "PIN code is 6 digits").optional(), dropPincode: z.string().regex(/^\d{6}$/, "PIN code is 6 digits"),
+  weightKg: z.number().positive().max(1000).default(1), packages: z.number().int().min(1).max(500).default(1),
+}).strict();
 
 const imageRef = z.union([z.literal(""), z.string().max(200).regex(/^(\/catalog\/[\w.-]+\.(jpe?g|png|webp)|\/brand\/[\w.-]+\.(jpe?g|png|webp)|\/media\/[0-9a-f-]{36})$/, "Choose an uploaded image")]);
 export const homeInput = z.object({

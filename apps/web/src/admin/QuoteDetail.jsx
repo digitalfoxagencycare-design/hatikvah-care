@@ -77,6 +77,8 @@ export default function QuoteDetail() {
             {["draft", "sent", "expired"].includes(q.status) && <button className="btn ghost" onClick={() => act("status", { status: "rejected" }, "Marked rejected")}>Mark rejected</button>}
             {can(me, "invoices") && !q.invoiceId && ["draft", "sent", "accepted"].includes(q.status) && <button className="btn" onClick={() => run(async () => { const inv = await api(`/api/admin/quotes/${id}/invoice`, { method: "POST" }); nav(`/admin/invoices/${inv.id}`); })}>Create Tax Invoice</button>}
             {q.invoiceId && <Link className="btn" to={`/admin/invoices/${q.invoiceId}`}>Open Tax Invoice</Link>}
+            {!q.invoiceId && ["draft", "sent", "accepted"].includes(q.status) && <button className="btn ghost" onClick={() => act("paylink", undefined, "Payment link ready ✓ Paying it confirms the order and raises the invoice.")}>{q.payLink ? "New payment link" : "Razorpay payment link"}</button>}
+            {q.payLink?.url && !q.invoiceId && <a className="btn ghost" href={q.payLink.url} target="_blank" rel="noopener noreferrer">Open pay link ↗</a>}
             {can(me, "orders") && !q.orderId && !q.invoiceId && ["draft", "sent", "accepted"].includes(q.status) && <button className="btn ghost" onClick={() => run(async () => { const o = await api(`/api/admin/quotes/${id}/order`, { method: "POST" }); nav(`/admin/orders/${o.id}`); })}>Sales order</button>}
             {q.orderId && <Link className="btn ghost" to={`/admin/orders/${q.orderId}`}>Open sales order</Link>}
             <button className="btn ghost" onClick={() => run(async () => { const n = await api(`/api/admin/quotes/${id}/duplicate`, { method: "POST" }); nav(`/admin/quotes/${n.id}`); })}>Duplicate</button>

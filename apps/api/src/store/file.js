@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
 
-const COLLECTIONS = ["products", "categories", "enquiries", "admins", "audit", "settings", "customers", "activities", "priceLists", "quotes", "orders", "invoices", "payments", "stockMoves", "suppliers", "purchases", "outbox", "otps"];
+const COLLECTIONS = ["products", "categories", "enquiries", "admins", "audit", "settings", "customers", "activities", "priceLists", "quotes", "orders", "invoices", "payments", "stockMoves", "suppliers", "purchases", "outbox", "otps", "ledger", "inbox"];
 
 /** Development / test store: one JSON file per collection, written atomically. Same interface as the Mongo store. */
 export async function createFileStore(dir) {

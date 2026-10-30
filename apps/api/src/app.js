@@ -9,6 +9,8 @@ import { mediaRoute, publicRoutes } from "./routes/public.js";
 import { seoRoutes } from "./routes/seo.js";
 import { docRoutes } from "./routes/docs.js";
 import { shopRoutes } from "./routes/shop.js";
+import { whatsappWebhook } from "./routes/whatsapp.js";
+import { logisticsWebhook } from "./routes/logistics.js";
 import { createAutomation } from "./lib/automation.js";
 import { createNotifier } from "./lib/notify.js";
 
@@ -34,6 +36,8 @@ export function createApp({ cfg, store, log = console, fetchImpl }) {
   app.use(cookieParser());
   app.use("/api", rateLimit({ windowMs: 60_000, limit: 600, standardHeaders: true, legacyHeaders: false }));
   app.use(docRoutes({ cfg, store, automation })); // before the JSON parser: the payment webhook needs the raw body to check its signature
+  app.use(whatsappWebhook({ cfg, store, automation, notifier, log })); // same: Meta signs the raw body
+  app.use(logisticsWebhook({ cfg, store, automation, log }));
   app.use(express.json({ limit: "100kb" }));
 
   app.get("/api/health", async (_req, res) => {
@@ -41,7 +45,7 @@ export function createApp({ cfg, store, log = console, fetchImpl }) {
   });
   app.use("/api/public", publicRoutes({ cfg, store, automation }));
   app.use("/api/shop", shopRoutes({ cfg, store, automation, notifier, ...(fetchImpl ? { fetchImpl } : {}) }));
-  app.use("/api/admin", adminRoutes({ cfg, store, automation, notifier }));
+  app.use("/api/admin", adminRoutes({ cfg, store, automation, notifier, ...(fetchImpl ? { fetchImpl } : {}) }));
   app.use("/media", mediaRoute({ store }));
   app.use(seoRoutes({ cfg, store }));
   app.use("/api", (_req, res) => res.status(404).json({ error: "NOT_FOUND", message: "Unknown endpoint" }));
@@ -58,6 +62,7 @@ export function createApp({ cfg, store, log = console, fetchImpl }) {
 
   app.use((err, _req, res, _next) => {
     if (err?.type === "entity.too.large") return res.status(413).json({ error: "TOO_LARGE", message: "That upload is too large" });
+    if (err?.userError) return res.status(err.status || 400).json({ error: "INVALID", message: err.message });
     if (err instanceof SyntaxError && "body" in err) return res.status(400).json({ error: "BAD_JSON", message: "Request was not valid JSON" });
     log.error?.("Unhandled error", err);
     res.status(500).json({ error: "SERVER_ERROR", message: "Something went wrong on our side. Please try again." });

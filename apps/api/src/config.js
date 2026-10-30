@@ -27,6 +27,12 @@ export function loadConfig(env = process.env) {
     resendKey: env.RESEND_API_KEY || "", mailFrom: env.MAIL_FROM || "", mailReplyTo: env.MAIL_REPLY_TO || "",
     waToken: env.WHATSAPP_TOKEN || "", waPhoneId: env.WHATSAPP_PHONE_ID || "", waTemplate: env.WHATSAPP_TEMPLATE || "", waTemplateLang: env.WHATSAPP_TEMPLATE_LANG || "en",
     waOtpTemplate: env.WHATSAPP_OTP_TEMPLATE || "", // an approved "Authentication" template; the login code is its only variable
+    // Inbound webhook (Meta app > WhatsApp > Configuration): GET verification token, and the app secret that signs every POST (X-Hub-Signature-256).
+    waVerifyToken: env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || "", waAppSecret: env.WHATSAPP_APP_SECRET || "", waBusinessId: env.WHATSAPP_BUSINESS_ACCOUNT_ID || "",
+    waApiVersion: env.WHATSAPP_API_VERSION || "v21.0",
+    // Shadowfax (logistics): API token from the Shadowfax client dashboard; webhook calls must carry X-Shadowfax-Token = SHADOWFAX_WEBHOOK_TOKEN.
+    sfxToken: env.SHADOWFAX_API_TOKEN || "", sfxBaseUrl: (env.SHADOWFAX_BASE_URL || "https://dale.shadowfax.in").replace(/\/$/, ""), sfxWebhookToken: env.SHADOWFAX_WEBHOOK_TOKEN || "",
+    sfxPickupPincode: env.SHADOWFAX_PICKUP_PINCODE || "", sfxTrackingUrl: env.SHADOWFAX_TRACKING_URL || "", // e.g. https://tracker.shadowfax.in/#/track/{awb}
     // Nova (central engine): login codes go out on Nova's WhatsApp number through its client API. Key issued in the Nova console.
     novaUrl: (env.NOVA_URL || "").replace(/\/$/, ""), novaKey: env.NOVA_CLIENT_KEY || "", novaSlug: env.NOVA_TENANT_SLUG || "",
     razorpayKeyId: env.RAZORPAY_KEY_ID || "", razorpaySecret: env.RAZORPAY_KEY_SECRET || "", razorpayWebhookSecret: env.RAZORPAY_WEBHOOK_SECRET || "",
@@ -38,6 +44,9 @@ export function loadConfig(env = process.env) {
   if (prod && /dev-only|change-me|replace/i.test(cfg.jwtSecret)) problems.push("JWT_SECRET looks like a placeholder");
   if (cfg.novaUrl && !/^https:\/\//.test(cfg.novaUrl) && prod) problems.push("NOVA_URL must start with https://");
   if (!!cfg.novaUrl !== !!cfg.novaKey) problems.push("Set both NOVA_URL and NOVA_CLIENT_KEY, or neither");
+  if (prod && cfg.waVerifyToken && !cfg.waAppSecret) problems.push("WHATSAPP_APP_SECRET is required with WHATSAPP_WEBHOOK_VERIFY_TOKEN (it proves webhook calls come from Meta)");
+  if (cfg.waVerifyToken && cfg.waVerifyToken.length < 16) problems.push("WHATSAPP_WEBHOOK_VERIFY_TOKEN must be at least 16 characters");
+  if (cfg.sfxWebhookToken && cfg.sfxWebhookToken.length < 24) problems.push("SHADOWFAX_WEBHOOK_TOKEN must be at least 24 characters");
   if (cfg.cronSecret && cfg.cronSecret.length < 24) problems.push("CRON_SECRET must be at least 24 characters");
   if (problems.length) throw new Error("Unsafe configuration: " + problems.join("; "));
   return cfg;
