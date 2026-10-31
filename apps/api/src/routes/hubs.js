@@ -70,7 +70,13 @@ export function hubRoutes({ cfg, store, audit }) {
 
   const walletRow = () => store.settings.findBy("key", "courierWallet");
   r.get("/hubs/logistics", requirePerm("orders"), wrap(async (_req, res) => {
-    const [orders, thumbs, saved] = await Promise.all([store.orders.all({ sort: { createdAt: -1 } }), images(), walletRow()]);
+    let [orders, thumbs, saved] = await Promise.all([store.orders.all({ sort: { createdAt: -1 } }), images(), walletRow()]);
+    if (!saved?.wallets?.shadowfax) {
+      const wallets = { ...(saved?.wallets || {}), shadowfax: { balance: 100000, lowAt: 20000, updatedAt: now(), updatedBy: "system" } };
+      if (saved) await store.settings.update(saved.id, { wallets, updatedAt: now() });
+      else await store.settings.insert({ key: "courierWallet", wallets, updatedAt: now() });
+      saved = { wallets };
+    }
     const card = (o) => ({ id: o.id, number: o.number, token: o.token, customer: o.customer.name, address: o.customer.shippingAddress || o.customer.billingAddress || "", status: o.status, challanNumber: o.challanNumber || "",
       weightKg: o.shipment?.weightKg ?? null, items: o.items.slice(0, 4).map((i) => ({ name: i.name, qty: i.qty, image: thumbs[i.productId] || "" })), more: Math.max(0, o.items.length - 4), shipment: o.shipment || null });
     const live = orders.filter(LIVE), at = (...statuses) => live.filter((o) => statuses.includes(o.shipment.status)).slice(0, 20).map(card);

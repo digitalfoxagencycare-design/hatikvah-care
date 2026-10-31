@@ -38,6 +38,31 @@ function deliveryFor(cfg, company, order, d, label) {
   return { customer, pickupPincode, dropPincode };
 }
 
+/** Helper to get or initialize tenant delivery wallet (starting with client's 1000 INR recharge if unset) */
+export async function getDeliveryWallet(store, provider = "shadowfax") {
+  const row = await store.settings.findBy("key", "courierWallet");
+  const wallets = row?.wallets || {};
+  if (!wallets[provider]) {
+    // Default initial balance for client: 1000 INR (100000 paise)
+    wallets[provider] = { balance: 100000, lowAt: 20000, history: [{ amount: 100000, type: "credit", reason: "Initial client deposit", at: now() }] };
+    if (row) await store.settings.update(row.id, { wallets, updatedAt: now() });
+    else await store.settings.insert({ key: "courierWallet", wallets, updatedAt: now() });
+  }
+  return { row, wallet: wallets[provider], wallets };
+}
+
+/** Deducts delivery charge from the tenant's wallet ledger */
+export async function deductDeliveryWallet(store, provider, amountPaise, orderNumber, by) {
+  if (!amountPaise || amountPaise <= 0) return null;
+  const { row, wallet, wallets } = await getDeliveryWallet(store, provider);
+  const newBalance = Math.max(0, (wallet.balance || 0) - amountPaise);
+  const history = [{ amount: amountPaise, type: "debit", orderNumber, reason: `Shipping charge for ${orderNumber}`, at: now(), by }, ...(wallet.history || []).slice(0, 99)];
+  const updated = { ...wallets, [provider]: { ...wallet, balance: newBalance, history, updatedAt: now(), updatedBy: by } };
+  if (row) await store.settings.update(row.id, { wallets: updated, updatedAt: now() });
+  else await store.settings.insert({ key: "courierWallet", wallets: updated, updatedAt: now() });
+  return newBalance;
+}
+
 /** Books a courier pickup for a dispatched order and keeps the AWB / tracking link on it. Shared by dispatch and the Book Courier Pickup modal. */
 export async function bookShipment({ cfg, store, fetchImpl }, order, d, by) {
   const courier = COURIERS[d.provider || "shadowfax"];
@@ -45,6 +70,13 @@ export async function bookShipment({ cfg, store, fetchImpl }, order, d, by) {
   const { customer, pickupPincode, dropPincode } = deliveryFor(cfg, company, order, d, courier.label);
   const dimensions = d.lengthCm && d.breadthCm && d.heightCm ? { lengthCm: d.lengthCm, breadthCm: d.breadthCm, heightCm: d.heightCm } : null;
   const pickupSlot = d.pickupDate ? { date: d.pickupDate, window: d.pickupWindow } : null, weightKg = d.weightKg || 1, packages = d.packages || 1;
+
+  // Check tenant wallet balance before booking
+  const { wallet } = await getDeliveryWallet(store, d.provider || "shadowfax");
+  if ((wallet.balance || 0) <= 0) {
+    throw Object.assign(new Error(`Insufficient delivery wallet balance (₹${((wallet.balance || 0) / 100).toFixed(2)}). Please recharge your shipping wallet before dispatching.`), { userError: true, status: 402 });
+  }
+
   const claim=crypto.randomUUID();
   order=await store.atomic(async()=>{
     const fresh=await store.orders.get(order.id);
@@ -58,8 +90,13 @@ export async function bookShipment({ cfg, store, fetchImpl }, order, d, by) {
   } catch(e) {
     await store.orders.update(order.id,{shipmentBooking:{claim,status:e.status>=400&&e.status<500&&!([408,429].includes(e.status))?'failed':'reconcile',at:now(),reason:'Confirm provider booking outcome before retry'}});throw e;
   }
-  const upd = await store.orders.update(order.id, { shipment: { ...shipment, weightKg, packages, pickupSlot, dimensions }, shipmentBooking:{claim,status:'booked',at:now()}, dispatch: { ...(order.dispatch || {}), transporter: courier.label, trackingNo: shipment.awb || order.dispatch?.trackingNo || "" }, updatedAt: now() });
-  await logActivity(store, { entity: "order", entityId: order.id, text: `${courier.label} pickup booked${shipment.awb ? ` (AWB ${shipment.awb})` : ""}${pickupSlot ? ` for ${pickupSlot.date} ${pickupSlot.window}` : ""}`, by });
+
+  // Deduct from tenant wallet if charge is known or estimated (fallback base 65 INR if provider doesn't return immediate charge)
+  const chargeToDeduct = shipment.chargePaise || 6500;
+  await deductDeliveryWallet(store, d.provider || "shadowfax", chargeToDeduct, order.number, by);
+
+  const upd = await store.orders.update(order.id, { shipment: { ...shipment, chargePaise: shipment.chargePaise ?? null, weightKg, packages, pickupSlot, dimensions }, shipmentBooking:{claim,status:'booked',at:now()}, dispatch: { ...(order.dispatch || {}), transporter: courier.label, trackingNo: shipment.awb || order.dispatch?.trackingNo || "" }, updatedAt: now() });
+  await logActivity(store, { entity: "order", entityId: order.id, text: `${courier.label} pickup booked${shipment.awb ? ` (AWB ${shipment.awb})` : ""}${pickupSlot ? ` for ${pickupSlot.date} ${pickupSlot.window}` : ""} (Wallet deducted: ₹${(chargeToDeduct/100).toFixed(2)})`, by });
   return upd;
 }
 
@@ -84,7 +121,31 @@ export function logisticsRoutes({ cfg, store, audit, automation, fetchImpl }) {
     const o = await store.orders.get(req.params.id); if (!o) return notFound(res, "Order");
     const ids = [...new Set(o.items.map((i) => i.productId).filter(Boolean))];
     const byId = Object.fromEntries((await Promise.all(ids.map((id) => store.products.get(id)))).filter(Boolean).map((p) => [p.id, p]));
-    res.json({ weightKg: estimateWeightKg(o.items, byId), pieces: o.items.reduce((n, i) => n + pieces(i), 0) });
+    const weightKg = estimateWeightKg(o.items, byId);
+    const piecesCount = o.items.reduce((n, i) => n + pieces(i), 0);
+    const { wallet } = await getDeliveryWallet(store, "shadowfax");
+    
+    // Check serviceability and base rate if customer pincode exists
+    const dropPin = pincodeOf(o.customer?.shippingAddress || o.customer?.billingAddress);
+    const pickupPin = cfg.sfxPickupPincode || pincodeOf((await getSettings(store)).address);
+    let serviceable = true, estimatedChargePaise = 6500; // default base charge: 65 INR
+    if (dropPin && pickupPin && /^\d{6}$/.test(dropPin) && /^\d{6}$/.test(pickupPin) && shadowfaxOn(cfg)) {
+      try {
+        const sfx = await checkServiceability(cfg, { pickup: pickupPin, drop: dropPin }, fetchImpl ? { fetchImpl } : {});
+        serviceable = !!sfx.serviceable;
+      } catch (_) {}
+    }
+
+    res.json({
+      weightKg,
+      pieces: piecesCount,
+      estimatedChargePaise,
+      walletBalancePaise: wallet?.balance || 0,
+      sufficientBalance: (wallet?.balance || 0) >= estimatedChargePaise,
+      serviceable,
+      dropPincode: dropPin,
+      pickupPincode: pickupPin,
+    });
   }));
   /** Staff copy a charge from the Shadowfax statement when the API did not report one. */
   r.put("/orders/:id/shipment/charge", requirePerm("orders"), wrap(async (req, res) => {
