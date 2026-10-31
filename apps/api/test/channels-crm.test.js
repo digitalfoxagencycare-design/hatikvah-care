@@ -5,7 +5,8 @@ import { stockBuckets } from "../src/lib/sales.js";
 import { channelSplit, paymentVia } from "../src/routes/hubs.js";
 import { estimateWeightKg } from "../src/routes/logistics.js";
 import { conversationList } from "../src/routes/whatsapp.js";
-import { boot, login } from "./helpers.js";
+import { hashPassword } from "../src/auth.js";
+import { boot, login, PW } from "./helpers.js";
 
 const SFX_HOOK = "s".repeat(24);
 const courier = { fail: 0, status: 200, bodies: [] };
@@ -159,6 +160,29 @@ describe("Razorpay hub", () => {
 });
 
 describe("WhatsApp conversations", () => {
+  it("sends a document only to the number on that document", async () => {
+    const o = await order("+91 90000 14141");
+    const quote = (await owner.post("/api/admin/quotes", { customerId: o.customerId, items: [line()], notes: "", placeOfSupply: "36" })).data;
+    const sent = await owner.post("/api/admin/whatsapp/threads/19000014141/template", { kind: "quote", docId: quote.id });
+    assert.equal(sent.status, 201, JSON.stringify(sent.data));
+    assert.equal(sent.data.to, "919000014141", "a look-alike number with another country code gets nothing");
+  });
+  it("shows a role only the documents it may see", async () => {
+    const o = await order("+91 90000 15151");
+    const quote = (await owner.post("/api/admin/quotes", { customerId: o.customerId, items: [line()], notes: "", placeOfSupply: "36" })).data;
+    const inv = (await owner.post(`/api/admin/orders/${o.id}/invoice`, {})).data;
+    await t.store.outbox.insert({ channel: "whatsapp", to: "919000015151", body: "Pay here https://x.test/doc/invoice/secrettoken", event: "invoiceSend", ref: inv.number, status: "sent", manualLink: "https://wa.me/x?text=secrettoken", createdAt: new Date().toISOString() });
+    await t.store.admins.insert({ email: "rep@example.com", name: "Rep", role: "sales_representative", passwordHash: await hashPassword(PW), active: true, tokenVersion: 0, createdAt: "x" });
+    const rep = await login(t.base, "rep@example.com");
+    const thread = (await rep.get("/api/admin/whatsapp/threads/9000015151")).data;
+    assert.deepEqual([thread.docs.invoice, thread.docs.dispatch], [[], []]);
+    assert.equal(thread.docs.quote[0].id, quote.id);
+    assert.doesNotMatch(JSON.stringify(thread), /secrettoken/);
+    assert.doesNotMatch(JSON.stringify((await rep.get("/api/admin/hubs/whatsapp")).data), /secrettoken/);
+    assert.equal((await rep.post("/api/admin/whatsapp/threads/9000015151/template", { kind: "invoice", docId: inv.id })).status, 403);
+    assert.equal((await rep.post("/api/admin/whatsapp/threads/9000015151/template", { kind: "quote", docId: quote.id })).status, 201);
+    assert.match(JSON.stringify((await owner.get("/api/admin/whatsapp/threads/9000015151")).data), /secrettoken/);
+  });
   it("shows both directions, sends a template outside the window, and refuses someone else's document", async () => {
     const o = await order("+91 90000 12121");
     const quote = (await owner.post("/api/admin/quotes", { customerId: o.customerId, items: [line()], notes: "", placeOfSupply: "36" })).data;

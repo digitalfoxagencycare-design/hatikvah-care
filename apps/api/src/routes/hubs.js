@@ -5,6 +5,7 @@ import { channels } from "../lib/notify.js";
 import { todayIST } from "../lib/gst.js";
 import { balance, now } from "../lib/sales.js";
 import { wrap } from "./public.js";
+import { hideDocLinks } from "./whatsapp.js";
 import { parse } from "./shared.js";
 
 const digits10 = (phone) => String(phone || "").replace(/\D/g, "").slice(-10);
@@ -52,10 +53,10 @@ export function hubRoutes({ cfg, store, audit }) {
   const images = async () => Object.fromEntries((await store.products.all()).map((p) => [p.id, p.images?.[0] || ""]));
   r.get("/thumbs", wrap(async (_req, res) => res.json(await images())));
 
-  r.get("/hubs/whatsapp", requirePerm("enquiries", "automation"), wrap(async (_req, res) => {
+  r.get("/hubs/whatsapp", requirePerm("enquiries", "automation"), wrap(async (req, res) => {
     const rows = (await store.outbox.all({ sort: { createdAt: -1 } })).filter((m) => m.channel === "whatsapp");
     const names = Object.fromEntries((await store.customers.all()).filter((c) => c.phone).map((c) => [digits10(c.phone), c.name]));
-    res.json({ stats: whatsappStats(rows), feed: rows.slice(0, 40).map((m) => ({ id: m.id, to: m.to, name: names[digits10(m.to)] || "", event: m.event, ref: m.ref, preview: String(m.body || "").slice(0, 160), at: m.sentAt || m.createdAt, status: m.deliveryStatus || m.status, error: m.error || "" })) });
+    res.json({ stats: whatsappStats(rows), feed: rows.slice(0, 40).map((m) => ({ id: m.id, to: m.to, name: names[digits10(m.to)] || "", event: m.event, ref: m.ref, preview: hideDocLinks(req.admin, m.body).slice(0, 160), at: m.sentAt || m.createdAt, status: m.deliveryStatus || m.status, error: m.error || "" })) });
   }));
 
   r.get("/hubs/payments", requirePerm("invoices"), wrap(async (_req, res) => {

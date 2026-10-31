@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import express, { Router } from "express";
-import { requirePerm } from "../lib/permissions.js";
+import { can, requirePerm } from "../lib/permissions.js";
 import { dispatchTpl, invoiceTpl, quoteTpl } from "../lib/automation.js";
 import { balance, logActivity, now } from "../lib/sales.js";
 import { templateLibrary, WA_TEMPLATES } from "../lib/notify.js";
@@ -173,7 +173,12 @@ export function whatsappWebhook({ cfg, store, automation, notifier, log = consol
 
 /** Admin: the WhatsApp inbox (customer messages), replies inside the 24-hour window, and the outbox delivery log. */
 const TEAM_EVENTS = new Set(["enquiryAlert", "lowStock", "followUps", "dailySummary"]); // these go to staff phones, not customers
-const TEMPLATE_DOCS = { quote: { path: "quote", list: "quotes" }, invoice: { path: "invoice", list: "invoices" }, dispatch: { path: "challan", list: "orders" } };
+const TEMPLATE_DOCS = { quote: { path: "quote", list: "quotes", perm: "quotes" }, invoice: { path: "invoice", list: "invoices", perm: "invoices" }, dispatch: { path: "challan", list: "orders", perm: "orders" } };
+
+/** A document link opens without sign-in, so a message only shows one to staff who may see that kind of document. */
+export function hideDocLinks(admin, text) {
+  return String(text || "").replace(/\/doc\/([\w-]+)\/[\w-]+/g, (link, kind) => (can(admin, { quote: "quotes", invoice: "invoices" }[kind] || "orders") ? link : `/doc/${kind}/…`));
+}
 
 /** One row per customer number across what they sent us and what we sent them, newest first. */
 export function conversationList(inbox, outbox, customers) {
@@ -201,12 +206,14 @@ export function whatsappAdminRoutes({ cfg, store, notifier, audit }) {
   r.use("/whatsapp", requirePerm("enquiries", "automation"));
   const docUrl = (path, tok) => `${cfg.publicUrl || `http://localhost:${cfg.port}`}/doc/${path}/${tok}`;
   const lists = async () => { const [inbox, outbox, customers] = await Promise.all([store.inbox.all({ sort: { at: -1 } }), store.outbox.all({ sort: { createdAt: -1 } }), store.customers.all()]); return { inbox, outbox, customers }; };
-  r.get("/whatsapp/threads", wrap(async (_req, res) => { const l = await lists(); res.json(conversationList(l.inbox, l.outbox, l.customers)); }));
+  const summaries = (req, l) => conversationList(l.inbox, l.outbox, l.customers).map((t) => ({ ...t, preview: hideDocLinks(req.admin, t.preview) }));
+  r.get("/whatsapp/threads", wrap(async (req, res) => res.json(summaries(req, await lists()))));
   /** One conversation, oldest first, with each sent document's current status and the customer's documents a template can carry. */
   r.get("/whatsapp/threads/:phone", wrap(async (req, res) => {
     const key = digits10(req.params.phone);
     if (key.length !== 10) return bad(res, "Enter the WhatsApp number");
-    const [l, quotes, invoices, orders] = await Promise.all([lists(), store.quotes.all({ sort: { createdAt: -1 } }), store.invoices.all({ sort: { createdAt: -1 } }), store.orders.all({ sort: { createdAt: -1 } })]);
+    const allowed = (kind) => (can(req.admin, TEMPLATE_DOCS[kind].perm) ? store[TEMPLATE_DOCS[kind].list].all({ sort: { createdAt: -1 } }) : []);
+    const [l, quotes, invoices, orders] = await Promise.all([lists(), allowed("quote"), allowed("invoice"), allowed("dispatch")]);
     const own = (d) => digits10(d.customer?.phone) === key;
     const docOf = (ref) => {
       if (!ref) return null;
@@ -217,8 +224,8 @@ export function whatsappAdminRoutes({ cfg, store, notifier, audit }) {
     };
     const inbound = l.inbox.filter((m) => digits10(m.from) === key).map((m) => ({ id: m.id, dir: "in", text: m.text || `[${m.type}]`, at: m.at, items: m.items || [], enquiryId: m.enquiryId || "" }));
     const outbound = l.outbox.filter((m) => m.channel === "whatsapp" && !TEAM_EVENTS.has(m.event) && digits10(m.to) === key)
-      .map((m) => ({ id: m.id, dir: "out", text: m.body, at: m.sentAt || m.createdAt, event: m.event, status: m.deliveryStatus || m.status, error: m.error || "", button: m.button?.label || "", manualLink: m.manualLink || "", doc: docOf(m.ref) }));
-    const summary = conversationList(l.inbox, l.outbox, l.customers).find((t) => t.key === key) || { key, phone: req.params.phone.replace(/\D/g, ""), name: quotes.concat(invoices, orders).find(own)?.customer.name || "", customerId: "", lastAt: "", lastInboundAt: "", preview: "", unread: 0 };
+      .map((m) => { const text = hideDocLinks(req.admin, m.body); return { id: m.id, dir: "out", text, at: m.sentAt || m.createdAt, event: m.event, status: m.deliveryStatus || m.status, error: m.error || "", button: m.button?.label || "", manualLink: text === m.body ? m.manualLink || "" : "", doc: docOf(m.ref) }; });
+    const summary = summaries(req, l).find((t) => t.key === key) || { key, phone: req.params.phone.replace(/\D/g, ""), name: quotes.concat(invoices, orders).find(own)?.customer.name || "", customerId: "", lastAt: "", lastInboundAt: "", preview: "", unread: 0 };
     res.json({ ...summary, messages: [...inbound, ...outbound].sort((a, b) => (a.at < b.at ? -1 : 1)),
       docs: { quote: quotes.filter(own).slice(0, 8).map((d) => ({ id: d.id, number: d.number, status: d.status })), invoice: invoices.filter((d) => own(d) && d.status !== "void").slice(0, 8).map((d) => ({ id: d.id, number: d.number, status: d.status })),
         dispatch: orders.filter((d) => own(d) && d.challanNumber).slice(0, 8).map((d) => ({ id: d.id, number: d.number, status: d.shipment?.status || d.status })) } });
@@ -233,6 +240,7 @@ export function whatsappAdminRoutes({ cfg, store, notifier, audit }) {
     const key = digits10(req.params.phone), kind = String(req.body?.kind || ""), spec = Object.hasOwn(TEMPLATE_DOCS, kind) ? TEMPLATE_DOCS[kind] : null;
     if (key.length !== 10) return bad(res, "Enter the WhatsApp number");
     if (!spec) return bad(res, "Choose a template");
+    if (!can(req.admin, spec.perm)) return bad(res, "Your role does not allow this", 403);
     const doc = await store[spec.list].get(String(req.body?.docId || ""));
     if (!doc || digits10(doc.customer?.phone) !== key) return bad(res, "Choose one of this customer's documents");
     if (kind === "dispatch" && !doc.challanNumber) return bad(res, "This order has not been dispatched", 409);
@@ -240,7 +248,7 @@ export function whatsappAdminRoutes({ cfg, store, notifier, audit }) {
     const template = kind === "quote" ? quoteTpl(doc) : kind === "invoice" ? invoiceTpl(doc, balance(doc) || doc.totals.total) : dispatchTpl(doc, details);
     const body = WA_TEMPLATES[kind].sample.replace(/\{\{(\d)\}\}/g, (_, n) => template.params[n - 1] ?? "");
     const label = { quote: "View & approve", invoice: "View invoice", dispatch: "View challan" }[kind];
-    const m = await notifier.queue({ channel: "whatsapp", to: req.params.phone, body, event: { quote: "quoteSend", invoice: "invoiceSend", dispatch: "orderDispatched" }[kind], ref: doc.number, button: { label, url: docUrl(spec.path, doc.token) }, template });
+    const m = await notifier.queue({ channel: "whatsapp", to: doc.customer.phone, body, event: { quote: "quoteSend", invoice: "invoiceSend", dispatch: "orderDispatched" }[kind], ref: doc.number, button: { label, url: docUrl(spec.path, doc.token) }, template });
     if (!m) return bad(res, "That number cannot receive WhatsApp");
     await notifier.flush();
     await audit(req, "whatsapp.template", doc.number, { kind });
@@ -263,7 +271,7 @@ export function whatsappAdminRoutes({ cfg, store, notifier, audit }) {
     if (body.length < 1 || body.length > 4000) return bad(res, "Type a message (up to 4000 characters)");
     const last = (await store.inbox.all({ sort: { at: -1 } })).find((m) => digits10(m.from) === digits10(to));
     if (!last || Date.now() - Date.parse(last.at) > 24 * 3600_000) return bad(res, "WhatsApp allows free-text replies only within 24 hours of the customer's last message. Use a template message instead.", 409);
-    const m = await notifier.queue({ channel: "whatsapp", to, body, event: "waReply", ref: last.customerId });
+    const m = await notifier.queue({ channel: "whatsapp", to: last.from, body, event: "waReply", ref: last.customerId });
     await notifier.flush();
     if (last.customerId) await logActivity(store, { entity: "customer", entityId: last.customerId, kind: "whatsapp", text: `WhatsApp reply: ${body}`.slice(0, 2000), by: req.admin.email });
     await audit(req, "whatsapp.reply", to);
