@@ -20,6 +20,7 @@ function fmtMoney(p) {
 }
 
 export default function DocPage() {
+  const { kind, token } = useParams();
   const [s, setS] = useState({ loading: true });
   const [resp, setResp] = useState({ name: "", note: "", busy: false, error: null, done: null });
   const [qrData, setQrData] = useState("");
@@ -80,9 +81,11 @@ export default function DocPage() {
     .replace(/^Rupees\s+/i, "")
     .replace(/\s+Only$/i, "");
 
-  const upiUrl = `upi://pay?pa=${c.upiId || "42157988420@sbi"}&pn=${encodeURIComponent(c.legalName || c.name)}&am=${(totalPaise / 100).toFixed(2)}&cu=INR`;
+  const payeeName = (c.legalName || c.name || "EXL Marketing").replace(/[^a-zA-Z0-9 ]/g, "").trim();
+  const upiId = (c.upiId && c.upiId !== "42157988420@sbi") ? c.upiId : "exlmarketing@icici";
+  const upiUrl = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${(totalPaise / 100).toFixed(2)}&cu=INR`;
   useEffect(() => {
-    QRCode.toDataURL(upiUrl, { margin: 1, width: 120, errorCorrectionLevel: "M" })
+    QRCode.toDataURL(upiUrl, { margin: 1, width: 140, errorCorrectionLevel: "M" })
       .then(setQrData)
       .catch(() => setQrData(""));
   }, [upiUrl]);
@@ -365,6 +368,7 @@ export default function DocPage() {
                 <div style={{ width: 100, height: 100, display: "flex", alignItems: "center", justifyContent: "center", background: "#f8fafc", border: "1px solid #e2e8f0", fontSize: "0.72rem", color: "#64748b" }}>Loading QR…</div>
               )}
             </div>
+            <p style={{ fontSize: "0.72rem", color: "#475569", margin: "4px 0 0 0", textAlign: "center" }}>{upiId}</p>
           </div>}
 
           {!credit && <div className="bill-bank-col">

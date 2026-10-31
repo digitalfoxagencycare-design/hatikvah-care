@@ -113,7 +113,7 @@ export const DEFAULT_SETTINGS = {
   hours: "", showPrices: true,
   gstin: "36ADDPC0083H1Z0", stateCode: "36",
   bankDetails: "State Bank of India\nAccount #: 42157988420\nIFSC Code: SBIN0020308\nBranch: SANJEEVA REDDY NGR",
-  upiId: "42157988420@sbi",
+  upiId: "exlmarketing@icici",
   quoteTerms: "1. Prices are exclusive of freight unless stated.\n2. Delivery within 7–10 working days of order confirmation.\n3. We declare that this quotation shows the actual price of the goods described and that all particulars are true and correct.",
   invoiceTerms: "We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct. Subject to Hyderabad jurisdiction.",
   quoteValidityDays: 15, paymentTermsDays: 30, ga4Id: "", metaPixelId: "", brochureUrl: "",

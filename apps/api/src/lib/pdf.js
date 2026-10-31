@@ -151,10 +151,13 @@ export async function generateDocumentPdf({ kind, doc, company }) {
       y += 60;
       if (!isChallan) {
         // UPI QR
-        const upiUrl = `upi://pay?pa=${company.upiId || "42157988420@sbi"}&pn=${encodeURIComponent(company.legalName || company.name || "EXL MARKETING")}&am=${(totalPaise / 100).toFixed(2)}&cu=INR`;
+        const payeeName = (company.legalName || company.name || "EXL MARKETING").replace(/[^a-zA-Z0-9 ]/g, "").trim();
+        const upiId = (company.upiId && company.upiId !== "42157988420@sbi") ? company.upiId : "exlmarketing@icici";
+        const upiUrl = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${(totalPaise / 100).toFixed(2)}&cu=INR`;
         const qrBuffer = await QRCode.toBuffer(upiUrl, { width: 90, margin: 1, errorCorrectionLevel: "M" });
         pdf.image(qrBuffer, 44, y, { width: 70 });
         pdf.fontSize(7).font("Helvetica-Bold").fillColor("#0F172A").text("Scan UPI to Pay", 44, y + 74, { width: 70, align: "center" });
+        pdf.fontSize(6).font("Helvetica").fillColor("#64748B").text(upiId, 30, y + 83, { width: 98, align: "center" });
 
         // Bank Details
         pdf.fontSize(8).font("Helvetica-Bold").text("Bank Details:", 130, y);
