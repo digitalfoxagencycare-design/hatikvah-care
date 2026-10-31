@@ -175,13 +175,14 @@ export function DispatchModal({ id, onClose }) {
             </div>
           </div>
 
-          <fieldset className="ship-size"><legend>Package size in cm, if it is bulky</legend>
-            <div className="grid3">
-              <label className="field"><span>Length</span><input type="number" min="1" max="300" step="any" value={f.lengthCm} onChange={set("lengthCm")} /></label>
-              <label className="field"><span>Breadth</span><input type="number" min="1" max="300" step="any" value={f.breadthCm} onChange={set("breadthCm")} /></label>
-              <label className="field"><span>Height</span><input type="number" min="1" max="300" step="any" value={f.heightCm} onChange={set("heightCm")} /></label>
+          <details style={{ margin: "8px 0 14px", fontSize: "0.85rem", color: "#64748B" }}>
+            <summary style={{ cursor: "pointer", fontWeight: 500, color: "#0284C7" }}>+ Bulky parcel dimensions in cm (optional, leave blank for standard bike parcel)</summary>
+            <div className="grid3" style={{ marginTop: "8px" }}>
+              <label className="field"><span>Length (cm)</span><input type="number" min="1" max="300" step="any" value={f.lengthCm} onChange={set("lengthCm")} placeholder="Optional" /></label>
+              <label className="field"><span>Breadth (cm)</span><input type="number" min="1" max="300" step="any" value={f.breadthCm} onChange={set("breadthCm")} placeholder="Optional" /></label>
+              <label className="field"><span>Height (cm)</span><input type="number" min="1" max="300" step="any" value={f.heightCm} onChange={set("heightCm")} placeholder="Optional" /></label>
             </div>
-          </fieldset>
+          </details>
           {st.error && <p className="alert" role="alert">{st.error}</p>}
           <button className="btn" disabled={st.busy || !a.connected}>{st.busy ? "Booking…" : "Confirm & Book Rider"}</button>
         </form>
