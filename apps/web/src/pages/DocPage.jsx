@@ -34,6 +34,18 @@ export default function DocPage() {
     }
   }, [s.data, kind]);
 
+  useEffect(() => {
+    if (!s.data) return;
+    const { doc: d, company: c } = s.data;
+    const totalPaise = d.totals?.total ?? d.total ?? 0;
+    const payeeName = (c.legalName || c.name || "EXL Marketing").replace(/[^a-zA-Z0-9 ]/g, "").trim();
+    const upiId = (c.upiId && c.upiId !== "42157988420@sbi") ? c.upiId : "exlmarketing@icici";
+    const upiUrl = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${(totalPaise / 100).toFixed(2)}&cu=INR`;
+    QRCode.toDataURL(upiUrl, { margin: 1, width: 140, errorCorrectionLevel: "M" })
+      .then(setQrData)
+      .catch(() => setQrData(""));
+  }, [s.data]);
+
   if (s.loading) return <p className="doc-note">Loading document…</p>;
   if (s.error) return <p className="doc-note">{s.error}</p>;
 
@@ -83,12 +95,6 @@ export default function DocPage() {
 
   const payeeName = (c.legalName || c.name || "EXL Marketing").replace(/[^a-zA-Z0-9 ]/g, "").trim();
   const upiId = (c.upiId && c.upiId !== "42157988420@sbi") ? c.upiId : "exlmarketing@icici";
-  const upiUrl = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${(totalPaise / 100).toFixed(2)}&cu=INR`;
-  useEffect(() => {
-    QRCode.toDataURL(upiUrl, { margin: 1, width: 140, errorCorrectionLevel: "M" })
-      .then(setQrData)
-      .catch(() => setQrData(""));
-  }, [upiUrl]);
 
   return (
     <div className="doc-page-container">
