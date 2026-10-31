@@ -139,17 +139,17 @@ export function DispatchModal({ id, onClose }) {
           <div className="panel" style={{ background: "#F1F5F9", padding: "12px 16px", borderRadius: "8px", margin: "12px 0", border: "1px solid #CBD5E1" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
               <span className="muted">Estimated Delivery Fee:</span>
-              <strong>₹{((e?.estimatedChargePaise || 6500) / 100).toFixed(2)}</strong>
+              <strong>₹{(((e?.estimatedChargePaise ?? 6500)) / 100).toFixed(2)}</strong>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
               <span className="muted">Current Shipping Wallet:</span>
-              <strong style={{ color: (e?.walletBalancePaise || 0) < (e?.estimatedChargePaise || 6500) ? "#DC2626" : "#047857" }}>
-                ₹{((e?.walletBalancePaise || 100000) / 100).toFixed(2)}
+              <strong style={{ color: (e?.walletBalancePaise ?? 0) < (e?.estimatedChargePaise ?? 6500) ? "#DC2626" : "#047857" }}>
+                ₹{(((e?.walletBalancePaise ?? 0)) / 100).toFixed(2)}
               </strong>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px dashed #CBD5E1", paddingTop: "6px" }}>
               <span className="muted">Balance After Dispatch:</span>
-              <strong>₹{Math.max(0, ((e?.walletBalancePaise || 100000) - (e?.estimatedChargePaise || 6500)) / 100).toFixed(2)}</strong>
+              <strong>₹{Math.max(0, ((e?.walletBalancePaise ?? 0) - (e?.estimatedChargePaise ?? 6500)) / 100).toFixed(2)}</strong>
             </div>
           </div>
 

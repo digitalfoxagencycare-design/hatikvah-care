@@ -50,6 +50,51 @@ export default function QuoteDetail() {
               {["draft", "sent"].includes(q.status) && <button className="btn" disabled={st.busy} onClick={() => act("send", undefined, "Sent ✓ The customer gets a link by email/WhatsApp (see Automation & messages).")}>{q.status === "sent" ? "Send again" : "Send to customer"}</button>}
             </div></div>
           <Msg st={st} />
+
+          {/* Settle / Conversion Banner */}
+          {q.invoiceId && (
+            <div className="panel" style={{ background: "#ECFDF5", border: "1px solid #10B981", borderRadius: "8px", padding: "12px 16px", marginBottom: "16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <strong style={{ color: "#065F46" }}>✓ Quotation Accepted & Settled</strong>
+                <p style={{ margin: "2px 0 0", fontSize: "0.88rem", color: "#047857" }}>Tax Invoice <strong>{q.invoiceNumber || q.invoiceId}</strong> has been generated and stock has left the warehouse.</p>
+              </div>
+              <Link className="btn small" to={`/admin/invoices/${q.invoiceId}`}>Open Tax Invoice ↗</Link>
+            </div>
+          )}
+
+          {/* Razorpay Online Payment & Dynamic QR Card */}
+          {!q.invoiceId && ["draft", "sent", "accepted"].includes(q.status) && (
+            <div className="panel" style={{ background: "#F8FAFC", border: "1px solid #CBD5E1", borderRadius: "10px", padding: "14px 18px", marginBottom: "16px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+                <div>
+                  <span style={{ fontSize: "0.75rem", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.05em", color: "#64748B" }}>Razorpay Online Payments</span>
+                  <p style={{ margin: "4px 0 0", fontWeight: 600, color: "#0F172A" }}>
+                    {q.payLink?.url ? "Active Payment Link Attached" : "Ready for Online Collection"}
+                  </p>
+                </div>
+                <div className="btn-row">
+                  {q.payLink?.url ? (
+                    <>
+                      <button type="button" className="btn ghost small" onClick={() => { navigator.clipboard.writeText(q.payLink.url); alert("Payment link copied to clipboard!"); }}>Copy Link</button>
+                      <a className="btn ghost small" href={q.payLink.url} target="_blank" rel="noopener noreferrer">Open Link ↗</a>
+                      <button type="button" className="btn small" onClick={() => act("paylink", undefined, "New link ready ✓")}>Refresh Link</button>
+                    </>
+                  ) : (
+                    <button type="button" className="btn small" disabled={st.busy} onClick={() => act("paylink", undefined, "Payment link ready ✓ Paying it confirms the order and raises the invoice.")}>
+                      ⚡ Generate Razorpay Link
+                    </button>
+                  )}
+                </div>
+              </div>
+              {q.payLink?.url && (
+                <div style={{ marginTop: "10px", padding: "8px 12px", background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "0.85rem" }}>
+                  <code style={{ color: "#0284C7" }}>{q.payLink.url}</code>
+                  <span style={{ color: "#059669", fontWeight: 600 }}>Amount: ₹{((q.payLink.amount || q.totals?.total || 0) / 100).toFixed(2)}</span>
+                </div>
+              )}
+            </div>
+          )}
+
           <DocView d={q} extraInfo={<p className="muted small-print">Valid until {fmtDate(q.validUntil)}{q.sentAt && <><br />Sent {fmtTime(q.sentAt)}</>}{q.customerResponse && <><br />Customer: {q.customerResponse.name} {q.customerResponse.note}</>}</p>}>
             {q.terms && <><h3>Terms</h3><p className="pre small-print">{q.terms}</p></>}
           </DocView>
@@ -58,8 +103,6 @@ export default function QuoteDetail() {
             {["draft", "sent", "expired"].includes(q.status) && <button className="btn ghost" onClick={() => act("status", { status: "rejected" }, "Marked rejected")}>Mark rejected</button>}
             {can(me, "invoices") && !q.invoiceId && ["draft", "sent", "accepted"].includes(q.status) && <button className="btn" onClick={() => run(async () => { const inv = await api(`/api/admin/quotes/${id}/invoice`, { method: "POST" }); nav(`/admin/invoices/${inv.id}`); })}>Create Tax Invoice</button>}
             {q.invoiceId && <Link className="btn" to={`/admin/invoices/${q.invoiceId}`}>Open Tax Invoice</Link>}
-            {!q.invoiceId && ["draft", "sent", "accepted"].includes(q.status) && <button className="btn ghost" onClick={() => act("paylink", undefined, "Payment link ready ✓ Paying it confirms the order and raises the invoice.")}>{q.payLink ? "New payment link" : "Razorpay payment link"}</button>}
-            {q.payLink?.url && !q.invoiceId && <a className="btn ghost" href={q.payLink.url} target="_blank" rel="noopener noreferrer">Open pay link ↗</a>}
             {can(me, "orders") && !q.orderId && !q.invoiceId && ["draft", "sent", "accepted"].includes(q.status) && <button className="btn ghost" onClick={() => run(async () => { const o = await api(`/api/admin/quotes/${id}/order`, { method: "POST" }); nav(`/admin/orders/${o.id}`); })}>Sales order</button>}
             {q.orderId && <Link className="btn ghost" to={`/admin/orders/${q.orderId}`}>Open sales order</Link>}
             <button className="btn ghost" onClick={() => run(async () => { const n = await api(`/api/admin/quotes/${id}/duplicate`, { method: "POST" }); nav(`/admin/quotes/${n.id}`); })}>Duplicate</button>

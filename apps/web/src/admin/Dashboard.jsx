@@ -90,9 +90,10 @@ export default function Dashboard() {
       <Loader s={s}>{d && <>
         <div className="kpis">
           {days && <Kpi to="/admin/invoices" label="Today's sales" n={rs(sold)}><small>{before ? `Yesterday ${rs(before)}` : "No sales yesterday"}</small><Spark days={days} /></Kpi>}
-          {"toDispatch" in d && <Kpi to="/admin/logistics-hub" label="Pending dispatches" n={d.toDispatch}><span className="kpi-tags">{couriers.length ? couriers.map((c) => <Courier key={c} name={COURIERS[c] || c} />) : <Courier name="No courier connected" off />}</span></Kpi>}
-          {"lowStock" in d && <Kpi to="/admin/stock" label="Low stock alert" n={d.lowStock} tone={d.lowStock ? "warn" : ""}><span className="kpi-tags">{d.lowStock ? <Pill s="unpaid">Needs reorder</Pill> : <Pill s="paid">All stocked</Pill>}</span></Kpi>}
+          {"salesThisMonth" in d && <Kpi to="/admin/invoices" label="Month-to-date sales" n={rs(d.salesThisMonth)} tone="good"><small>{rs(d.receivedThisMonth || 0)} received</small></Kpi>}
+          {"toDispatch" in d && <Kpi to="/admin/logistics-hub" label="Pending dispatches" n={d.toDispatch} tone={d.toDispatch ? "warn" : ""}><span className="kpi-tags">{couriers.length ? couriers.map((c) => <Courier key={c} name={COURIERS[c] || c} />) : <Courier name="No courier connected" off />}</span></Kpi>}
           {"outstanding" in d && <Kpi to="/admin/invoices?status=overdue" label="Unpaid invoices" n={rs(d.outstanding)} tone={d.overdue ? "bad" : ""}><small>{rs(d.overdue)} overdue · {d.overdueCount} invoice{d.overdueCount === 1 ? "" : "s"}</small></Kpi>}
+          {"lowStock" in d && <Kpi to="/admin/stock" label="Low stock alert" n={d.lowStock} tone={d.lowStock ? "warn" : ""}><span className="kpi-tags">{d.lowStock ? <Pill s="unpaid">Needs reorder</Pill> : <Pill s="paid">All stocked</Pill>}</span></Kpi>}
         </div>
 
         {d.lowStockItems?.length > 0 && (

@@ -46,9 +46,19 @@ function ById({ name }) { const { id } = useParams(); const C = P[name]; return 
 export default function AdminApp() {
   const [me, setMe] = useState(undefined); // undefined = checking, null = signed out
   const [menu, setMenu] = useState(false);
+  const [command, setCommand] = useState(false);
+  const [query, setQuery] = useState("");
   const nav = useNavigate(), loc = useLocation();
   useEffect(() => { document.title = "Admin | HaTikvah Care"; api("/api/admin/me").then(setMe).catch(() => setMe(null)); }, []);
-  useEffect(() => setMenu(false), [loc.pathname]);
+  useEffect(() => { setMenu(false); setCommand(false); setQuery(""); }, [loc.pathname]);
+  useEffect(() => {
+    const key = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setCommand((v) => !v); }
+      if (e.key === "Escape") setCommand(false);
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, []);
   if (me === undefined) return <div className="center-note">Loading…</div>;
   if (me === null) return <><Login onLogin={setMe} /><Toaster /></>;
   const logout = async () => { await api("/api/admin/logout", { method: "POST" }).catch(() => {}); setMe(null); nav("/admin"); };
@@ -59,8 +69,9 @@ export default function AdminApp() {
       <div className="adm">
         <aside className="adm-side">
           <div className="row-between"><img src="/brand/hatikvah-logo.png" alt="HaTikvah Care" width="110" height="62" /><button className="menu-btn adm-menu" aria-expanded={menu} onClick={() => setMenu(!menu)}>{menu ? "Close" : "Menu"}</button></div>
+          <div className="tenant-pill">HaTikvah Care <span>NOVA-004</span></div>
           <nav className={menu ? "open" : ""}>
-            <NavLink to="/admin" end><Icon name="dashboard" />Dashboard</NavLink>
+            <NavLink to="/admin" end><Icon name="dashboard" />Overview</NavLink>
             {NAV.map(([group, items]) => {
               const mine = items.filter(([, , perm]) => can(me, perm));
               return mine.length > 0 && <div key={group} className="nav-group">{group && <small>{group}</small>}{mine.map(link)}</div>;
@@ -68,8 +79,30 @@ export default function AdminApp() {
             <NavLink className="nav-more" to="/admin/more"><Icon name="more" />More tools</NavLink>
           </nav>
           <div className="adm-user"><span>{me.name}<small>{me.role}{me.twoFactor ? " · 2-step on" : ""}</small></span><NavLink to="/admin/account">My account</NavLink><button className="link" onClick={logout}>Sign out</button><a href="/" target="_blank" rel="noopener noreferrer">View website ↗</a></div>
+          <div className="nova-brand"><span aria-hidden="true">⬡</span> Powered by NovaSaaS</div>
         </aside>
         <main className="adm-main">
+          <header className="cockpit-topbar">
+            <button className="command-trigger" onClick={() => setCommand(true)}><Icon name="search" /> Search navigation <kbd>Ctrl K</kbd></button>
+            <div className="top-actions">
+              {can(me, "quotes") && <NavLink className="top-link" to="/admin/quotes/new">+ New quote</NavLink>}
+              {can(me, "pos") && <NavLink className="top-primary" to="/admin/pos">+ POS walk-in</NavLink>}
+            </div>
+            <span className="top-brand">Powered by NovaSaaS</span>
+          </header>
+          {command && (
+            <div className="command-overlay" onMouseDown={() => setCommand(false)}>
+              <div className="command-dialog" role="dialog" aria-modal="true" aria-label="Search navigation" onMouseDown={(e) => e.stopPropagation()}>
+                <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search pages..." aria-label="Search pages" />
+                <div className="command-results">
+                  {[["", "Overview", null], ...NAV.flatMap(([, items]) => items), ...MORE]
+                    .filter((x) => (!x[2] || can(me, x[2])) && x[1].toLowerCase().includes(query.toLowerCase()))
+                    .map((x) => <NavLink key={x[0]} to={`/admin/${x[0]}`}>{x[1]} <span>↗</span></NavLink>)}
+                </div>
+                <small>Searches pages available to your role · Esc to close</small>
+              </div>
+            </div>
+          )}
           <Suspense fallback={<p className="muted">Loading…</p>}>
             <Routes>
               <Route index element={el("Dashboard")} />
