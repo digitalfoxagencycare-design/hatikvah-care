@@ -174,8 +174,21 @@ export function createAutomation({ cfg, store, notifier, log = console }) {
   async function paymentReceived(inv, p) {
     const [a, company] = await Promise.all([config(), getSettings(store)]);
     if (!isOn(a, "paymentReceipt")) return;
+    // 1. Send receipt to customer
     await send(toCustomer(inv.customer), { event: "paymentReceipt", ref: inv.number, subject: `Payment received for ${inv.number}`,
       body: `Dear ${inv.customer.contactName || inv.customer.name},\nThank you. We received ${money(p.amount)} against invoice ${inv.number}.${balance(inv) > 0 ? ` Balance due: ${money(balance(inv))}.` : " The invoice is fully paid."}\n– ${company.name}` });
+    // 2. Instant WhatsApp alert to Owner & Team
+    await send(await teamTargets(a, company), {
+      event: "paymentAlert",
+      ref: inv.number,
+      subject: `💰 Payment ${money(p.amount)} received for ${inv.number}`,
+      body: `💰 *Payment Received: ${money(p.amount)}*\n\n` +
+        `📄 *Invoice:* ${inv.number}\n` +
+        `👤 *Customer:* ${inv.customer.name}${inv.customer.phone ? " (" + inv.customer.phone + ")" : ""}\n` +
+        `💳 *Mode:* ${p.mode || "online"}${p.reference ? " (" + p.reference + ")" : ""}\n` +
+        `📊 *Status:* ${balance(inv) > 0 ? `Balance remaining ${money(balance(inv))}` : "Fully Paid (Clear)"}\n\n` +
+        `Open Invoice: ${base()}/admin/invoices/${inv.id}`
+    });
     await notifier.flush();
   }
 

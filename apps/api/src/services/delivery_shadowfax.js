@@ -15,7 +15,10 @@ export const pincodeOf = (address = "") => (String(address).match(/\b\d{6}\b/g) 
 async function call(cfg, fetchImpl, method, path, body) {
   const r = await fetchImpl(`${cfg.sfxBaseUrl}${path}`, { method, signal: AbortSignal.timeout(15000), headers: headers(cfg), ...(body ? { body: JSON.stringify(body) } : {}) });
   const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw Object.assign(new Error(data?.message || data?.errors?.[0] || data?.error || `Shadowfax said ${r.status}`), { status: r.status });
+  if (!r.ok || data?.message === "Failure" || (data?.errors && !data?.data)) {
+    const errText = typeof data?.errors === "string" ? data.errors : data?.errors ? JSON.stringify(data.errors) : data?.message || `Shadowfax said ${r.status}`;
+    throw Object.assign(new Error(errText), { status: r.status < 400 ? 400 : r.status });
+  }
   return data;
 }
 
@@ -52,18 +55,65 @@ function chargeOf(d = {}) {
 
 /** Pickup request for a dispatched order (delivery challan). Returns the shipment record kept on the order. */
 export async function createPickup(cfg, { order, company, pickupPincode, dropPincode, weightKg = 1, packages = 1, pickupSlot = null, dimensions = null }, { fetchImpl = globalThis.fetch } = {}) {
-  const c = order.customer;
-  const body = {
-    order_details: { client_order_id: order.challanNumber || order.number, actual_weight: Math.round(weightKg * 1000), product_value: Math.round(order.totals.total / 100), payment_mode: "Prepaid", total_amount: 0, cod_amount: 0, num_of_packages: packages, ...(dimensions ? { volumetric_weight: Math.round((dimensions.lengthCm * dimensions.breadthCm * dimensions.heightCm) / 5) } : {}), ...(pickupSlot ? { pickup_slot: `${pickupSlot.date} ${pickupSlot.window}` } : {}) },
-    customer_details: { name: (c.contactName || c.name).slice(0, 100), contact: c.phone.replace(/\D/g, "").slice(-10), address_line_1: (c.shippingAddress || c.billingAddress).slice(0, 250), pincode: dropPincode, state: c.state || "" },
-    pickup_details: { name: company.name, contact: String(company.phone || "").replace(/\D/g, "").slice(-10), address_line_1: (company.dispatchAddress || company.address || company.billingAddress || "").slice(0, 250), pincode: pickupPincode, state: company.state || "" },
-    product_details: order.items.slice(0, 50).map((it) => ({ sku_name: it.name.slice(0, 100), sku_id: it.sku || "", hsn_code: it.hsn || "", price: Math.round((it.rate || 0) / 100), qty: it.qty })),
+  const c = order.customer || {};
+  const pickupAddress = (company.dispatchAddress || company.address || company.billingAddress || "Eshwar Nilayam, Plot No. 4-1447, JV Hills, Kondapur, Gachibowli, Hyderabad, Telangana – 500084").slice(0, 250);
+  const dropAddress = (c.shippingAddress || c.billingAddress || "Customer Address").slice(0, 250);
+  const pickupLat = Number(company.dispatchLat) || 17.4710;
+  const pickupLng = Number(company.dispatchLng) || 78.3535;
+  const dropLat = Number(c.lat) || pickupLat;
+  const dropLng = Number(c.lng) || pickupLng;
+
+  const pickupDetails = {
+    name: (company.name || "HaTikvah Care").slice(0, 60),
+    contact: String(company.phone || "7995444434").replace(/\D/g, "").slice(-10),
+    address: pickupAddress,
+    address_line: pickupAddress,
+    address_line_1: pickupAddress,
+    city: "Hyderabad",
+    state: company.state || "Telangana",
+    pincode: pickupPincode || "500084",
+    latitude: pickupLat,
+    longitude: pickupLng
   };
-  const data = await call(cfg, fetchImpl, "POST", "/api/v3/clients/orders/", body);
+
+  const body = {
+    order_details: {
+      client_order_id: order.challanNumber || order.number,
+      actual_weight: Math.round((Number(weightKg) || 1) * 1000),
+      product_value: Math.round(order.totals.total / 100),
+      payment_mode: "Prepaid",
+      num_of_packages: packages || 1,
+      package_count: packages || 1,
+      order_type: "Regular",
+      ...(dimensions ? { volumetric_weight: Math.round((dimensions.lengthCm * dimensions.breadthCm * dimensions.heightCm) / 5) } : {}),
+      ...(pickupSlot ? { pickup_slot: `${pickupSlot.date} ${pickupSlot.window}` } : {})
+    },
+    pickup_details: pickupDetails,
+    return_details: pickupDetails, // 2-3 day RTO / undelivered return packages route back to JV Hills warehouse
+    customer_details: {
+      name: (c.contactName || c.name || "Customer").slice(0, 60),
+      contact: String(c.phone || "").replace(/\D/g, "").slice(-10),
+      address: dropAddress,
+      address_line: dropAddress,
+      address_line_1: dropAddress,
+      city: c.city || "Hyderabad",
+      state: c.state || "Telangana",
+      pincode: dropPincode,
+      latitude: dropLat,
+      longitude: dropLng
+    },
+    product_details: order.items.slice(0, 50).map((it) => ({
+      sku_name: (it.name || "Item").slice(0, 60),
+      price: Math.round((it.rate || 0) / 100),
+      quantity: Math.max(1, Number(it.qty) || 1)
+    }))
+  };
+
+  const data = await call(cfg, fetchImpl, "POST", "/api/v2/clients/orders/", body);
   const d = data.data || data;
   const awb = String(d.awb_number || d.awb || d.tracking_id || "");
   return {
-    provider: "shadowfax", awb, sfxOrderId: String(d.id || d.order_id || ""), status: "created", trackingUrl: d.tracking_url || d.track_url || (awb ? trackingUrl(cfg, awb) : ""),
+    provider: "shadowfax", awb, sfxOrderId: String(d.id || d.order_id || d.client_order_id || ""), status: "created", trackingUrl: d.tracking_url || d.track_url || (awb ? trackingUrl(cfg, awb) : ""),
     riderName: "", riderPhone: "", chargePaise: chargeOf(d), pickupPincode, dropPincode, createdAt: new Date().toISOString(), history: [{ status: "created", at: new Date().toISOString() }],
   };
 }
