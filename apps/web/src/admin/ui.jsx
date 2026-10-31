@@ -92,6 +92,10 @@ export function DocEditor({ initial, kind, onSave, busy, error, extra }) {
   const company = useAsync("/api/admin/settings");
   const [f, setF] = useState(() => ({ customerId: "", placeOfSupply: "", notes: "", items: [], ...initial }));
   const [showParser, setShowParser] = useState(false);
+  const [showAddCust, setShowAddCust] = useState(false);
+  const [newCust, setNewCust] = useState({ name: "", contactName: "", phone: "", email: "", gstin: "", stateCode: "", shippingAddress: "", deliveryPincode: "" });
+  const [custBusy, setCustBusy] = useState(false);
+  const [custErr, setCustErr] = useState("");
   const rates = useAsync(`/api/admin/rates${f.customerId ? `?customerId=${f.customerId}` : ""}`);
   const [picking, setPicking] = useState(false);
   const thumbs = useThumbs();
@@ -121,7 +125,10 @@ export function DocEditor({ initial, kind, onSave, busy, error, extra }) {
     <form className="panel form" onSubmit={submit}>
       <div className="grid3">
         <label className="field"><span>Customer *</span><select required value={f.customerId} onChange={(e) => set("customerId", e.target.value)}><option value="">Choose…</option>{customers.data?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
-          <small><Link to="/admin/customers?new=1">+ New customer</Link></small></label>
+          <small style={{ display: "flex", gap: "10px", marginTop: "4px" }}>
+            <button type="button" className="link" onClick={() => setShowAddCust(true)}>+ Quick Add Customer</button>
+            <Link to="/admin/customers?new=1" target="_blank" rel="noopener noreferrer">Full page ↗</Link>
+          </small></label>
         <StateSelect label={`Place of supply (${inter ? "IGST" : "CGST + SGST"})`} value={f.placeOfSupply} onChange={(v) => set("placeOfSupply", v)} />
         {extra?.(f, set)}
       </div>
@@ -168,6 +175,39 @@ export function DocEditor({ initial, kind, onSave, busy, error, extra }) {
           onClose={() => setShowParser(false)}
         />
       )}
+      {showAddCust && (
+        <Modal title="Quick add new customer" onClose={() => setShowAddCust(false)}>
+          <div className="form" style={{ padding: 0 }}>
+            <div className="grid2">
+              <label className="field"><span>Company / hotel name *</span><input required minLength={2} maxLength={160} value={newCust.name} onChange={(e) => setNewCust({ ...newCust, name: e.target.value })} autoFocus /></label>
+              <label className="field"><span>Contact person</span><input maxLength={100} value={newCust.contactName} onChange={(e) => setNewCust({ ...newCust, contactName: e.target.value })} /></label>
+              <label className="field"><span>Phone (WhatsApp) *</span><input required type="tel" maxLength={20} value={newCust.phone} onChange={(e) => setNewCust({ ...newCust, phone: e.target.value })} /></label>
+              <label className="field"><span>Email</span><input type="email" maxLength={160} value={newCust.email} onChange={(e) => setNewCust({ ...newCust, email: e.target.value })} /></label>
+              <label className="field"><span>GSTIN</span><input maxLength={15} value={newCust.gstin} onChange={(e) => setNewCust({ ...newCust, gstin: e.target.value.toUpperCase() })} placeholder="36ABCDE1234F1Z5" /></label>
+              <StateSelect value={newCust.stateCode} onChange={(v) => setNewCust({ ...newCust, stateCode: v })} label="State" />
+            </div>
+            <div className="grid2">
+              <label className="field"><span>Delivery address *</span><textarea rows={2} required maxLength={380} value={newCust.shippingAddress} onChange={(e) => setNewCust({ ...newCust, shippingAddress: e.target.value })} /></label>
+              <label className="field"><span>Delivery PIN code *</span><input required inputMode="numeric" maxLength={6} value={newCust.deliveryPincode} onChange={(e) => setNewCust({ ...newCust, deliveryPincode: e.target.value.replace(/\D/g, "") })} placeholder="e.g. 500084" /></label>
+            </div>
+            {custErr && <p className="alert" role="alert">{custErr}</p>}
+            <button type="button" className="btn" disabled={custBusy || !newCust.name || !newCust.phone} onClick={async () => {
+              setCustBusy(true); setCustErr("");
+              try {
+                const created = await api("/api/admin/customers", { method: "POST", body: newCust });
+                await customers.reload?.();
+                set("customerId", created.id);
+                setShowAddCust(false);
+                setNewCust({ name: "", contactName: "", phone: "", email: "", gstin: "", stateCode: "", shippingAddress: "", deliveryPincode: "" });
+              } catch (err) {
+                setCustErr(err.message);
+              } finally {
+                setCustBusy(false);
+              }
+            }}>{custBusy ? "Saving…" : "Save & select customer"}</button>
+          </div>
+        </Modal>
+      )}
       <div className="doc-foot">
         <div className="grow">
           <label className="field"><span>Notes (shown on the document)</span><textarea rows="3" maxLength={2000} value={f.notes} onChange={(e) => set("notes", e.target.value)} /></label>
@@ -189,8 +229,9 @@ function RateInput({ value, onChange }) {
 /** Fetch helper for look-ups (no loading UI). */
 export function useAsync(path) {
   const [s, setS] = useState({ data: null, error: null });
-  useEffect(() => { let on = true; api(path).then((data) => on && setS({ data, error: null })).catch((e) => on && setS({ data: null, error: e.message })); return () => { on = false; }; }, [path]);
-  return s;
+  const [tick, setTick] = useState(0);
+  useEffect(() => { let on = true; api(path).then((data) => on && setS({ data, error: null })).catch((e) => on && setS({ data: null, error: e.message })); return () => { on = false; }; }, [path, tick]);
+  return { ...s, reload: () => setTick((t) => t + 1) };
 }
 
 /** Simple horizontal bars (no chart library needed). */

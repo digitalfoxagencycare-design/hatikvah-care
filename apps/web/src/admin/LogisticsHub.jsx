@@ -9,14 +9,13 @@ import { HubTabs, Photo, Stat } from "./visual.jsx";
 
 const COURIERS = [["shadowfax", "Shadowfax"], ["porter", "Porter"]];
 
-/** The couriers report no balance through their APIs, so this is the figure staff last read from each courier's portal, labelled as such. */
-function Wallet({ id, name, on, w, onEdit }) {
+/** Centralized shipping wallet: auto-deducted per booking and centrally managed via Nova console. */
+function Wallet({ id, name, on, w }) {
   const low = !!w && w.balance <= w.lowAt;
   return (
-    <div className="wallet">
-      <Stat n={w ? rs(w.balance) : "—"} label={`${name} balance`} tone={low ? "warn" : ""} sub={!on ? "Not connected" : w ? `Typed in by ${w.updatedBy}, ${fmtTime(w.updatedAt)}` : "Not entered yet"} />
-      {low && <p className="pos-change short" role="alert">Low balance: top up on the {name} portal.</p>}
-      <button className="btn ghost small" onClick={() => onEdit({ provider: id, name, balance: w ? String(w.balance / 100) : "", lowAt: w ? String(w.lowAt / 100) : "" })}>Update</button>
+    <div className="wallet" style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "8px", padding: "16px" }}>
+      <Stat n={w ? rs(w.balance) : "—"} label={`${name} Shipping Wallet`} tone={low ? "warn" : "good"} sub={!on ? "Not connected" : "Auto-deducted on dispatch · Centrally managed via Nova Console"} />
+      {low && <p className="pos-change short" role="alert" style={{ color: "#DC2626", marginTop: "8px" }}>Low wallet balance (&lt; ₹200.00). Balance auto-reconciled via Nova Console.</p>}
     </div>
   );
 }
@@ -131,7 +130,7 @@ export default function LogisticsHub() {
           <Stat n={d.outForDelivery.length} label="Out for delivery" />
           <Stat n={d.delivered.length} label="Delivered" tone="good" sub="latest 20" />
         </div>
-        <div className="wallets">{COURIERS.map(([id, name]) => <Wallet key={id} id={id} name={name} on={d.couriers.includes(id)} w={d.wallets[id]} onEdit={setWallet} />)}</div>
+        <div className="wallets">{COURIERS.map(([id, name]) => <Wallet key={id} id={id} name={name} on={d.couriers.includes(id)} w={d.wallets[id]} />)}</div>
         <div className="grid2 top">
           <Queue title="Ready to dispatch" rows={d.queue} empty="Nothing waiting to go out." {...card} />
           <Queue title="Pending pickups" rows={d.pending} empty="No pickups waiting." {...card} />
@@ -140,7 +139,6 @@ export default function LogisticsHub() {
         </div>
         <Deductions rows={d.charges} total={d.chargedTotal} onChange={s.reload} />
       </>}</Loader>
-      {wallet && <WalletEdit w={wallet} onClose={() => setWallet(null)} onSaved={() => { setWallet(null); s.reload(); }} />}
       {book && <PickupModal o={book} onClose={() => setBook(null)} onBooked={() => { setBook(null); s.reload(); }} />}
       {send && <DispatchModal id={send.id} onClose={() => { setSend(null); s.reload(); }} />}
     </>

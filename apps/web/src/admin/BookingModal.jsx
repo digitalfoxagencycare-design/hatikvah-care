@@ -81,7 +81,7 @@ export default function BookingModal({ enquiry: e, onBooked, onClose }) {
         <div className="grid2">
           <label className="field"><span>Delivery address</span><textarea rows="2" required minLength={5} maxLength={380} value={address} onChange={(ev) => setTypedAddress(ev.target.value)} /></label>
           <label className="field"><span>Delivery PIN</span><input inputMode="numeric" maxLength={6} value={pin} onChange={(ev) => setTypedPin(ev.target.value.replace(/\D/g, ""))} />
-            {pinCheck && <small className={pinCheck.serviceable === false ? "due" : "muted"} role="status">{pinCheck.checking ? "Checking Shadowfax…" : pinCheck.error ? `PIN check unavailable: ${pinCheck.error}` : pinCheck.serviceable ? "Shadowfax delivers here" : "Shadowfax does not serve this PIN. You can still book and use another transporter."}</small>}</label>
+            {pinCheck && <small className={pinCheck.serviceable === false ? "due" : "notice"} role="status" style={{ display: "block", marginTop: "4px" }}>{pinCheck.checking ? "Checking Shadowfax Dale 360…" : pinCheck.error ? `PIN check unavailable: ${pinCheck.error}` : pinCheck.serviceable ? `✓ Shadowfax Dale 360 delivers to PIN ${pin} · Est. Courier Freight: ~₹65.00 (Auto-deducted from Shipping Wallet upon dispatch)` : "Shadowfax does not serve this PIN. You can still book and use another transporter."}</small>}</label>
         </div>
         <div className="tbl-wrap"><table className="tbl lines-tbl">
           <thead><tr><th>Item</th><th>Qty (pcs)</th><th>Rate ₹</th><th>GST</th><th className="num">Amount</th><th></th></tr></thead>

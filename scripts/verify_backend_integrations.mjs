@@ -174,13 +174,13 @@ async function testCloudRunAdmin() {
       console.log("   • Shadowfax Logistics:", chData.shadowfax);
 
       // 4. Check Delivery Wallet & Courier Hubs
-      const hubRes = await fetch(`${CONFIG.cloudRunUrl}/api/admin/hubs`, {
+      const hubRes = await fetch(`${CONFIG.cloudRunUrl}/api/admin/hubs/logistics`, {
         headers: { Cookie: sessionCookie }
       });
       const hubData = await hubRes.json();
       console.log("✅ Hub & Courier Wallet Status:");
-      console.log(`   • Courier Wallet Balance: ₹${((hubData.hubs?.courierWallet?.balancePaise || 0) / 100).toFixed(2)}`);
-      console.log(`   • Initial Credit Seeded: ₹${((hubData.hubs?.courierWallet?.initialCreditPaise || 0) / 100).toFixed(2)}`);
+      console.log(`   • Shadowfax Wallet Balance: ₹${((hubData.wallets?.shadowfax?.balance || 0) / 100).toFixed(2)}`);
+      console.log(`   • Low Balance Alert Threshold: ₹${((hubData.wallets?.shadowfax?.lowAt || 0) / 100).toFixed(2)}`);
 
       // 5. Check Live Shadowfax Status
       const sfxRes = await fetch(`${CONFIG.cloudRunUrl}/api/admin/logistics/shadowfax/status`, {
