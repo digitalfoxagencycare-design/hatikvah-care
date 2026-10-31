@@ -3,6 +3,8 @@ import { NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams }
 import { api } from "../api.js";
 import Login from "./Login.jsx";
 import { MetaProvider } from "./ui.jsx";
+import { Toaster } from "./toast.jsx";
+import { Icon } from "./visual.jsx";
 import "./admin.css";
 
 const Me = createContext(null);
@@ -20,17 +22,23 @@ const P = {
   Reports: page(() => import("./Reports.jsx")), Content: page(() => import("./Content.jsx")), Automation: page(() => import("./Automation.jsx")),
   Settings: page(() => import("./Settings.jsx")), Team: page(() => import("./Team.jsx")), Audit: page(() => import("./Audit.jsx")), Account: page(() => import("./Account.jsx")),
   CreditNotes: page(() => import("./CreditNotes.jsx")), POS: page(() => import("./POS.jsx")), WhatsApp: page(() => import("./WhatsApp.jsx")), Ledger: page(() => import("./Ledger.jsx")),
+  PaymentsHub: page(() => import("./PaymentsHub.jsx")), LogisticsHub: page(() => import("./LogisticsHub.jsx")), More: page(() => import("./More.jsx")),
 };
-// [path, label, permission, component, extra routes]
+// [path, label, permission, component, icon]
 const NAV = [
-  ["Sell", [["pos", "Counter billing", "pos", "POS"], ["whatsapp", "WhatsApp inbox", "enquiries", "WhatsApp"], ["enquiries", "Enquiries", "enquiries", "Enquiries"], ["customers", "Customers", "customers", "Customers"], ["quotes", "Quotations", "quotes", "Quotes"], ["invoices", "Invoices & Payments", "invoices", "Invoices"], ["credit-notes", "Credit notes", "invoices", "CreditNotes"], ["orders", "Sales orders", "orders", "Orders"]]],
-  ["Catalogue", [["products", "Products", "catalog", "Products"], ["price-lists", "Offers & Discounts", "customers", "PriceLists"]]],
-  ["Stock", [["stock", "Stock Levels", "stock", "Stock"], ["purchases", "Purchase Orders / Bills", "stock", "Purchases"], ["suppliers", "Suppliers", "stock", "Suppliers"]]],
-  ["Business", [["ledger", "Cash & bank book", "ledger", "Ledger"], ["reports", "Reports", "reports", "Reports"], ["automation", "Automation & messages", "automation", "Automation"], ["content", "Website content", "content", "Content"]]],
-  ["Admin", [["settings", "Company & GST", "settings", "Settings"], ["team", "Team", "team", "Team"], ["audit", "Activity log", "audit", "Audit"]]],
+  ["", [["pos", "Counter Billing", "pos", "POS", "pos"], ["quotes", "Quotations", "quotes", "Quotes", "quote"], ["invoices", "Invoices", "invoices", "Invoices", "invoice"], ["purchase-orders", "Purchase Orders", "stock", "Purchases", "purchase"], ["vendors", "Suppliers", "stock", "Suppliers", "vendor"], ["products", "Products & Inventory", "catalog", "Products", "product"]]],
+  ["Automations & Channels", [["whatsapp", "WhatsApp Hub", "enquiries", "WhatsApp", "chat"], ["payments-hub", "Razorpay Payments", "invoices", "PaymentsHub", "card"], ["logistics-hub", "Logistics & Delivery", "orders", "LogisticsHub", "truck"]]],
 ];
+// Off the sidebar, on the More page: [path, label, permission, component, hint]
+export const MORE = [["enquiries", "Enquiries", "enquiries", "Enquiries", "Quote requests from the website"], ["customers", "Customers", "customers", "Customers", "Hotel accounts and credit terms"], ["orders", "Sales orders", "orders", "Orders", "Packing and dispatch"],
+  ["stock", "Stock levels", "stock", "Stock", "Adjustments, batches and transfers"], ["price-lists", "Offers & discounts", "customers", "PriceLists", "Special price lists"], ["credit-notes", "Credit notes", "invoices", "CreditNotes", "Returns, needed for GST filing"],
+  ["ledger", "Cash & bank book", "ledger", "Ledger", "Money in and out"], ["reports", "Reports", "reports", "Reports", "GST, sales and stock reports"], ["automation", "Automation & messages", "automation", "Automation", "Message rules and the outbox"],
+  ["content", "Website content", "content", "Content", "Pages, banners and testimonials"], ["settings", "Company & GST", "settings", "Settings", "Business details on every invoice"], ["team", "Team", "team", "Team", "Staff sign-ins and roles"], ["audit", "Activity log", "audit", "Audit", "Who changed what"]];
 const DETAIL = [["products/new", "catalog", "ProductForm"], ["products/:id", "catalog", "ProductForm"], ["customers/:id", "customers", "CustomerDetail"], ["quotes/:id", "quotes", "QuoteDetail"],
-  ["orders/:id", "orders", "OrderDetail"], ["invoices/:id", "invoices", "InvoiceDetail"], ["purchases/:id", "stock", "PurchaseDetail"]];
+  ["orders/:id", "orders", "OrderDetail"], ["invoices/:id", "invoices", "InvoiceDetail"], ["purchase-orders/:id", "stock", "PurchaseDetail"]];
+
+/** Old links to purchase orders and suppliers keep working. */
+function OldPurchase() { const { id } = useParams(); return <Navigate to={`/admin/purchase-orders/${id}`} replace />; }
 
 /** Remounts a detail page when its id changes (e.g. "new" → the saved record), so no stale data is shown. */
 function ById({ name }) { const { id } = useParams(); const C = P[name]; return <C key={id} />; }
@@ -42,20 +50,22 @@ export default function AdminApp() {
   useEffect(() => { document.title = "Admin | HaTikvah Care"; api("/api/admin/me").then(setMe).catch(() => setMe(null)); }, []);
   useEffect(() => setMenu(false), [loc.pathname]);
   if (me === undefined) return <div className="center-note">Loading…</div>;
-  if (me === null) return <Login onLogin={setMe} />;
+  if (me === null) return <><Login onLogin={setMe} /><Toaster /></>;
   const logout = async () => { await api("/api/admin/logout", { method: "POST" }).catch(() => {}); setMe(null); nav("/admin"); };
   const el = (name) => { const C = P[name]; return <C />; };
+  const link = ([path, label, , , icon]) => <NavLink key={path} to={`/admin/${path}`}><Icon name={icon} />{label}</NavLink>;
   return (
     <Me.Provider value={me}><MetaProvider>
       <div className="adm">
         <aside className="adm-side">
           <div className="row-between"><img src="/brand/hatikvah-logo.png" alt="HaTikvah Care" width="110" height="62" /><button className="menu-btn adm-menu" aria-expanded={menu} onClick={() => setMenu(!menu)}>{menu ? "Close" : "Menu"}</button></div>
           <nav className={menu ? "open" : ""}>
-            <NavLink to="/admin" end>Dashboard</NavLink>
+            <NavLink to="/admin" end><Icon name="dashboard" />Dashboard</NavLink>
             {NAV.map(([group, items]) => {
               const mine = items.filter(([, , perm]) => can(me, perm));
-              return mine.length > 0 && <div key={group} className="nav-group"><small>{group}</small>{mine.map(([path, label]) => <NavLink key={path} to={`/admin/${path}`}>{label}</NavLink>)}</div>;
+              return mine.length > 0 && <div key={group} className="nav-group">{group && <small>{group}</small>}{mine.map(link)}</div>;
             })}
+            <NavLink className="nav-more" to="/admin/more"><Icon name="more" />More tools</NavLink>
           </nav>
           <div className="adm-user"><span>{me.name}<small>{me.role}{me.twoFactor ? " · 2-step on" : ""}</small></span><NavLink to="/admin/account">My account</NavLink><button className="link" onClick={logout}>Sign out</button><a href="/" target="_blank" rel="noopener noreferrer">View website ↗</a></div>
         </aside>
@@ -64,12 +74,17 @@ export default function AdminApp() {
             <Routes>
               <Route index element={el("Dashboard")} />
               <Route path="account" element={el("Account")} />
-              {NAV.flatMap(([, items]) => items).map(([path, , perm, C]) => <Route key={path} path={path} element={can(me, perm) ? el(C) : <Navigate to="/admin" />} />)}
+              <Route path="more" element={el("More")} />
+              <Route path="purchases" element={<Navigate to="/admin/purchase-orders" replace />} />
+              <Route path="purchases/:id" element={<OldPurchase />} />
+              <Route path="suppliers" element={<Navigate to="/admin/vendors" replace />} />
+              {[...NAV.flatMap(([, items]) => items), ...MORE].map(([path, , perm, C]) => <Route key={path} path={path} element={can(me, perm) ? el(C) : <Navigate to="/admin" />} />)}
               {DETAIL.map(([path, perm, C]) => <Route key={path} path={path} element={can(me, perm) ? <ById name={C} /> : <Navigate to="/admin" />} />)}
               <Route path="*" element={<Navigate to="/admin" />} />
             </Routes>
           </Suspense>
         </main>
+        <Toaster />
       </div>
     </MetaProvider></Me.Provider>
   );

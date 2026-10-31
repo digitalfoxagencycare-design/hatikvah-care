@@ -2,6 +2,8 @@ import { useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api.js";
 import { Loader, useLoad } from "./hooks.jsx";
+import { Photo, StockMeter } from "./visual.jsx";
+import { Msg } from "./ui.jsx";
 
 const toPaise = (s) => { if (s.trim() === "") return null; const n = Number(s.replace(/,/g, "")); return Number.isFinite(n) && n >= 0 && n <= 1_000_000 ? Math.round(n * 100) : NaN; };
 
@@ -35,8 +37,9 @@ export default function Products() {
 
   return (
     <>
-      <div className="row-between"><h1>Products</h1>
+      <div className="row-between"><h1>Products & Inventory</h1>
         <div className="btn-row">
+          <Link className="btn ghost" to="/admin/price-lists">Offers & Discounts</Link>
           <a className="btn ghost" href="/api/admin/products/export.csv">Export CSV</a>
           <button className="btn ghost" onClick={() => setImp(true)}>Import CSV</button>
           <Link className="btn" to="/admin/products/new">+ Add product</Link>
@@ -47,27 +50,26 @@ export default function Products() {
         <select value={cat} onChange={(e) => set("category", e.target.value)} aria-label="Category"><option value="">All categories</option>{cats.data?.map((c) => <option key={c.id} value={c.slug}>{c.name}</option>)}</select>
         <select value={filter} onChange={(e) => set("filter", e.target.value)} aria-label="Filter"><option value="">All</option><option value="noprice">No price yet</option><option value="hidden">Hidden</option><option value="nophoto">No photo</option></select>
       </div>
-      {msg && <p className="alert" role="alert">{msg}</p>}
+      <Msg st={{ error: msg }} />
       <Loader s={s}>
-        <p className="muted" role="status">{rows.length} of {s.data?.length} products. Type a price and press Enter or click away to save.</p>
-        <div className="tbl-wrap"><table className="tbl">
-          <thead><tr><th></th><th>Product</th><th>Category</th><th>Price (₹)</th><th>Unit</th><th>Live</th><th>★</th><th></th></tr></thead>
-          <tbody>
-            {rows.map((p) => (
-              <tr key={p.id} className={p.active ? "" : "off"}>
-                <td><img className="thumb" src={p.images[0]} alt="" width="44" height="44" /></td>
-                <td><Link to={`/admin/products/${p.id}`}><strong>{p.name}</strong></Link><small>{p.sku}{p.pack && ` · ${p.pack}`}</small></td>
-                <td>{catName(p.category)}<small>{p.collection}</small></td>
-                <td><PriceCell key={p.id + ":" + p.price} p={p} onSaved={replace} onError={setMsg} /></td>
-                <td><input className="unit-in" defaultValue={p.priceUnit} placeholder="per piece" maxLength={40} aria-label={`Price unit for ${p.name}`} onBlur={(e) => e.target.value !== p.priceUnit && patch(p, { priceUnit: e.target.value })} /></td>
-                <td><input type="checkbox" checked={p.active} onChange={(e) => patch(p, { active: e.target.checked })} aria-label={`${p.name} is live on the website`} /></td>
-                <td><input type="checkbox" checked={p.featured} onChange={(e) => patch(p, { featured: e.target.checked })} aria-label={`${p.name} is featured on the home page`} /></td>
-                <td><Link className="link" to={`/admin/products/${p.id}`}>Edit</Link></td>
-              </tr>
-            ))}
-            {rows.length === 0 && <tr><td colSpan="8" className="muted">No products match.</td></tr>}
-          </tbody>
-        </table></div>
+        <p className="muted" role="status">{rows.length} of {s.data?.length} products. Type a price and press Enter to save.</p>
+        <div className="prod-grid">
+          {rows.map((p) => (
+            <article key={p.id} className={"prod" + (p.active ? "" : " off")}>
+              <Link className="prod-img" to={`/admin/products/${p.id}`} aria-label={`Edit ${p.name}`}><Photo src={p.images[0]} />{p.featured && <span className="prod-flag">Featured</span>}</Link>
+              <div className="prod-body">
+                <Link to={`/admin/products/${p.id}`}>{p.name}</Link>
+                <small>{p.sku}{p.pack && ` · ${p.pack}`} · {catName(p.category)}</small>
+                {p.stockTracked ? <StockMeter available={p.available} reorderLevel={p.reorderLevel || 0} /> : <small>Stock not tracked</small>}
+                <div className="prod-foot">
+                  <PriceCell key={p.id + ":" + p.price} p={p} onSaved={replace} onError={setMsg} />
+                  <label className="toggle"><input type="checkbox" checked={p.active} onChange={(e) => patch(p, { active: e.target.checked })} aria-label={`${p.name} is live on the website`} />Live</label>
+                </div>
+              </div>
+            </article>
+          ))}
+          {rows.length === 0 && <p className="muted">No products match.</p>}
+        </div>
       </Loader>
       {imp && <ImportDialog onClose={(changed) => { setImp(false); if (changed) s.reload(); }} />}
     </>

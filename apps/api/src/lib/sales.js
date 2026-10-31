@@ -137,6 +137,20 @@ async function createOrderFromQuoteCore(store, quote, by) {
   return order;
 }
 
+const last10 = (phone) => String(phone || "").replace(/\D/g, "").slice(-10);
+/** The customer behind a document. If the record is gone, the copy saved on the document finds them by GSTIN, phone or name, or brings them back. */
+export async function resolveCustomer(store, doc) {
+  const c = doc.customerId ? await store.customers.get(doc.customerId) : null;
+  if (c) return c;
+  const s = doc.customer;
+  if (!s?.name) return null;
+  const all = await store.customers.all();
+  const phone = last10(s.phone), name = s.name.trim().toLowerCase();
+  const match = (s.gstin && all.find((x) => x.gstin === s.gstin)) || (phone.length === 10 && all.find((x) => last10(x.phone) === phone)) || all.find((x) => x.name.trim().toLowerCase() === name);
+  return match || store.customers.insert({ name: s.name, contactName: s.contactName || "", phone: s.phone || "", email: s.email || "", gstin: s.gstin || "", stateCode: s.stateCode || (s.gstin ? s.gstin.slice(0, 2) : ""), city: "", billingAddress: s.billingAddress || "", shippingAddress: s.shippingAddress || s.billingAddress || "",
+    priceListId: "", paymentTermsDays: 30, reorderDays: 0, tags: [], notes: "", assignedTo: "", followUpAt: "", source: "restored", createdAt: now(), updatedAt: now() });
+}
+
 async function bookingCustomer(store, e, d, address) {
   if (d.customerId) { const c = await store.customers.get(d.customerId); if (!c) throw userError("Customer not found", 404); return c; }
   let c = e.customerId ? await store.customers.get(e.customerId) : null;

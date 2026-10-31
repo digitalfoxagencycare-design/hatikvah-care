@@ -1,95 +1,126 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { tiltHandlers } from "../tilt.js";
-import { useMe } from "./AdminApp.jsx";
+import { can, useMe } from "./AdminApp.jsx";
 import { Loader, useLoad } from "./hooks.jsx";
-import { fmtDate, fmtTime, Pill, rs } from "./ui.jsx";
+import { PickupModal } from "./Logistics.jsx";
+import { Pill, rs, useMeta } from "./ui.jsx";
+import { Icon, Photo } from "./visual.jsx";
 
-const tilt = tiltHandlers(9);
-const Tile = ({ to, n, label, sub, tone = "" }) => <Link to={to} className={"tile " + tone} {...tilt}><strong>{n}</strong><span>{label}</span>{sub && <small>{sub}</small>}</Link>;
+const COURIERS = { shadowfax: "Shadowfax", porter: "Porter" };
+
+/** The last seven days as a small line; the end of the line is today. */
+function Spark({ days }) {
+  const max = Math.max(1, ...days.map((d) => d.total));
+  const points = days.map((d, i) => `${(i * 100) / (days.length - 1)},${28 - (d.total / max) * 26}`).join(" ");
+  return <svg className="spark" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true"><polyline points={points} fill="none" stroke="currentColor" strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" /></svg>;
+}
+
+const Kpi = ({ to, label, n, tone = "", children }) => <Link to={to} className={"kpi " + tone}><span className="kpi-label">{label}</span><strong>{n}</strong>{children}</Link>;
+
+const Courier = ({ name, off }) => <span className={"courier" + (off ? " off" : "")}>{name}</span>;
+
+function LowCard({ p }) {
+  const level = p.reorderLevel, pct = Math.min(100, Math.round((100 * p.physical) / Math.max(1, level)));
+  return (
+    <li className="low-card">
+      <Link to={`/admin/products/${p.id}`} aria-label={p.name}><Photo src={p.image} /></Link>
+      <div className="low-info">
+        <Link to={`/admin/products/${p.id}`}>{p.name}</Link>
+        <small>{p.sku}</small>
+        <i className={"gauge" + (p.available <= 0 ? " out" : "")}><em style={{ width: `${pct}%` }} /></i>
+        <small><b>{p.physical.toLocaleString("en-IN")}</b> {p.unit} in stock · threshold {level.toLocaleString("en-IN")}{p.reserved > 0 ? ` · ${p.reserved.toLocaleString("en-IN")} reserved` : ""}</small>
+      </div>
+      <Link className="btn small" to={`/admin/purchase-orders/new?product=${p.id}`}>+ Create PO</Link>
+    </li>
+  );
+}
+
+function DispatchCard({ o, couriers, onBook }) {
+  const shipped = o.status === "dispatched", waiting = ["pending", "reconcile"].includes(o.booking);
+  return (
+    <li className="queue-card">
+      <div className="queue-who">
+        <strong>{o.customer}</strong>
+        <small><Link to={`/admin/orders/${o.id}`}>{o.number}</Link> · {rs(o.total)}</small>
+        <small className="queue-dest">{o.destination || "No delivery address"}</small>
+      </div>
+      <div className="queue-tags"><Pill s={o.status} />{o.courier ? <Courier name={COURIERS[o.courier] || o.courier} /> : <Courier name="No courier" off />}</div>
+      <div className="queue-acts">
+        {shipped && !waiting && couriers.length > 0 && <button className="btn small" onClick={() => onBook(o)}>Book Rider</button>}
+        {!shipped && <Link className="btn small" to={`/admin/orders/${o.id}`}>Dispatch order</Link>}
+        {o.challanNumber && <a className="btn ghost small" href={`/doc/label/${o.token}`} target="_blank" rel="noopener noreferrer">Print 4x6 Label</a>}
+      </div>
+    </li>
+  );
+}
+
+function Aging({ rows }) {
+  const total = rows.reduce((n, a) => n + a.amount, 0);
+  if (!total) return <p className="muted">Nothing outstanding.</p>;
+  return (
+    <>
+      <div className="age-bar" role="img" aria-label={rows.map((a) => `${a.label}: ${rs(a.amount)}`).join(", ")}>
+        {rows.filter((a) => a.amount > 0).map((a) => <i key={a.key} className={a.key} style={{ flexGrow: a.amount }} />)}
+      </div>
+      <ul className="age-keys">
+        {rows.map((a) => <li key={a.key}><span><i className={a.key} aria-hidden="true" />{a.label}</span><strong>{rs(a.amount)}</strong><small>{Math.round((100 * a.amount) / total)}% · {a.count} invoice{a.count === 1 ? "" : "s"}</small></li>)}
+      </ul>
+    </>
+  );
+}
 
 export default function Dashboard() {
   const me = useMe();
   const s = useLoad("/api/admin/dashboard");
+  const couriers = useMeta().channels.couriers || [];
+  const [booking, setBooking] = useState(null);
   const d = s.data;
+  const hour = new Date().getHours();
+  const days = d?.revenueDays, sold = days?.at(-1).total ?? 0, before = days?.at(-2).total ?? 0;
   return (
-    <>
-      <div className="kpi-stage">
-      <h1>Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}, {me.name.split(" ")[0]}</h1>
-      <Loader s={s}>{d && (
-          <div className="tiles">
-            {"salesThisMonth" in d && <Tile to="/admin/reports" n={rs(d.salesThisMonth)} label="Invoiced this month" sub={`${rs(d.receivedThisMonth)} received`} />}
-            {"outstanding" in d && <Tile to="/admin/invoices?status=overdue" n={rs(d.outstanding)} label="To collect" sub={`${rs(d.overdue)} overdue (${d.overdueCount} invoices)`} tone={d.overdue ? "warn" : ""} />}
-            {me.permissions.includes("enquiries") && <Tile to="/admin/enquiries" n={d.newEnquiries} label="New enquiries" sub={`${d.totalEnquiries} in total`} tone={d.newEnquiries ? "hot" : ""} />}
-            {"openQuotes" in d && <Tile to="/admin/quotes?status=sent" n={d.openQuotes} label="Quotes awaiting reply" sub={rs(d.openQuoteValue)} />}
-            {"toDispatch" in d && <Tile to="/admin/orders" n={d.toDispatch} label="Orders to dispatch" tone={d.toDispatch ? "hot" : ""} />}
-            {"lowStock" in d && <Tile to="/admin/stock?filter=low" n={d.lowStock} label="Items low on stock" sub="available ≤ reorder level" tone={d.lowStock ? "warn" : ""} />}
-            {"expiringBatches" in d && d.expiringBatches > 0 && <Tile to="/admin/stock?filter=expiring" n={d.expiringBatches} label="Batches expiring" sub="within 60 days" tone="warn" />}
-            {"inboxUnread" in d && <Tile to="/admin/whatsapp" n={d.inboxUnread} label="Unread WhatsApp" tone={d.inboxUnread ? "hot" : ""} />}
-            {me.permissions.includes("catalog") && <Tile to="/admin/products?filter=noprice" n={d.withoutPrice} label="Products without a price" sub={`${d.active} live products`} tone={d.withoutPrice ? "warn" : ""} />}
-          </div>
-      )}</Loader>
+    <div className="dash">
+      <div className="row-between">
+        <h1>Good {hour < 12 ? "morning" : hour < 17 ? "afternoon" : "evening"}, {me.name.split(" ")[0]}</h1>
+        <div className="btn-row">
+          {can(me, "quotes") && <Link className="btn ghost" to="/admin/quotes/new">New quotation</Link>}
+          {can(me, "pos") && <Link className="btn" to="/admin/pos">New bill</Link>}
+        </div>
       </div>
-      {d && (
-        <>
-          <div className="grid2 top">
-            {d.dispatchQueue && (
-              <div className="panel">
-                <div className="row-between"><h2>Dispatch queue</h2><Link to="/admin/orders">Orders →</Link></div>
-                {d.dispatchQueue.length === 0 ? <p className="muted">Nothing waiting to go out.{d.inTransit ? ` ${d.inTransit} in transit.` : ""}</p> : (
-                  <table className="tbl"><tbody>{d.dispatchQueue.map((o) => <tr key={o.id}><td><Link to={`/admin/orders/${o.id}`}><strong>{o.number}</strong></Link><small>{fmtDate(o.createdAt)}{o.expectedDate && ` · due ${fmtDate(o.expectedDate)}`}</small></td>
-                    <td>{o.customer}{o.paymentStatus === "pending" && <small className="due">awaiting online payment</small>}</td><td className="num">{rs(o.total)}</td><td><Pill s={o.status} /></td></tr>)}</tbody></table>
-                )}
-              </div>
-            )}
-            {d.aging && (
-              <div className="panel">
-                <div className="row-between"><h2>Receivables by age</h2><Link to="/admin/invoices?status=overdue">Overdue →</Link></div>
-                <div className="aging">{d.aging.map((b) => <div key={b.key} className={b.key !== "current" && b.amount ? "late" : ""}><small>{b.label}</small><strong>{rs(b.amount)}</strong><small>{b.count} invoice{b.count === 1 ? "" : "s"}</small></div>)}</div>
-              </div>
-            )}
-            {d.lowStockItems?.length > 0 && (
-              <div className="panel">
-                <div className="row-between"><h2>Reorder now</h2><Link to="/admin/stock?filter=low">Stock →</Link></div>
-                <table className="tbl"><thead><tr><th>Item</th><th className="num">Floor</th><th className="num">Held</th><th className="num">Avail.</th></tr></thead>
-                  <tbody>{d.lowStockItems.map((p) => <tr key={p.id}><td className="grow-cell">{p.name}<small>{p.sku} · reorder at {p.reorderLevel}</small></td><td className="num">{p.physical}</td><td className="num">{p.reserved}</td><td className="num"><strong>{p.available}</strong></td></tr>)}</tbody></table>
-              </div>
-            )}
-            {d.expiringItems?.length > 0 && (
-              <div className="panel">
-                <h2>Batches expiring soon</h2>
-                <table className="tbl"><tbody>{d.expiringItems.map((b) => <tr key={b.productId + b.batchNumber}><td>{b.name}<small>Batch {b.batchNumber}</small></td><td>{fmtDate(b.expDate)}<small className={b.daysToExpiry < 0 ? "due" : ""}>{b.daysToExpiry < 0 ? `expired ${-b.daysToExpiry} days ago` : `${b.daysToExpiry} days left`}</small></td><td className="num">{b.qty}</td></tr>)}</tbody></table>
-              </div>
-            )}
-            {d.outbox && (
-              <div className="panel">
-                <div className="row-between"><h2>Messages sent</h2><Link to="/admin/automation">Outbox →</Link></div>
-                {d.outbox.length === 0 ? <p className="muted">No messages yet.</p> : (
-                  <table className="tbl"><tbody>{d.outbox.map((m) => <tr key={m.id}><td>{m.channel === "whatsapp" ? "WhatsApp" : "Email"}<small>{fmtTime(m.createdAt)}</small></td><td>{m.event}<small>{m.ref}</small></td><td><Pill s={m.deliveryStatus || m.status} />{m.error && <small className="due">{m.error}</small>}</td></tr>)}</tbody></table>
-                )}
-              </div>
-            )}
-          </div>
-          {me.permissions.includes("enquiries") && (
-            <div className="grid2 top">
-              <div className="panel">
-                <div className="row-between"><h2>Follow-ups due</h2><Link to="/admin/enquiries">Enquiries →</Link></div>
-                {d.followUps.length === 0 ? <p className="muted">Nothing due today. 🎉</p> : (
-                  <table className="tbl"><tbody>{d.followUps.map((e) => <tr key={e.id}><td><strong>{e.ref}</strong><small>{fmtDate(e.followUpAt)}</small></td><td>{e.name}<small>{e.company}</small></td><td><a href={`tel:${e.phone}`}>{e.phone}</a></td></tr>)}</tbody></table>
-                )}
-              </div>
-              <div className="panel">
-                <div className="row-between"><h2>Recent enquiries</h2><Link to="/admin/enquiries">See all →</Link></div>
-                {d.recentEnquiries.length === 0 ? <p className="muted">No enquiries yet. They appear here when visitors use the contact or quote forms.</p> : (
-                  <table className="tbl"><tbody>
-                    {d.recentEnquiries.map((e) => <tr key={e.id}><td>{e.ref}</td><td>{e.name}{e.company && <small>{e.company}</small>}</td><td>{e.items.length} item{e.items.length === 1 ? "" : "s"}</td><td><Pill s={e.status} /></td></tr>)}
-                  </tbody></table>
-                )}
-              </div>
-            </div>
+      <Loader s={s}>{d && <>
+        <div className="kpis">
+          {days && <Kpi to="/admin/invoices" label="Today's sales" n={rs(sold)}><small>{before ? `Yesterday ${rs(before)}` : "No sales yesterday"}</small><Spark days={days} /></Kpi>}
+          {"toDispatch" in d && <Kpi to="/admin/logistics-hub" label="Pending dispatches" n={d.toDispatch}><span className="kpi-tags">{couriers.length ? couriers.map((c) => <Courier key={c} name={COURIERS[c] || c} />) : <Courier name="No courier connected" off />}</span></Kpi>}
+          {"lowStock" in d && <Kpi to="/admin/stock" label="Low stock alert" n={d.lowStock} tone={d.lowStock ? "warn" : ""}><span className="kpi-tags">{d.lowStock ? <Pill s="unpaid">Needs reorder</Pill> : <Pill s="paid">All stocked</Pill>}</span></Kpi>}
+          {"outstanding" in d && <Kpi to="/admin/invoices?status=overdue" label="Unpaid invoices" n={rs(d.outstanding)} tone={d.overdue ? "bad" : ""}><small>{rs(d.overdue)} overdue · {d.overdueCount} invoice{d.overdueCount === 1 ? "" : "s"}</small></Kpi>}
+        </div>
+
+        {d.lowStockItems?.length > 0 && (
+          <section className="panel">
+            <div className="row-between"><h2>Low stock</h2><Link to="/admin/stock">All stock</Link></div>
+            <ul className="low-grid">{d.lowStockItems.slice(0, 6).map((p) => <LowCard key={p.id} p={p} />)}</ul>
+          </section>
+        )}
+
+        <div className="dash-two">
+          {d.dispatchQueue && (
+            <section className="panel">
+              <div className="row-between"><h2>Dispatch queue</h2><Link to="/admin/logistics-hub">Logistics</Link></div>
+              {d.dispatchQueue.length === 0 ? <p className="muted">Nothing waiting to go out.{d.inTransit ? ` ${d.inTransit} in transit.` : ""}</p> : <ul className="queue">{d.dispatchQueue.slice(0, 5).map((o) => <DispatchCard key={o.id} o={o} couriers={couriers} onBook={setBooking} />)}</ul>}
+            </section>
           )}
-          {me.permissions.includes("catalog") && d.withoutPrice > 0 && <p className="notice">Tip: open <Link to="/admin/products">Products</Link> to type prices into the table, or use <strong>Export / Import CSV</strong> to fill them from a spreadsheet.</p>}
-        </>
-      )}
-    </>
+          {d.aging && <section className="panel"><div className="row-between"><h2>Receivables aging</h2><span className="muted">{rs(d.outstanding)} due</span></div><Aging rows={d.aging} /></section>}
+          {can(me, "enquiries") && (
+            <section className="panel">
+              <div className="row-between"><h2>New enquiries</h2><Link to="/admin/enquiries">{d.newEnquiries} new</Link></div>
+              {d.recentEnquiries.length === 0 ? <p className="muted">They appear here when visitors use the contact or quote forms.</p> : (
+                <ul className="feed">{d.recentEnquiries.slice(0, 4).map((e) => <li key={e.id}><strong>{e.name}{e.company && ` · ${e.company}`}</strong><p>{e.ref} · {e.items.length} item{e.items.length === 1 ? "" : "s"}</p><span className="feed-end"><Pill s={e.status} /></span></li>)}</ul>
+              )}
+            </section>
+          )}
+          {d.inboxUnread > 0 && <Link className="panel inbox-note" to="/admin/whatsapp"><Icon name="chat" size={20} />{d.inboxUnread} unread WhatsApp message{d.inboxUnread === 1 ? "" : "s"}</Link>}
+        </div>
+      </>}</Loader>
+      {booking && <PickupModal o={booking} onClose={() => setBooking(null)} onBooked={() => { setBooking(null); s.reload(); }} />}
+    </div>
   );
 }

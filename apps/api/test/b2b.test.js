@@ -73,7 +73,7 @@ describe("stock buckets and batches", () => {
     let row = (await owner.get("/api/admin/stock")).data.find((p) => p.id === product.id);
     assert.deepEqual([row.physical, row.reserved, row.available, row.low], [1000, 100, 900, true], "low is judged on available stock");
     const dash = (await owner.get("/api/admin/dashboard")).data;
-    assert.ok(dash.lowStockItems.some((p) => p.id === product.id)); assert.ok(dash.dispatchQueue.some((o) => o.id === order.id)); assert.equal(dash.aging.length, 5);
+    assert.ok(dash.lowStockItems.some((p) => p.id === product.id && "reorderQty" in p && "physical" in p)); assert.ok(dash.dispatchQueue.some((o) => o.id === order.id)); assert.equal(dash.aging.length, 5);
     assert.equal((await owner.post(`/api/admin/orders/${order.id}/invoice`)).status, 201);
     row = (await owner.get("/api/admin/stock")).data.find((p) => p.id === product.id);
     assert.deepEqual([row.physical, row.reserved, row.available], [900, 0, 900], "2 boxes = 100 pieces left the warehouse");

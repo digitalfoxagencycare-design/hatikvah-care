@@ -4,20 +4,11 @@ import { api } from "../api.js";
 import { can, useMe } from "./AdminApp.jsx";
 import { DocView } from "./DocParts.jsx";
 import { Loader, useLoad } from "./hooks.jsx";
+import { ask } from "./toast.jsx";
 import { DocEditor, fmtDate, fmtTime, Msg, Timeline, useAction } from "./ui.jsx";
+import { openWhatsAppQuote, whatsAppQuote } from "./whatsappQuote.js";
 
 const strip = (items) => items.map(({ amount, tax, total, ...l }) => l);
-
-function getWhatsAppQuote(q) {
-  if (!q) return null;
-  const rawPhone = q.customer?.phone || "";
-  const clean = rawPhone.replace(/\D/g, "");
-  const waPhone = clean.length === 10 ? `91${clean}` : clean;
-  const quoteUrl = `${window.location.origin}/doc/quote/${q.token}`;
-  const total = ((q.totals?.total ?? q.total ?? 0) / 100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const text = `Hello ${q.customer?.name || "Customer"},\n\nPlease find your Quotation ${q.number} from HaTikvah Care.\nTotal Amount: ₹${total}\n\nYou can review, print, and approve your quotation online here:\n${quoteUrl}\n\nThank you,\nHaTikvah Care`;
-  return { waPhone, text, url: waPhone ? `https://wa.me/${waPhone}?text=${encodeURIComponent(text)}` : null };
-}
 
 export default function QuoteDetail() {
   const { id } = useParams();
@@ -28,18 +19,8 @@ export default function QuoteDetail() {
   const [editing, setEditing] = useState(false);
   const [st, run] = useAction();
   const q = isNew ? null : s.data;
-  const wa = getWhatsAppQuote(q);
-  const openWhatsApp = () => {
-    if (wa?.url) {
-      window.open(wa.url, "_blank", "noopener,noreferrer");
-    } else {
-      const num = window.prompt("Enter customer WhatsApp mobile number (10 digits):", q?.customer?.phone || "");
-      if (!num) return;
-      const clean = num.replace(/\D/g, "");
-      const p = clean.length === 10 ? `91${clean}` : clean;
-      window.open(`https://wa.me/${p}?text=${encodeURIComponent(wa.text)}`, "_blank", "noopener,noreferrer");
-    }
-  };
+  const wa = whatsAppQuote(q);
+  const openWhatsApp = () => openWhatsAppQuote(q);
   const save = (body) => run(async () => {
     const out = await api(isNew ? "/api/admin/quotes" : `/api/admin/quotes/${id}`, { method: isNew ? "POST" : "PUT", body });
     if (isNew) nav(`/admin/quotes/${out.id}`, { replace: true }); else { setEditing(false); s.reload(); }
@@ -83,7 +64,7 @@ export default function QuoteDetail() {
             {q.orderId && <Link className="btn ghost" to={`/admin/orders/${q.orderId}`}>Open sales order</Link>}
             <button className="btn ghost" onClick={() => run(async () => { const n = await api(`/api/admin/quotes/${id}/duplicate`, { method: "POST" }); nav(`/admin/quotes/${n.id}`); })}>Duplicate</button>
             <Link className="btn ghost" to={`/admin/customers/${q.customerId}`}>Customer</Link>
-            {q.status === "draft" && <button className="link danger" onClick={() => window.confirm("Delete this draft?") && run(async () => { await api(`/api/admin/quotes/${id}`, { method: "DELETE" }); nav("/admin/quotes"); })}>Delete draft</button>}
+            {q.status === "draft" && <button className="link danger" onClick={async () => { if (await ask("Delete this draft?", { danger: true, confirmLabel: "Delete" })) run(async () => { await api(`/api/admin/quotes/${id}`, { method: "DELETE" }); nav("/admin/quotes"); }); }}>Delete draft</button>}
           </div>
           <div className="panel"><h2>History</h2><Timeline entity="quote" entityId={q.id} items={q.activities} onAdded={s.reload} /></div>
         </>

@@ -12,7 +12,6 @@ import About from "./pages/About.jsx";
 import Contact from "./pages/Contact.jsx";
 import NotFound from "./pages/NotFound.jsx";
 import "./styles.css";
-import "./lux.css";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 
 const Admin = lazy(() => import("./admin/AdminApp.jsx"));

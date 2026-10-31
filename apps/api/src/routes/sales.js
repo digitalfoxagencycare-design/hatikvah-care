@@ -6,7 +6,7 @@ import { channels } from "../lib/notify.js";
 import { requirePerm } from "../lib/permissions.js";
 import { refreshPayLink } from "../lib/payments.js";
 import { createPaymentLink } from "../lib/razorpay.js";
-import { balance, bucketOf, stockBuckets, createCreditNote, createInvoice, createOrderFromQuote, customerSnapshot, deductForInvoice, logActivity, moveStock, now, priced, rateFor, recordPayment, refreshInvoice, refundDue, removePaymentLedger, postLedger, assertStockAvailable, consumeStock, token } from "../lib/sales.js";
+import { balance, bucketOf, stockBuckets, createCreditNote, createInvoice, createOrderFromQuote, customerSnapshot, deductForInvoice, logActivity, moveStock, now, priced, rateFor, recordPayment, refreshInvoice, refundDue, resolveCustomer, removePaymentLedger, postLedger, assertStockAvailable, consumeStock, token } from "../lib/sales.js";
 import { measureLabel, pieces, uomOptions } from "../lib/units.js";
 import { nextNumber } from "../lib/gst.js";
 import { getSettings } from "../model.js";
@@ -21,6 +21,16 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
   const r = Router();
   const by = (req) => req.admin.email;
   const customerOr404 = async (id, res) => { const c = await store.customers.get(id); if (!c) notFound(res, "Customer"); return c; };
+  /** Who to invoice. `links` are [collection, document] pairs: each is re-pointed if the customer had to be found or restored, because the invoice copies its customer id from them. */
+  const billTo = async (req, res, links) => {
+    const c = await resolveCustomer(store, links[0][1]);
+    if (!c) { bad(res, "This document has no customer details. Open it and choose a customer.", 409); return null; }
+    if (links[0][1].customerId === c.id) return c;
+    for (const [rows, row] of links) await rows.update(row.id, { customerId: c.id, updatedAt: now() });
+    await logActivity(store, { entity: "customer", entityId: c.id, text: `Linked to ${links[0][1].number} because its customer record was missing`, by: by(req) });
+    await audit(req, "customer.relink", c.name, { document: links[0][1].number });
+    return c;
+  };
   const withActivity = async (row) => ({ ...row, activities: (await store.activities.all({ sort: { at: -1 } })).filter((a) => a.entityId === row.id) });
   const overdue = (i) => ["unpaid", "partial"].includes(i.status) && i.dueDate < todayIST();
 
@@ -31,7 +41,7 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
     for (const p of await store.products.all({ sort: { order: 1 } })) {
       const rVal = await rateFor(store, c, p);
       const rate = rVal ?? p.price ?? 0;
-      out.push({ productId: p.id, sku: p.sku, name: p.name, pack: p.pack || measureLabel(p.measure), hsn: p.hsn || "", gstRate: p.gstRate ?? 18, unit: p.unit || "pcs", rate, price: p.price, pricePaise: p.price, priceTiers: p.priceTiers || [], active: p.active, stockTracked: !!p.stockTracked, ...bucketOf(buckets, p.id),
+      out.push({ productId: p.id, sku: p.sku, name: p.name, image: p.images?.[0] || "", category: p.category || "", collection: p.collection || "", reorderLevel: p.reorderLevel || 0, pack: p.pack || measureLabel(p.measure), hsn: p.hsn || "", gstRate: p.gstRate ?? 18, unit: p.unit || "pcs", rate, price: p.price, pricePaise: p.price, priceTiers: p.priceTiers || [], active: p.active, stockTracked: !!p.stockTracked, ...bucketOf(buckets, p.id),
         // piece / box / carton with pieces per unit and the default rate (customer's piece rate scaled; own box / carton prices win when no price list applies)
         uoms: uomOptions(rVal != null && rVal !== p.price ? { ...p, packPrices: {} } : p, rate) });
     }
@@ -111,7 +121,7 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
     const order = q.orderId ? await store.orders.get(q.orderId) : null;
     if (order?.invoiceId) return bad(res, "This quote's order already has an invoice", 409);
     if (q.invoiceId) return bad(res, "This quote already has an invoice", 409);
-    const c = await customerOr404(q.customerId, res); if (!c) return;
+    const c = await billTo(req, res, [[store.quotes, q], ...(order ? [[store.orders, order]] : [])]); if (!c) return;
     const inv = await createInvoice(store, {
       customer: c,
       items: q.items.map(({ amount, tax, total, ...l }) => l),
@@ -226,7 +236,7 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
     const o = await store.orders.get(req.params.id); if (!o) return notFound(res, "Order");
     if (o.invoiceId) return bad(res, "This order is already invoiced", 409);
     if (o.status === "cancelled") return bad(res, "A cancelled order cannot be invoiced", 409);
-    const c = await customerOr404(o.customerId, res); if (!c) return;
+    const c = await billTo(req, res, [[store.orders, o]]); if (!c) return;
     const inv = await createInvoice(store, { customer: c, items: o.items.map(({ amount, tax, total, ...l }) => l), placeOfSupply: o.placeOfSupply, notes: o.notes, poNumber: o.poNumber, orderId: o.id, orderNumber: o.number, by: by(req) });
     res.status(201).json(await afterInvoice(req, inv));
   }));

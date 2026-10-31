@@ -7,6 +7,7 @@ import { Loader, useLoad } from "./hooks.jsx";
 import { PickupModal, shipmentOpen, ShipmentPanel } from "./Logistics.jsx";
 import { PayLinkActions } from "./PayLink.jsx";
 import { DocEditor, fmtDate, Modal, Msg, Timeline, today, useAction } from "./ui.jsx";
+import { ask } from "./toast.jsx";
 
 const strip = (items) => items.map(({ amount, tax, total, ...l }) => l);
 
@@ -67,7 +68,7 @@ export default function OrderDetail() {
             {o.status === "dispatched" && <button className="btn ghost" onClick={() => status("delivered")}>Mark delivered</button>}
             {can(me, "invoices") && !o.invoiceId && o.status !== "cancelled" && <button className="btn" onClick={() => run(async () => { const inv = await api(`/api/admin/orders/${id}/invoice`, { method: "POST" }); nav(`/admin/invoices/${inv.id}`); })}>Create GST invoice</button>}
             {o.invoiceId && <Link className="btn" to={`/admin/invoices/${o.invoiceId}`}>Invoice {o.invoiceNumber}</Link>}
-            {["confirmed", "packed"].includes(o.status) && <button className="link danger" onClick={() => window.confirm("Cancel this order?") && status("cancelled")}>Cancel order</button>}
+            {["confirmed", "packed"].includes(o.status) && <button className="link danger" onClick={async () => { if (await ask("Cancel this order?", { danger: true, confirmLabel: "Cancel order" })) status("cancelled"); }}>Cancel order</button>}
           </div>
           <div className="panel"><h2>History</h2><Timeline entity="order" entityId={o.id} items={o.activities} onAdded={s.reload} /></div>
           {pickup && <PickupModal o={o} onClose={() => setPickup(false)} onBooked={() => { setPickup(false); s.reload(); }} />}

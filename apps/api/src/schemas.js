@@ -98,6 +98,7 @@ export const posInput = z.object({
   customerId: id.default(""), walkIn: z.object({ name: text(160).min(2), phone, gstin, stateCode }).strict().optional(),
   items: lines, placeOfSupply: stateCode, notes: text(500).default(""),
   payment: z.object({ mode: z.enum(["cash", "upi", "card", "bank", "cheque"]), reference: text(100).default(""), amount: paise.optional() }).strict().nullable().default(null),
+  credit: z.boolean().default(false), // pay later, on the customer's agreed terms
 }).strict().refine((d) => d.customerId || d.walkIn, "Choose a customer or enter the walk-in buyer's name");
 
 export const PICKUP_WINDOWS = ["09:00-12:00", "12:00-15:00", "15:00-18:00", "18:00-21:00"];

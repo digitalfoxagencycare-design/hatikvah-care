@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api.js";
 import { Modal, Msg, rs, useAction } from "./ui.jsx";
+import { ask } from "./toast.jsx";
 
 const POLL_MS = 3000, SYNC_EVERY = 5; // our own record every 3 s (the webhook updates it), Razorpay itself every 15 s
 
@@ -52,7 +53,7 @@ export function UpiQrModal({ invoice, onPaid, onCancelled }) {
       </div>
       <Msg st={st} />
       <div className="btn-row">
-        <button className="btn ghost" disabled={st.busy} onClick={() => window.confirm("Close this QR code and record a cash payment?") && close({ mode: "cash", reference: "" })}>Paid by cash instead</button>
+        <button className="btn ghost" disabled={st.busy} onClick={async () => { if (await ask("Close this QR code and record a cash payment?", { confirmLabel: "Record cash" })) close({ mode: "cash", reference: "" }); }}>Paid by cash instead</button>
         <button className="link danger" disabled={st.busy} onClick={() => close(null)}>Cancel QR, leave invoice unpaid</button>
       </div>
     </Modal>

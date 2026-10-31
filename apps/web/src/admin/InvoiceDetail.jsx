@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { api } from "../api.js";
 import { DocView } from "./DocParts.jsx";
 import { Loader, useLoad } from "./hooks.jsx";
+import { ask, askText } from "./toast.jsx";
 import { PayLinkActions } from "./PayLink.jsx";
 import { DocEditor, fmtDate, Modal, Msg, rs, Timeline, today, toPaise, useAction } from "./ui.jsx";
 
@@ -29,11 +30,11 @@ export default function InvoiceDetail() {
   const [st, run] = useAction();
   const inv = isNew ? null : s.data;
   const wa = getWhatsAppInvoice(inv);
-  const openWhatsApp = () => {
+  const openWhatsApp = async () => {
     if (wa?.url) {
       window.open(wa.url, "_blank", "noopener,noreferrer");
     } else {
-      const num = window.prompt("Enter customer WhatsApp mobile number (10 digits):", inv?.customer?.phone || "");
+      const num = await askText("Customer's WhatsApp number", { value: inv?.customer?.phone || "", placeholder: "10 digits", confirmLabel: "Open WhatsApp" });
       if (!num) return;
       const clean = num.replace(/\D/g, "");
       const p = clean.length === 10 ? `91${clean}` : clean;
@@ -51,7 +52,7 @@ export default function InvoiceDetail() {
       <h1>New GST invoice</h1>
       <p className="notice">Most invoices are created from a sales order (Order → Create GST invoice). Use this for direct sales. Invoices cannot be edited after saving (GST rule); void and re-issue instead.</p>
       <DocEditor kind="invoice" busy={st.busy} error={st.error} extra={extra} initial={{ customerId: sp.get("customer") || "", items: [], notes: "", date: today(), dueDate: "", poNumber: "", placeOfSupply: "" }}
-        onSave={(body) => window.confirm("Issue this invoice? It gets the next invoice number and cannot be edited afterwards.") && run(async () => { const out = await api("/api/admin/invoices", { method: "POST", body }); nav(`/admin/invoices/${out.id}`, { replace: true }); })} />
+        onSave={async (body) => { if (await ask("Issue this invoice?", { body: "It gets the next invoice number and cannot be edited afterwards.", confirmLabel: "Issue invoice" })) run(async () => { const out = await api("/api/admin/invoices", { method: "POST", body }); nav(`/admin/invoices/${out.id}`, { replace: true }); }); }} />
     </>
   );
   return (
@@ -87,11 +88,11 @@ export default function InvoiceDetail() {
           <div className="panel">
             <h2>Payments</h2>
             <table className="tbl"><tbody>
-              {inv.payments.map((p) => <tr key={p.id}><td>{fmtDate(p.date)}</td><td>{p.mode}</td><td>{p.reference}</td><td className="num">{rs(p.amount)}</td><td><button className="link danger" onClick={() => window.confirm("Remove this payment?") && run(async () => { await api(`/api/admin/payments/${p.id}`, { method: "DELETE" }); s.reload(); })}>Remove</button></td></tr>)}
+              {inv.payments.map((p) => <tr key={p.id}><td>{fmtDate(p.date)}</td><td>{p.mode}</td><td>{p.reference}</td><td className="num">{rs(p.amount)}</td><td><button className="link danger" onClick={async () => { if (await ask("Remove this payment?", { danger: true, confirmLabel: "Remove" })) run(async () => { await api(`/api/admin/payments/${p.id}`, { method: "DELETE" }); s.reload(); }); }}>Remove</button></td></tr>)}
               {inv.payments.length === 0 && <tr><td className="muted">No payments yet.</td></tr>}
             </tbody></table>
           </div>
-          {inv.status !== "void" && inv.amountPaid === 0 && <button className="link danger" onClick={() => { const reason = window.prompt("Reason for voiding this invoice?"); if (reason !== null) run(async () => { await api(`/api/admin/invoices/${id}/void`, { method: "POST", body: { reason } }); s.reload(); }); }}>Void invoice</button>}
+          {inv.status !== "void" && inv.amountPaid === 0 && <button className="link danger" onClick={async () => { const reason = await askText("Reason for voiding this invoice?", { confirmLabel: "Void invoice", danger: true }); if (reason !== null) run(async () => { await api(`/api/admin/invoices/${id}/void`, { method: "POST", body: { reason } }); s.reload(); }); }}>Void invoice</button>}
           <div className="panel"><h2>History</h2><Timeline entity="invoice" entityId={inv.id} items={inv.activities} onAdded={s.reload} /></div>
           {credit && <CreditNoteModal inv={inv} c={credit} setC={setCredit} st={st} onSave={(body) => run(async () => { const r = await api("/api/admin/credit-notes", { method: "POST", body }); setCredit(null); s.reload(); return r; }, "Credit note issued ✓")} />}
           {pay && (
@@ -125,7 +126,7 @@ function CreditNoteModal({ inv, c, setC, st, onSave }) {
   const est = items.reduce((n, x) => { const L = inv.items[x.line]; const t = Math.round(x.qty * (x.rate ?? L.rate) * (1 - (L.discountPct || 0) / 100)); return n + t + Math.round((t * (L.gstRate || 0)) / 100); }, 0);
   return (
     <Modal title={`Credit note on ${inv.number}`} wide onClose={() => setC(null)}>
-      <form className="form" onSubmit={(e) => { e.preventDefault(); if (items.length && window.confirm(`Issue a credit note of about ${rs(est)}? It gets the next CN number and cannot be edited.`)) onSave({ invoiceId: inv.id, reason: c.reason, restock: c.restock, notes: c.notes, items }); }}>
+      <form className="form" onSubmit={async (e) => { e.preventDefault(); if (items.length && await ask(`Issue a credit note of about ${rs(est)}?`, { body: "It gets the next CN number and cannot be edited.", confirmLabel: "Issue credit note" })) onSave({ invoiceId: inv.id, reason: c.reason, restock: c.restock, notes: c.notes, items }); }}>
         <div className="grid2">
           <label className="field"><span>Reason</span><select value={c.reason} onChange={(e) => setC({ ...c, reason: e.target.value, restock: ["return", "incorrect_item"].includes(e.target.value) })}>{REASONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
           <label className="checks"><input type="checkbox" checked={c.restock} disabled={adj} onChange={(e) => setC({ ...c, restock: e.target.checked })} /> Put the goods back into stock</label>

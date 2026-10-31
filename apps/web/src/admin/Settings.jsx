@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
 import { Loader, useLoad } from "./hooks.jsx";
-import { StateSelect } from "./ui.jsx";
+import { StateSelect, Msg } from "./ui.jsx";
 
 export default function Settings() {
   const s = useLoad("/api/admin/settings");
@@ -62,7 +62,7 @@ export default function Settings() {
           </div>
           <div className="field"><span>Brochure PDF (download button on the website)</span>
             <div className="btn-row">{f.brochureUrl ? <><a href={f.brochureUrl} target="_blank" rel="noopener noreferrer">Current brochure</a><button type="button" className="link danger" onClick={() => set("brochureUrl")("")}>Remove</button></> : <span className="muted">None</span>}<input type="file" accept="application/pdf" onChange={brochure} /></div></div>
-          {st.error && <p className="alert" role="alert">{st.error}</p>}{st.saved && <p className="notice" role="status">Saved ✓ (visitors see changes within a minute)</p>}
+          <Msg st={{ error: st.error, ok: st.saved && "Saved. Visitors see changes within a minute." }} />
           <button className="btn" disabled={st.busy}>{st.busy ? "Saving…" : "Save"}</button>
         </form>
       )}</Loader>

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { api } from "../api.js";
 import { Loader, useLoad } from "./hooks.jsx";
 import { Modal, Msg, rs, toPaise, useAction, useAsync } from "./ui.jsx";
+import { ask } from "./toast.jsx";
 
 export default function PriceLists() {
   const s = useLoad("/api/admin/price-lists");
@@ -27,7 +28,7 @@ function Editor({ list, products, onDone }) {
   const [q, setQ] = useState("");
   const [st, run] = useAction();
   const save = (e) => { e.preventDefault(); run(async () => { await api(list.id ? `/api/admin/price-lists/${list.id}` : "/api/admin/price-lists", { method: list.id ? "PATCH" : "POST", body: { ...f, discountPct: Number(f.discountPct) || 0 } }); onDone(); }); };
-  const del = () => window.confirm("Delete this price list?") && run(async () => { await api(`/api/admin/price-lists/${list.id}`, { method: "DELETE" }); onDone(); });
+  const del = async () => { if (await ask("Delete this price list?", { danger: true, confirmLabel: "Delete" })) run(async () => { await api(`/api/admin/price-lists/${list.id}`, { method: "DELETE" }); onDone(); }); };
   const shown = products.filter((p) => f.prices[p.productId] != null || (q && `${p.name} ${p.sku}`.toLowerCase().includes(q.toLowerCase()))).slice(0, 60);
   return (
     <form className="form" onSubmit={save}>

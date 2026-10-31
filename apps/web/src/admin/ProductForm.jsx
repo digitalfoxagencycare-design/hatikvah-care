@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api.js";
 import { Loader, useLoad } from "./hooks.jsx";
+import { ask } from "./toast.jsx";
+import { Msg } from "./ui.jsx";
 
 const EMPTY = { name: "", sku: "", category: "", collection: "", pack: "", variants: [], description: "", images: [], price: null, priceUnit: "per piece", minOrder: "", active: true, featured: false, hsn: "", gstRate: 18, unit: "pcs",
   brand: "", manufacturer: "", shortDescription: "", variantLabel: "", priceTiers: [], packSize: 1, minQty: 0, dispatchInfo: "", returnable: true, specs: [],
@@ -146,7 +148,7 @@ export default function ProductForm() {
     } catch (err) { setSt({ busy: false, error: err.message, saved: false, field: err.field }); }
   }
   async function remove() {
-    if (!window.confirm(`Delete “${f.name}” permanently? To just hide it from the website, untick “Show on website” instead.`)) return;
+    if (!await ask(`Delete “${f.name}” permanently?`, { body: "To just hide it from the website, untick “Show on website” instead.", danger: true, confirmLabel: "Delete" })) return;
     try { await api(`/api/admin/products/${id}`, { method: "DELETE" }); nav("/admin/products"); } catch (err) { setSt((s) => ({ ...s, error: err.message })); }
   }
 
@@ -303,8 +305,7 @@ export default function ProductForm() {
               <label><input type="checkbox" checked={f.featured} onChange={(e) => set("featured", e.target.checked)} /> Feature on home page</label>
               <label><input type="checkbox" checked={!f.returnable} onChange={(e) => set("returnable", !e.target.checked)} /> Non returnable</label>
             </div>
-            {st.error && <p className="alert" role="alert">{st.error}</p>}
-            {st.saved && <p className="notice" role="status">Saved ✓</p>}
+            <Msg st={{ error: st.error, ok: st.saved && "Saved" }} />
             <div className="btn-row">
               <button className="btn" disabled={st.busy}>{st.busy ? "Saving…" : "Save product"}</button>
               {id && <button type="button" className="btn danger-btn" onClick={remove}>Delete</button>}

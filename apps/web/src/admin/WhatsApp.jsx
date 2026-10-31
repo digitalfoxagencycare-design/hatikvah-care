@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import { api } from "../api.js";
 import { Loader, useLoad } from "./hooks.jsx";
 import TemplatePreview from "./TemplatePreview.jsx";
-import { fmtTime, Msg, useAction } from "./ui.jsx";
+import { fmtTime, Msg, Pill, useAction } from "./ui.jsx";
+import { HubTabs, Stat } from "./visual.jsx";
 import { serviceWindow } from "./waWindow.js";
 
 /** Green with the time left while free-form replies are allowed, amber once only templates may be sent. */
@@ -16,9 +17,13 @@ function WindowBadge({ win }) {
   );
 }
 
-/** Customer messages from the WhatsApp Business number, one thread per number; replies are allowed within 24 hours of their last message. */
+const EVENTS = { invoiceSend: "Invoice", quoteSend: "Quote", quoteAccepted: "Quote accepted", quoteReminder: "Quote reminder", orderBooked: "Order booked", orderDispatched: "Dispatched", paymentLink: "Payment link", paymentReceipt: "Receipt", invoiceOverdue: "Overdue reminder", enquiryAck: "Enquiry reply", enquiryAlert: "Enquiry alert", lowStock: "Low stock", followUps: "Follow-ups", dailySummary: "Daily summary" };
+const eventName = (e) => EVENTS[e] || e;
+
+/** Message counts, what went out lately, and the inbox: one thread per number, with replies allowed within 24 hours of their last message. */
 export default function WhatsApp() {
   const s = useLoad("/api/admin/whatsapp/inbox");
+  const hub = useLoad("/api/admin/hubs/whatsapp");
   const [sel, setSel] = useState("");
   const [text, setText] = useState("");
   const [st, run] = useAction();
@@ -38,8 +43,29 @@ export default function WhatsApp() {
   const win = cur && serviceWindow(cur.last.at, now);
   return (
     <>
-      <h1>WhatsApp inbox</h1>
-      <p className="muted">Messages to the business number. New numbers become customer leads automatically, and the bot answers greetings with the quote / hotel / clinic menu. Delivery ticks for messages we send are in <Link to="/admin/automation">Automation & messages</Link>.</p>
+      <h1>Automations & Channels</h1>
+      <HubTabs />
+      <Loader s={hub}>{hub.data && <>
+        <div className="stats">
+          <Stat n={hub.data.stats.sent} label="Sent" />
+          <Stat n={hub.data.stats.delivered} label="Delivered" />
+          <Stat n={hub.data.stats.read} label="Read" tone="good" />
+          <Stat n={hub.data.stats.failed} label="Failed" tone={hub.data.stats.failed ? "bad" : ""} />
+        </div>
+      </>}</Loader>
+      <div className="grid2 top">
+      <div className="panel">
+        <h2>Live feed</h2>
+        {hub.data?.feed.length === 0 && <p className="muted">Nothing sent yet.</p>}
+        <ul className="feed">{hub.data?.feed.slice(0, 12).map((m) => {
+          const thread = threads.find((t) => t.from.slice(-10) === String(m.to).replace(/\D/g, "").slice(-10));
+          return <li key={m.id}><strong><i className={"wa-dot " + (thread && serviceWindow(thread.last.at, now).open ? "open" : "closed")} title={thread && serviceWindow(thread.last.at, now).open ? "Reply window open" : "Template only"} />{m.name || m.to}</strong><p>{eventName(m.event)}: {m.preview}</p>
+            <span className="feed-end"><Pill s={m.status} /><small>{fmtTime(m.at)}</small></span></li>;
+        })}</ul>
+      </div>
+      <div className="panel"><TemplatePreview customer={cur?.name} /></div>
+      </div>
+      <h2>Inbox</h2>
       <Loader s={s}>
         {threads.length === 0 ? <p className="muted">No WhatsApp messages yet. Connect the webhook (see docs/INTEGRATIONS.md) and they appear here.</p> : (
           <div className="chat">
@@ -56,7 +82,6 @@ export default function WhatsApp() {
                     <button className="btn" disabled={st.busy || !text.trim()}>Send</button>
                   </form>
                 ) : <p className="muted small-print">More than 24 hours since their last message: WhatsApp only allows approved template messages now. <a href={`https://wa.me/${cur.from}`} target="_blank" rel="noopener noreferrer">Open in WhatsApp ↗</a></p>}
-                <TemplatePreview customer={cur.name} />
               </>}
             </div>
           </div>

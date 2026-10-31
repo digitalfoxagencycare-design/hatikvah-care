@@ -4,7 +4,8 @@ import { api } from "../api.js";
 import { can, useMe } from "./AdminApp.jsx";
 import BookingModal from "./BookingModal.jsx";
 import { Loader, useLoad } from "./hooks.jsx";
-import { fmtTime, personName, PersonSelect, Pill, Timeline, useMeta } from "./ui.jsx";
+import { fmtTime, personName, PersonSelect, Pill, Timeline, useMeta, Msg } from "./ui.jsx";
+import { ask } from "./toast.jsx";
 
 const STATUSES = ["new", "contacted", "quoted", "won", "closed"];
 export default function Enquiries() {
@@ -19,7 +20,7 @@ export default function Enquiries() {
   const acts =useLoad(open ? `/api/admin/activities?entityId=${open}` : "/api/admin/activities?entityId=none");
   const replace = (n) => s.setData((d) => d.map((x) => (x.id === n.id ? n : x)));
   const update = async (e, body) => { setMsg(null); try { replace(await api(`/api/admin/enquiries/${e.id}`, { method: "PATCH", body })); } catch (err) { setMsg(err.message); } };
-  const del = async (e) => { if (!window.confirm(`Delete enquiry ${e.ref}?`)) return; try { await api(`/api/admin/enquiries/${e.id}`, { method: "DELETE" }); s.reload(); } catch (err) { setMsg(err.message); } };
+  const del = async (e) => { if (!await ask(`Delete enquiry ${e.ref}?`, { danger: true, confirmLabel: "Delete" })) return; try { await api(`/api/admin/enquiries/${e.id}`, { method: "DELETE" }); s.reload(); } catch (err) { setMsg(err.message); } };
   const convert = async (e) => { setMsg(null); try { const r = await api(`/api/admin/enquiries/${e.id}/convert`, { method: "POST" }); replace(r.enquiry); return r; } catch (err) { setMsg(err.message); } };
   const quote = async (e) => {
     setMsg(null);
@@ -34,7 +35,7 @@ export default function Enquiries() {
         <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status"><option value="">All statuses</option>{STATUSES.map((x) => <option key={x}>{x}</option>)}</select>
         <label className="check-inline"><input type="checkbox" checked={mine} onChange={(e) => setMine(e.target.checked)} /> Only mine</label>
       </div>
-      {msg && <p className="alert" role="alert">{msg}</p>}
+      <Msg st={{ error: msg }} />
       <Loader s={s}>
         {rows.length === 0 ? <p className="muted">No enquiries {status ? `with status “${status}”` : "yet"}.</p> : (
           <ul className="enq">

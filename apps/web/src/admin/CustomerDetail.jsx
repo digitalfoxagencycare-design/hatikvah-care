@@ -5,6 +5,7 @@ import { can, useMe } from "./AdminApp.jsx";
 import CustomerForm from "./CustomerForm.jsx";
 import { Loader, useLoad } from "./hooks.jsx";
 import { fmtDate, Modal, personName, Pill, rs, Timeline, useMeta } from "./ui.jsx";
+import { ask, toast } from "./toast.jsx";
 
 export default function CustomerDetail() {
   const { id } = useParams();
@@ -13,7 +14,7 @@ export default function CustomerDetail() {
   const [edit, setEdit] = useState(false);
   const [tab, setTab] = useState("quotes");
   const d = s.data, c = d?.customer;
-  const del = async () => { if (!window.confirm(`Delete ${c.name}?`)) return; try { await api(`/api/admin/customers/${id}`, { method: "DELETE" }); nav("/admin/customers"); } catch (e) { window.alert(e.message); } };
+  const del = async () => { if (!await ask(`Delete ${c.name}?`, { danger: true, confirmLabel: "Delete" })) return; try { await api(`/api/admin/customers/${id}`, { method: "DELETE" }); nav("/admin/customers"); } catch (e) { toast(e.message, "error"); } };
   return (
     <>
       <p><Link to="/admin/customers">← Customers</Link></p>

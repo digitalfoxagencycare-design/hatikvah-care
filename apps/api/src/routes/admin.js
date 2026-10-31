@@ -16,6 +16,7 @@ import { opsRoutes } from "./ops.js";
 import { reportRoutes } from "./reports.js";
 import { posRoutes } from "./pos.js";
 import { logisticsRoutes } from "./logistics.js";
+import { dispatchQueue, hubRoutes } from "./hubs.js";
 import { whatsappAdminRoutes } from "./whatsapp.js";
 import { salesRoutes } from "./sales.js";
 import { stockRoutes } from "./stock.js";
@@ -119,9 +120,10 @@ export function adminRoutes({ cfg, store, automation, notifier, fetchImpl }) {
     };
     if (can(req.admin, "quotes")) Object.assign(out, { openQuotes: quotes.filter((q) => q.status === "sent").length, openQuoteValue: quotes.filter((q) => q.status === "sent").reduce((n, q) => n + q.totals.total, 0) });
     if (can(req.admin, "orders")) {
-      const queue = orders.filter((o) => ["confirmed", "packed"].includes(o.status)).sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
+      const queue = dispatchQueue(orders).sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
       Object.assign(out, { toDispatch: queue.length, dispatchQueue: queue.slice(0, 10).map((o) => ({ id: o.id, number: o.number, customer: o.customer.name, status: o.status, createdAt: o.createdAt,
-        expectedDate: o.expectedDate || "", total: o.totals.total, paymentStatus: o.paymentStatus || "", reserved: reservesStock(o) })),
+        expectedDate: o.expectedDate || "", total: o.totals.total, paymentStatus: o.paymentStatus || "", reserved: reservesStock(o), token: o.token, challanNumber: o.challanNumber || "",
+        destination: o.customer.shippingAddress || o.customer.billingAddress || o.customer.state || "", courier: o.shipment?.provider || "", booking: o.shipmentBooking?.status || "" })),
         inTransit: orders.filter((o) => o.status === "dispatched").length });
     }
     if (can(req.admin, "invoices")) Object.assign(out, {
@@ -129,11 +131,15 @@ export function adminRoutes({ cfg, store, automation, notifier, fetchImpl }) {
       receivedThisMonth: payments.filter((p) => p.date.startsWith(month)).reduce((n, p) => n + p.amount, 0),
       outstanding: open.reduce((n, i) => n + balance(i), 0), overdue: open.filter((i) => i.dueDate < today).reduce((n, i) => n + balance(i), 0), overdueCount: open.filter((i) => i.dueDate < today).length,
       aging: agingBuckets(open, today),
+      revenueDays: Array.from({ length: 7 }, (_, n) => {
+        const day = new Date(Date.parse(today + "T00:00:00Z") - (6 - n) * 86_400_000).toISOString().slice(0, 10);
+        return { day, total: invoices.filter((i) => i.status !== "void" && i.date === day).reduce((sum, i) => sum + i.totals.total, 0) };
+      }),
     });
     if (can(req.admin, "stock")) {
       const low = products.filter((p) => isLow(p, lv));
       const expiring = batchLevels(await store.stockMoves.all(), today).filter((b) => b.daysToExpiry != null && b.daysToExpiry <= 60);
-      Object.assign(out, { lowStock: low.length, lowStockItems: low.slice(0, 10).map((p) => ({ id: p.id, sku: p.sku, name: p.name, unit: p.unit || "pcs", reorderLevel: p.reorderLevel || 0, ...lv[p.id] || { physical: 0, reserved: 0, available: 0 } })),
+      Object.assign(out, { lowStock: low.length, lowStockItems: low.slice(0, 10).map((p) => ({ id: p.id, image: p.images?.[0] || "", sku: p.sku, name: p.name, unit: p.unit || "pcs", reorderLevel: p.reorderLevel || 0, reorderQty: p.reorderQty || 0, supplierId: p.supplierId || "", ...lv[p.id] || { physical: 0, reserved: 0, available: 0 } })),
         expiringBatches: expiring.length, expiringItems: expiring.slice(0, 10).map((b) => ({ ...b, name: products.find((p) => p.id === b.productId)?.name || "" })) });
     }
     if (can(req.admin, "automation")) {
@@ -167,7 +173,10 @@ export function adminRoutes({ cfg, store, automation, notifier, fetchImpl }) {
   }));
 
   // ---------- products
-  r.get("/products", wrap(async (_req, res) => res.json((await store.products.all()).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)))));
+  r.get("/products", wrap(async (_req, res) => {
+    const levels = await stockBuckets(store);
+    res.json((await store.products.all()).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map((p) => ({ ...p, available: levels[p.id]?.available ?? 0 })));
+  }));
   r.get("/products/export.csv", wrap(async (_req, res) => {
     const rows = (await store.products.all()).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map((p) => ({
       sku: p.sku, name: p.name, category: p.category, collection: p.collection, pack: p.pack, price_rupees: rupees(p.price), price_unit: p.priceUnit,
@@ -322,6 +331,6 @@ export function adminRoutes({ cfg, store, automation, notifier, fetchImpl }) {
   r.get("/audit", requireOwner, wrap(async (_req, res) => res.json(await store.audit.all({ sort: { at: -1 }, limit: 300 }))));
 
   const ctx = { cfg, store, audit, automation, notifier, fetchImpl };
-  r.use(crmRoutes(ctx)); r.use(salesRoutes(ctx)); r.use(posRoutes(ctx)); r.use(logisticsRoutes(ctx)); r.use(whatsappAdminRoutes(ctx)); r.use(stockRoutes(ctx)); r.use(reportRoutes(ctx)); r.use(opsRoutes(ctx));
+  r.use(crmRoutes(ctx)); r.use(salesRoutes(ctx)); r.use(posRoutes(ctx)); r.use(logisticsRoutes(ctx)); r.use(whatsappAdminRoutes(ctx)); r.use(hubRoutes(ctx)); r.use(stockRoutes(ctx)); r.use(reportRoutes(ctx)); r.use(opsRoutes(ctx));
   return r;
 }

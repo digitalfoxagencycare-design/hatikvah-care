@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { money } from "../api.js";
 import { useSite } from "../data.jsx";
-import { useRfq } from "./RfqDrawer.jsx";
 
 export const minQty = (p) => Math.max(p.minQty || 0, p.packSize || 1);
 export function unitPrice(p, qty) {
@@ -24,10 +23,13 @@ export function Price({ p, big }) {
 }
 
 export default function ProductCard({ p }) {
-  const { add, basket } = useSite();
-  const [variant, setVariant] = useState(p.variants?.[0] || "20ml");
+  const { add, basket, settings } = useSite();
+  const [variant, setVariant] = useState(p.variants?.[0] || "");
   const inBasket = basket.some((i) => i.productId === p.id);
-  const rfq = useRfq();
+  const buy = settings.shop?.cart !== false;
+  const nav = useNavigate();
+  const price = p.pricePaise ?? p.price;
+  const priced = price != null;
 
   return (
     <article className="live-card">
@@ -44,7 +46,9 @@ export default function ProductCard({ p }) {
         </h3>
         <p className="live-card-desc">{p.shortDescription || p.description}</p>
 
-        <div className="live-card-price"><Price p={p} /></div>
+        <div className="live-card-price">
+          {priced ? money(price) : "Price on request"}
+        </div>
 
         <div className="live-card-actions">
           {p.variants && p.variants.length > 0 && (
@@ -57,14 +61,17 @@ export default function ProductCard({ p }) {
             </div>
           )}
 
-          <button
-            className={"live-card-btn" + (inBasket ? " in-cart" : "")}
-            disabled={p.stock === "out"}
-            onClick={() => add(p.id, minQty(p), variant)}
-          >
-            {inBasket ? "Added ✓" : "Add To Cart"}
-          </button>
-          <button type="button" className="live-card-sample" onClick={() => rfq({ mode: "sample", product: p })}>Request a sample</button>
+          {priced ? (
+            <button
+              className={"live-card-btn" + (inBasket ? " in-cart" : "")}
+              disabled={p.stock === "out"}
+              onClick={() => add(p.id, minQty(p), variant)}
+            >
+              {inBasket ? "Added ✓" : "Add To Cart"}
+            </button>
+          ) : (
+            <button className="live-card-btn" onClick={() => nav(`/product/${p.slug}`)}>Enquire</button>
+          )}
         </div>
       </div>
     </article>

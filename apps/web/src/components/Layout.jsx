@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useSite } from "../data.jsx";
-import { RfqProvider, useRfq } from "./RfqDrawer.jsx";
 
 const UserIcon = () => (
   <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -31,11 +30,6 @@ const PhoneIcon = () => (
   </svg>
 );
 
-const RfqButton = () => {
-  const open = useRfq();
-  return <button type="button" className="rfq-open" aria-label="Request a quote" onClick={() => open({ mode: "rfq" })}><span>Request a </span>quote</button>;
-};
-
 export default function Layout() {
   const { settings, catalog, basket, loading, error, reload } = useSite();
   const [open, setOpen] = useState(false);
@@ -57,7 +51,7 @@ export default function Layout() {
   const search = (e) => { e.preventDefault(); nav(q.trim() ? `/shop?q=${encodeURIComponent(q.trim())}` : "/shop"); };
 
   return (
-    <RfqProvider>
+    <>
       <a className="skip" href="#main">Skip to content</a>
 
       {/* Top Banner Bar (matching live site) */}
@@ -100,7 +94,6 @@ export default function Layout() {
           </form>
 
           <div className="head-icons">
-            <RfqButton />
             <Link to="/account" aria-label="My account" className="head-icon-btn"><UserIcon /></Link>
             <Link to="/cart" aria-label={`Cart, ${count} item${count === 1 ? "" : "s"}`} className="cart-link head-icon-btn">
               <BagIcon />
@@ -185,6 +178,6 @@ export default function Layout() {
           </svg>
         </a>
       </footer>
-    </RfqProvider>
+    </>
   );
 }

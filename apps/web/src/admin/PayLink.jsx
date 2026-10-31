@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api } from "../api.js";
+import { askText } from "./toast.jsx";
 import { Msg, useAction, useMeta } from "./ui.jsx";
 
 /**
@@ -15,7 +16,7 @@ export function PayLinkActions({ base, doc, due, onChange, compact }) {
   const generate = () => run(async () => { onChange(await api(`${base}/paylink`, { method: "POST" })); });
   const copy = async () => {
     try { await navigator.clipboard.writeText(link); setCopied(true); setTimeout(() => setCopied(false), 2000); }
-    catch { window.prompt("Copy this link:", link); }
+    catch { askText("Copy this link", { value: link, confirmLabel: "Done" }); }
   };
   const send = () => run(async () => {
     const r = await api(`${base}/paylink/send`, { method: "POST" });

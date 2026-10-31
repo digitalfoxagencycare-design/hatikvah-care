@@ -37,7 +37,8 @@ export function posRoutes({ cfg, store, audit, automation, fetchImpl, log = cons
   r.post("/pos/invoice", requirePerm("pos"), wrap(async (req, res) => {
     const d = parse(posInput, req.body, res); if (!d) return;
     const c = await buyer(d); if (!c) return notFound(res, "Customer");
-    const inv = await createInvoice(store, { customer: { ...c, paymentTermsDays: 0 }, items: d.items, placeOfSupply: d.placeOfSupply, notes: d.notes, by: by(req) });
+    if (d.credit && (d.payment || !d.customerId || !(c.paymentTermsDays > 0))) return bad(res, "Pay later is only for saved customers with credit terms", 409);
+    const inv = await createInvoice(store, { customer: { ...c, paymentTermsDays: d.credit ? c.paymentTermsDays : 0 }, items: d.items, placeOfSupply: d.placeOfSupply, notes: d.notes, by: by(req) });
     await store.invoices.update(inv.id, { source: "pos" });
     await deductForInvoice(store, inv, by(req));
     let out = { ...inv, source: "pos" }, payment = null;

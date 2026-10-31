@@ -1,24 +1,51 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../api.js";
 import { Loader, useLoad } from "./hooks.jsx";
-import { Modal, Msg, StateSelect, useAction } from "./ui.jsx";
+import { fmtDate, Modal, Msg, Pill, rs, StateSelect, useAction } from "./ui.jsx";
+import { ThumbStack, useThumbs } from "./visual.jsx";
+import { ask } from "./toast.jsx";
 
 const EMPTY = { name: "", contactName: "", phone: "", email: "", gstin: "", stateCode: "", address: "", notes: "" };
+const ACTIVE = ["draft", "sent", "partial"];
+
 export default function Suppliers() {
   const s = useLoad("/api/admin/suppliers");
+  const pos = useLoad("/api/admin/purchases");
+  const map = useThumbs();
   const [edit, setEdit] = useState(null);
   const [st, run] = useAction();
+  const bySupplier = useMemo(() => { const out = {}; for (const p of pos.data || []) (out[p.supplierId] ||= []).push(p); return out; }, [pos.data]);
   const save = (e) => { e.preventDefault(); const body = Object.fromEntries(Object.keys(EMPTY).map((k) => [k, edit[k] ?? ""])); run(async () => { await api(edit.id ? `/api/admin/suppliers/${edit.id}` : "/api/admin/suppliers", { method: edit.id ? "PATCH" : "POST", body }); setEdit(null); s.reload(); }); };
   return (
     <>
       <div className="row-between"><h1>Suppliers</h1><button className="btn" onClick={() => setEdit({ ...EMPTY })}>+ Add supplier</button></div>
       <Msg st={st} />
       <Loader s={s}>
-        <div className="tbl-wrap"><table className="tbl"><thead><tr><th>Supplier</th><th>Contact</th><th>GSTIN</th><th></th></tr></thead><tbody>
-          {s.data?.map((x) => <tr key={x.id}><td><strong>{x.name}</strong><small>{x.address}</small></td><td>{x.contactName}<small>{x.phone} {x.email}</small></td><td>{x.gstin || "—"}</td>
-            <td className="btn-row"><button className="link" onClick={() => setEdit(x)}>Edit</button><button className="link danger" onClick={() => window.confirm(`Delete ${x.name}?`) && run(async () => { await api(`/api/admin/suppliers/${x.id}`, { method: "DELETE" }); s.reload(); })}>Delete</button></td></tr>)}
-          {s.data?.length === 0 && <tr><td colSpan="4" className="muted">No suppliers yet.</td></tr>}
-        </tbody></table></div>
+        {s.data?.length === 0 && <p className="muted">No suppliers yet.</p>}
+        <ul className="doc-cards">
+          {s.data?.map((x) => {
+            const orders = bySupplier[x.id] || [], active = orders.filter((p) => ACTIVE.includes(p.status));
+            const lastDone = orders.find((p) => p.status === "received");
+            const supplied = orders.filter((p) => ["received", "partial"].includes(p.status)).reduce((n, p) => n + (p.total || 0), 0);
+            return (
+              <li key={x.id} className="doc-card">
+                <div className="doc-main">
+                  <ThumbStack items={orders.flatMap((p) => p.items).filter((l, i, all) => all.findIndex((y) => y.productId === l.productId) === i)} map={map} />
+                  <span className="doc-who"><strong>{x.name}</strong><small>{[x.contactName, x.phone, x.email].filter(Boolean).join(" · ") || "No contact details"}</small>
+                    <small>{orders.length ? `${orders.length} order${orders.length === 1 ? "" : "s"}, ${rs(supplied)} received${lastDone ? `, last on ${fmtDate(lastDone.updatedAt || lastDone.createdAt)}` : ""}` : "No orders yet"}</small></span>
+                  <span className="doc-money">{active.length > 0 ? <Pill s="sent">{active.length} active PO{active.length === 1 ? "" : "s"}</Pill> : <Pill s="draft">No active POs</Pill>}</span>
+                </div>
+                <div className="doc-acts">
+                  {x.phone && <a className="btn ghost small" href={`tel:${x.phone}`}>Call</a>}
+                  {active.slice(0, 2).map((p) => <Link key={p.id} className="btn ghost small" to={`/admin/purchase-orders/${p.id}`}>{p.number}</Link>)}
+                  <button className="btn ghost small" onClick={() => setEdit(x)}>Edit</button>
+                  <button className="link danger" onClick={async () => { if (await ask(`Delete ${x.name}?`, { danger: true, confirmLabel: "Delete" })) run(async () => { await api(`/api/admin/suppliers/${x.id}`, { method: "DELETE" }); s.reload(); }); }}>Delete</button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
       </Loader>
       {edit && (
         <Modal title={edit.id ? `Edit ${edit.name}` : "Add supplier"} onClose={() => setEdit(null)}>

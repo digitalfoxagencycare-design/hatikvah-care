@@ -3,7 +3,9 @@ import { calcTotals as exactTotals } from "../../../api/src/lib/gst.js";
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, money } from "../api.js";
+import { toast } from "./toast.jsx";
 import { WhatsAppMessageParser } from "./WhatsAppParser.jsx";
+import { Photo, ProductPicker, useThumbs } from "./visual.jsx";
 
 /** Shared admin building blocks: look-up data, formatting, pills, modal, timeline, document line editor. */
 export const rs = (p) => (p == null ? "—" : money(p));
@@ -91,16 +93,16 @@ export function DocEditor({ initial, kind, onSave, busy, error, extra }) {
   const [f, setF] = useState(() => ({ customerId: "", placeOfSupply: "", notes: "", items: [], ...initial }));
   const [showParser, setShowParser] = useState(false);
   const rates = useAsync(`/api/admin/rates${f.customerId ? `?customerId=${f.customerId}` : ""}`);
-  const [pick, setPick] = useState("");
+  const [picking, setPicking] = useState(false);
+  const thumbs = useThumbs();
   const cust = customers.data?.find((c) => c.id === f.customerId);
   const pos = f.placeOfSupply || cust?.stateCode || company.data?.stateCode || "";
   const inter = !!company.data && pos !== company.data.stateCode;
   const t = useMemo(() => calcTotals(f.items, inter), [f.items, inter]);
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
   const setLine = (i, k, v) => setF((x) => ({ ...x, items: x.items.map((l, j) => (j === i ? { ...l, [k]: v } : l)) }));
-  const addProduct = (label) => {
-    const r = rates.data?.find((x) => `${x.sku} · ${x.name}` === label); if (!r) return;
-    setF((x) => ({ ...x, items: [...x.items, { productId: r.productId, sku: r.sku, name: r.name, hsn: r.hsn, unit: r.unit, qty: 1, rate: r.rate, discountPct: 0, gstRate: r.gstRate, uom: "piece", perUnit: 1 }] })); setPick("");
+  const addProduct = (r) => {
+    setF((x) => ({ ...x, items: [...x.items, { productId: r.productId, sku: r.sku, name: r.name, hsn: r.hsn, unit: r.unit, qty: 1, rate: r.rate, discountPct: 0, gstRate: r.gstRate, uom: "piece", perUnit: 1 }] })); setPicking(false);
   };
   const uomsOf = (l) => (l.productId && rates.data?.find((x) => x.productId === l.productId)?.uoms) || [];
   /** Piece / box / carton: the line keeps the ordered unit; the server fixes pieces per unit from the product. */
@@ -131,7 +133,7 @@ export function DocEditor({ initial, kind, onSave, busy, error, extra }) {
             const amt = Math.round((Number(l.qty) || 0) * l.rate * (1 - (Number(l.discountPct) || 0) / 100));
             return (
               <tr key={i}>
-                <td><input className="wide" required value={l.name} maxLength={200} onChange={(e) => setLine(i, "name", e.target.value)} aria-label="Item name" />{l.sku && <small>{l.sku}</small>}</td>
+                <td><span className="line-ph"><Photo src={thumbs[l.productId]} /><span className="grow"><input className="wide" required value={l.name} maxLength={200} onChange={(e) => setLine(i, "name", e.target.value)} aria-label="Item name" />{l.sku && <small>{l.sku}</small>}</span></span></td>
                 <td><input className="w-sm" value={l.hsn} maxLength={8} inputMode="numeric" onChange={(e) => setLine(i, "hsn", e.target.value.replace(/\D/g, ""))} aria-label="HSN" /></td>
                 <td><input className="w-sm" type="number" min="0.001" step="any" required value={l.qty} onChange={(e) => setLine(i, "qty", e.target.value)} aria-label="Quantity" /></td>
                 <td>{uomsOf(l).length > 1
@@ -149,11 +151,11 @@ export function DocEditor({ initial, kind, onSave, busy, error, extra }) {
         </tbody>
       </table></div>
       <div className="btn-row">
-        <input className="grow" list={`products-${kind}`} value={pick} placeholder="Search a product to add (name or SKU)…" onChange={(e) => { setPick(e.target.value); addProduct(e.target.value); }} aria-label="Add product" />
-        <datalist id={`products-${kind}`}>{rates.data?.map((r) => <option key={r.productId} value={`${r.sku} · ${r.name}`}>{r.pack}{r.rate ? ` · ₹${r.rate / 100}` : ""}</option>)}</datalist>
+        <button type="button" className="btn" onClick={() => setPicking(true)}>+ Add product</button>
         <button type="button" className="btn ghost" onClick={() => set("items", [...f.items, { productId: "", sku: "", name: "", hsn: "", unit: "pcs", qty: 1, rate: 0, discountPct: 0, gstRate: 18 }])}>+ Custom line</button>
         <button type="button" className="btn btn-whatsapp" onClick={() => setShowParser(true)}>📱 Paste from WhatsApp</button>
       </div>
+      {picking && <ProductPicker rows={rates.data} onPick={addProduct} onClose={() => setPicking(false)} />}
       {showParser && (
         <WhatsAppMessageParser
           catalog={rates.data || []}
@@ -204,4 +206,9 @@ export function useAction() {
   const run = async (fn, ok = null) => { if(inFlight.current)return;inFlight.current=true;setSt({ busy: true, error: null, ok: null }); try { const r = await fn(); setSt({ busy: false, error: null, ok }); return r; } catch (e) { setSt({ busy: false, error: e.message, ok: null }); return undefined; } finally {inFlight.current=false;} };
   return [st, run, setSt];
 }
-export const Msg = ({ st }) => <>{st.error && <p className="alert" role="alert">{st.error}</p>}{st.ok && <p className="notice" role="status">{st.ok}</p>}</>;
+/** Result of an action, shown as a floating toast. */
+export function Msg({ st }) {
+  useEffect(() => { if (st.error) toast(st.error, "error"); }, [st.error]);
+  useEffect(() => { if (st.ok) toast(st.ok); }, [st.ok]);
+  return null;
+}

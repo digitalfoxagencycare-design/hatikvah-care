@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { api } from "../api.js";
 import { Loader, useLoad } from "./hooks.jsx";
+import { askText } from "./toast.jsx";
+import { Msg } from "./ui.jsx";
 
 export default function Team() {
   const s = useLoad("/api/admin/users");
@@ -12,7 +14,7 @@ export default function Team() {
     <>
       <h1>Team</h1>
       <p className="muted">Owner: everything. Manager: everything except company settings, team and the activity log. Sales: enquiries, customers, quotes, orders. Accounts: customers, invoices, payments, reports. Warehouse: products, orders (dispatch) and stock. Staff: catalogue, enquiries, customers, quotes. Tick “Gets leads” for people who should receive new website enquiries in turn.</p>
-      {msg && <p className="alert" role="alert">{msg}</p>}
+      <Msg st={{ error: msg }} />
       <Loader s={s}>
         <table className="tbl"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Gets leads</th><th>Status</th><th></th></tr></thead><tbody>
           {s.data?.map((u) => (
@@ -21,8 +23,8 @@ export default function Team() {
               <td><input type="checkbox" checked={u.receivesLeads} onChange={(e) => act(() => api(`/api/admin/users/${u.id}`, { method: "PATCH", body: { receivesLeads: e.target.checked } }))} aria-label={`${u.name} gets leads`} /></td><td><span className={"pill " + (u.active ? "won" : "closed")}>{u.active ? "active" : "disabled"}</span></td>
               <td className="btn-row">
                 <button className="link" onClick={() => act(() => api(`/api/admin/users/${u.id}`, { method: "PATCH", body: { active: !u.active } }))}>{u.active ? "Disable" : "Enable"}</button>
-                <button className="link" onClick={() => { const ph = window.prompt(`WhatsApp / phone for ${u.name} (for alerts):`, u.phone); if (ph !== null) act(() => api(`/api/admin/users/${u.id}`, { method: "PATCH", body: { phone: ph } })); }}>Phone</button>
-                <button className="link" onClick={() => { const p = window.prompt(`New password for ${u.email} (min 10 characters, letters and numbers):`); if (p) act(() => api(`/api/admin/users/${u.id}`, { method: "PATCH", body: { password: p } })); }}>Reset password</button>
+                <button className="link" onClick={async () => { const ph = await askText(`WhatsApp / phone for ${u.name}`, { body: "Used for alerts.", value: u.phone, confirmLabel: "Save" }); if (ph !== null) act(() => api(`/api/admin/users/${u.id}`, { method: "PATCH", body: { phone: ph } })); }}>Phone</button>
+                <button className="link" onClick={async () => { const p = await askText(`New password for ${u.email}`, { body: "At least 10 characters, with letters and numbers.", type: "password", confirmLabel: "Reset password" }); if (p) act(() => api(`/api/admin/users/${u.id}`, { method: "PATCH", body: { password: p } })); }}>Reset password</button>
               </td></tr>
           ))}
         </tbody></table>
