@@ -7,6 +7,7 @@ import { getSettings } from "../model.js";
 import { shipmentChargeInput, shipmentInput } from "../schemas.js";
 import { checkServiceability, createPickup, parseWebhook, pincodeOf, shadowfaxOn, verifyShadowfaxToken, webhookAuthorised } from "../services/delivery_shadowfax.js";
 import { createPorterPickup, parsePorterWebhook, porterOn, porterWebhookAuthorised } from "../services/delivery_porter.js";
+import { createShiprocketPickup, shiprocketOn } from "../services/delivery_shiprocket.js";
 import { wrap } from "./public.js";
 import { bad, notFound, parse } from "./shared.js";
 import { atomicWrap } from "./atomic.js";
@@ -14,6 +15,7 @@ import { calculateDeliveryEstimate, DEFAULT_WAREHOUSE } from "../lib/geo.js";
 
 const COURIERS = {
   shadowfax: { label: "Shadowfax", on: shadowfaxOn, book: createPickup, env: "SHADOWFAX_API_TOKEN" },
+  shiprocket: { label: "Shiprocket", on: shiprocketOn, book: createShiprocketPickup, env: "NOVA_CLIENT_KEY or SHIPROCKET_TOKEN" },
   porter: { label: "Porter", on: porterOn, book: createPorterPickup, env: "PORTER_API_KEY and PORTER_BASE_URL" },
 };
 const shipmentLive = (o) => !!o.shipment && !["cancelled", "returned"].includes(o.shipment.status);

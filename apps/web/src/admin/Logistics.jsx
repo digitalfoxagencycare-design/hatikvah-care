@@ -4,12 +4,12 @@ import { can, useMe } from "./AdminApp.jsx";
 import { Loader, useLoad } from "./hooks.jsx";
 import { fmtDate, Modal, Msg, Pill, today, useAction, useMeta } from "./ui.jsx";
 
-const COURIERS = { shadowfax: "Shadowfax", porter: "Porter" };
+const COURIERS = { shadowfax: "Shadowfax", shiprocket: "Shiprocket", porter: "Porter" };
 const WINDOWS = ["09:00-12:00", "12:00-15:00", "15:00-18:00", "18:00-21:00"];
 const STEPS = ["Pickup scheduled", "Rider assigned", "In transit", "Delivered"];
 const STEP_OF = { created: 0, assigned: 1, picked: 2, in_transit: 2, out_for_delivery: 2, delivered: 3 };
 export const shipmentOpen = (s) => !!s && !["delivered", "cancelled", "returned"].includes(s.status);
-export const DISPATCH_LABEL = "📦 Dispatch via Shadowfax";
+export const DISPATCH_LABEL = "📦 Book Courier (Shadowfax / Shiprocket)";
 const shipmentStopped = (s) => !s || ["cancelled", "returned"].includes(s.status);
 /** Confirmed or packed, or dispatched by hand with no live courier booking and none in doubt. */
 export const dispatchable = (o) => ["confirmed", "packed"].includes(o.status) || (o.status === "dispatched" && shipmentStopped(o.shipment) && !["pending", "reconcile"].includes(o.shipmentBooking?.status));
@@ -75,7 +75,7 @@ export function DispatchModal({ id, onClose }) {
   useEffect(() => {
     if (f || !order.data || !a || !e) return;
     const c = order.data.customer, address = c.shippingAddress || c.billingAddress || "";
-    setF({ dropName: c.contactName || c.name, dropPhone: c.phone || "", dropAddress: address, dropPincode: c.deliveryPincode || pinOf(address), pickupPincode: e?.pickupPincode || a.pickup || "500084", weightKg: e.weightKg, packages: 1, lengthCm: "", breadthCm: "", heightCm: "" });
+    setF({ dropName: c.contactName || c.name, dropPhone: c.phone || "", dropAddress: address, dropPincode: c.deliveryPincode || pinOf(address), pickupPincode: e?.pickupPincode || a.pickup || "500084", weightKg: e.weightKg, packages: 1, lengthCm: "", breadthCm: "", heightCm: "", courier: "shadowfax" });
   }, [f, order.data, a, e]);
   const pin = f?.dropPincode || "", pickup = f?.pickupPincode || "", live = !!a?.verified;
   useEffect(() => { // a hint only: Shadowfax still decides at booking
@@ -92,7 +92,7 @@ export function DispatchModal({ id, onClose }) {
     const { lengthCm, breadthCm, heightCm, ...rest } = f;
     const size = lengthCm && breadthCm && heightCm ? { lengthCm: Number(lengthCm), breadthCm: Number(breadthCm), heightCm: Number(heightCm) } : {};
     run(async () => {
-      try { setBooked(await api(`/api/admin/orders/${id}/shipment`, { method: "POST", body: { courier: "shadowfax", ...rest, weightKg: Number(f.weightKg), packages: Number(f.packages), ...size } })); }
+      try { setBooked(await api(`/api/admin/orders/${id}/shipment`, { method: "POST", body: { courier: f.courier || "shadowfax", ...rest, weightKg: Number(f.weightKg), packages: Number(f.packages), ...size } })); }
       catch (err) { order.reload(); throw err; }
     });
   };
@@ -101,9 +101,10 @@ export function DispatchModal({ id, onClose }) {
     <Modal title={DISPATCH_LABEL} onClose={onClose} wide>
       <Loader s={order}>{o && (!shipmentStopped(s) ? (
         <div className="ship-done">
-          <p className="notice">{booked ? "Rider booked with Shadowfax." : "This order already has a Shadowfax booking."}</p>
+          <p className="notice">{booked ? `Courier booked with ${COURIERS[s.provider] || "Courier"}.` : "This order already has a courier booking."}</p>
           <dl className="dl">
             <dt>AWB</dt><dd><code>{s.awb || "—"}</code></dd>
+            <dt>Courier</dt><dd>{COURIERS[s.provider] || s.provider || "Shadowfax"}</dd>
             <dt>Status</dt><dd><Pill s={s.status}>{s.status.replace(/_/g, " ")}</Pill></dd>
             <dt>Challan</dt><dd>{o.challanNumber}</dd>
             {s.trackingUrl && <><dt>Tracking</dt><dd><a href={s.trackingUrl} target="_blank" rel="noopener noreferrer">{s.trackingUrl}</a></dd></>}
@@ -114,12 +115,16 @@ export function DispatchModal({ id, onClose }) {
           </div>
         </div>
       ) : !dispatchable(o) ? (
-        <p className="alert" role="alert">{["pending", "reconcile"].includes(o.shipmentBooking?.status) ? "The last booking got no clear answer from Shadowfax. Check their dashboard before booking again." : `This order is ${o.status}, so it cannot be dispatched.`}</p>
+        <p className="alert" role="alert">{["pending", "reconcile"].includes(o.shipmentBooking?.status) ? "The last booking got no clear answer from courier. Check their dashboard before booking again." : `This order is ${o.status}, so it cannot be dispatched.`}</p>
       ) : !f ? <p className="muted">Loading the booking details…</p> : (
         <form className="form" onSubmit={submit}>
+          <div className="seg" role="group" aria-label="Courier Selection" style={{ marginBottom: "14px" }}>
+            <button type="button" className={f.courier === "shadowfax" ? "on" : ""} onClick={() => setF({ ...f, courier: "shadowfax" })}>⚡ Shadowfax (Hyperlocal 2W Express)</button>
+            <button type="button" className={f.courier === "shiprocket" ? "on" : ""} onClick={() => setF({ ...f, courier: "shiprocket" })}>🚀 Shiprocket (Surface / Cargo)</button>
+          </div>
           <p className="muted"><strong>{o.number}</strong> · {e.pieces.toLocaleString("en-IN")} pieces · from pickup PIN {pickup}</p>
-          {!a.connected && <p className="alert" role="alert">{a.message}. Nothing can be booked until the token is on the server.</p>}
-          {a.connected && !a.verified && <p className="alert" role="alert">{a.message}</p>}
+          {f.courier === "shadowfax" && !a.connected && <p className="alert" role="alert">{a.message}. Nothing can be booked until the token is on the server.</p>}
+          {f.courier === "shadowfax" && a.connected && !a.verified && <p className="alert" role="alert">{a.message}</p>}
           {o.paymentStatus === "pending" && <p className="alert" role="alert">This website order has not been paid yet.</p>}
           {o.status !== "dispatched" && <p className="muted small-print">{o.invoiceId ? "Booking raises the delivery challan. The stock already left with the invoice." : "Booking raises the delivery challan and takes the goods out of stock."}</p>}
           <div className="grid2">
@@ -184,7 +189,7 @@ export function DispatchModal({ id, onClose }) {
             </div>
           </details>
           {st.error && <p className="alert" role="alert">{st.error}</p>}
-          <button className="btn" disabled={st.busy || !a.connected}>{st.busy ? "Booking…" : "Confirm & Book Rider"}</button>
+          <button className="btn" disabled={st.busy || (f.courier === "shadowfax" && !a.connected)}>{st.busy ? "Booking…" : `Confirm & Book ${COURIERS[f.courier || "shadowfax"]}`}</button>
         </form>
       ))}</Loader>
     </Modal>

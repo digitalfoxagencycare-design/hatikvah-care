@@ -110,8 +110,12 @@ export default function OrderDetail() {
                   <label className="field"><span>Date</span><input type="date" value={dispatch.date} onChange={(e) => setDispatch({ ...dispatch, date: e.target.value })} /></label>
                 </div>
                 <label className="field"><span>Notes</span><input maxLength={500} value={dispatch.notes} onChange={(e) => setDispatch({ ...dispatch, notes: e.target.value })} /></label>
-                <div className="checks"><label><input type="checkbox" checked={dispatch.courier === "shadowfax"} onChange={(e) => setDispatch({ ...dispatch, courier: e.target.checked ? "shadowfax" : "", transporter: e.target.checked ? "Shadowfax" : dispatch.transporter })} /> Book Shadowfax pickup (customer gets the live tracking link on WhatsApp)</label></div>
-                {dispatch.courier === "shadowfax" && <div className="grid3">
+                <div className="checks">
+                  <label><input type="radio" name="courierOption" checked={dispatch.courier === "shadowfax"} onChange={() => setDispatch({ ...dispatch, courier: "shadowfax", transporter: "Shadowfax" })} /> Book Shadowfax 2W Express</label>
+                  <label><input type="radio" name="courierOption" checked={dispatch.courier === "shiprocket"} onChange={() => setDispatch({ ...dispatch, courier: "shiprocket", transporter: "Shiprocket" })} /> Book Shiprocket Surface / Cargo</label>
+                  <label><input type="radio" name="courierOption" checked={!dispatch.courier} onChange={() => setDispatch({ ...dispatch, courier: "", transporter: dispatch.transporter === "Shadowfax" || dispatch.transporter === "Shiprocket" ? "" : dispatch.transporter })} /> Manual / Own Delivery</label>
+                </div>
+                {["shadowfax", "shiprocket"].includes(dispatch.courier) && <div className="grid3">
                   <label className="field"><span>Delivery PIN (blank = from address)</span><input inputMode="numeric" maxLength={6} value={dispatch.dropPincode} onChange={(e) => setDispatch({ ...dispatch, dropPincode: e.target.value.replace(/\D/g, "") })} /></label>
                   <label className="field"><span>Weight kg</span><input type="number" min="0.1" step="any" value={dispatch.weightKg} onChange={(e) => setDispatch({ ...dispatch, weightKg: Number(e.target.value) || 1 })} /></label>
                   <label className="field"><span>Packages</span><input type="number" min="1" value={dispatch.packages} onChange={(e) => setDispatch({ ...dispatch, packages: Number(e.target.value) || 1 })} /></label>

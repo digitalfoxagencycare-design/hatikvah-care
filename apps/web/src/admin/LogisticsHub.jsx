@@ -7,7 +7,7 @@ import { askText, toast } from "./toast.jsx";
 import { fmtDate, fmtTime, Modal, Msg, Pill, rs, toPaise, useAction } from "./ui.jsx";
 import { HubTabs, Photo, Stat } from "./visual.jsx";
 
-const COURIERS = [["shadowfax", "Shadowfax"], ["porter", "Porter"]];
+const COURIERS = [["shadowfax", "Shadowfax"], ["shiprocket", "Shiprocket"], ["porter", "Porter"]];
 
 /** Centralized shipping wallet: auto-deducted per booking and centrally managed via Nova console. */
 function Wallet({ id, name, on, w }) {
