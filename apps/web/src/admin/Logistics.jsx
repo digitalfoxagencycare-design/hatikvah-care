@@ -134,6 +134,25 @@ export function DispatchModal({ id, onClose }) {
             <label className="field"><span>Packages</span><input required type="number" min="1" max="500" step="1" value={f.packages} onChange={set("packages")} /></label>
           </div>
           {reach && <p className={reach.serviceable ? "notice" : "alert"}>{reach.serviceable ? `Shadowfax serves PIN ${pin}.` : `Shadowfax says PIN ${pin} is not serviceable.`}</p>}
+          
+          {/* Pre-Booking Wallet & Rate Estimate Box */}
+          <div className="panel" style={{ background: "#F1F5F9", padding: "12px 16px", borderRadius: "8px", margin: "12px 0", border: "1px solid #CBD5E1" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+              <span className="muted">Estimated Delivery Fee:</span>
+              <strong>₹{((e?.estimatedChargePaise || 6500) / 100).toFixed(2)}</strong>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+              <span className="muted">Current Shipping Wallet:</span>
+              <strong style={{ color: (e?.walletBalancePaise || 0) < (e?.estimatedChargePaise || 6500) ? "#DC2626" : "#047857" }}>
+                ₹{((e?.walletBalancePaise || 100000) / 100).toFixed(2)}
+              </strong>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px dashed #CBD5E1", paddingTop: "6px" }}>
+              <span className="muted">Balance After Dispatch:</span>
+              <strong>₹{Math.max(0, ((e?.walletBalancePaise || 100000) - (e?.estimatedChargePaise || 6500)) / 100).toFixed(2)}</strong>
+            </div>
+          </div>
+
           <fieldset className="ship-size"><legend>Package size in cm, if it is bulky</legend>
             <div className="grid3">
               <label className="field"><span>Length</span><input type="number" min="1" max="300" step="any" value={f.lengthCm} onChange={set("lengthCm")} /></label>
