@@ -144,6 +144,8 @@ async function createOrderFromQuoteCore(store, quote, by) {
   const order = await store.orders.insert({
     number, token: token(), quoteId: quote.id, quoteNumber: quote.number, customerId: quote.customerId, customer: quote.customer, items: quote.items, totals: quote.totals,
     interState: quote.interState, placeOfSupply: quote.placeOfSupply, placeOfSupplyName: quote.placeOfSupplyName, poNumber: "", status: "confirmed",
+    paymentTerms: quote.paymentTerms || "prepaid", creditDays: quote.creditDays ?? 30,
+    shippingType: quote.shippingType || "free", shippingCharge: quote.shippingCharge || 0,
     expectedDate: "", notes: quote.notes || "", dispatch: null, challanNumber: "", invoiceId: "", createdBy: by, createdAt: now(), updatedAt: now(),
   });
   await store.quotes.update(quote.id, { status: "converted", orderId: order.id, updatedAt: now() });

@@ -184,6 +184,8 @@ export default function DocPage() {
 
         <div className="bill-pos-bar">
           <span>Place of Supply: <strong>{d.placeOfSupply || "36"}-{d.placeOfSupplyName || "TELANGANA"}</strong></span>
+          {quote && <span>Payment Terms: <strong>{d.paymentTerms === "credit" ? `Credit (${d.creditDays || 30} Days)` : "Prepaid / Advance"}</strong></span>}
+          {quote && <span>Delivery: <strong>{d.shippingType === "shadowfax" ? `Shadowfax Courier${d.shippingCharge ? ` (+₹${(d.shippingCharge/100).toFixed(2)})` : ""}` : d.shippingType === "custom" ? `Custom Courier${d.shippingCharge ? ` (+₹${(d.shippingCharge/100).toFixed(2)})` : ""}` : "Free Delivery"}</strong></span>}
           {d.poNumber && <span>Customer PO #: <strong>{d.poNumber}</strong></span>}
           {d.orderNumber && <span>Order #: <strong>{d.orderNumber}</strong></span>}
           {credit && <span>Reason: <strong>{String(d.reason || "").replace(/_/g, " ")}</strong>{d.restock ? " (goods returned)" : ""}</span>}
@@ -459,11 +461,25 @@ export default function DocPage() {
       )}
 
       {resp.done && (
-        <p className="doc-note no-print success-msg">
-          {resp.done === "accept"
-            ? "Thank you! Your quotation acceptance has been recorded. Our team will contact you shortly."
-            : "Thank you for letting us know."}
-        </p>
+        <div className="doc-note no-print success-msg" style={{ padding: "16px 20px", background: "#F0FDF4", border: "1px solid #16A34A", borderRadius: "10px", marginTop: "16px" }}>
+          {resp.done === "accept" ? (
+            <div>
+              <h3 style={{ color: "#15803D", margin: "0 0 6px 0", fontSize: "1.1rem" }}>✓ Quotation Accepted!</h3>
+              <p style={{ margin: "0 0 10px 0", color: "#166534" }}>
+                {d.paymentTerms === "credit"
+                  ? `Your order has been confirmed on ${d.creditDays || 30} days credit terms. Our warehouse team is preparing your goods for packing and dispatch. We will share your live tracking link as soon as your shipment is dispatched.`
+                  : "Your order is confirmed! As per advance payment terms, you can complete payment using the UPI QR below or tap the secure online payment link. We've also sent the confirmation and payment link to your WhatsApp."}
+              </p>
+              {d.paymentTerms !== "credit" && d.payLink?.url && (
+                <a href={d.payLink.url} target="_blank" rel="noopener noreferrer" className="btn" style={{ display: "inline-block", background: "#16A34A", color: "#fff", fontWeight: 700, textDecoration: "none" }}>
+                  💳 Pay Online Now via Razorpay (UPI, Cards, NetBanking) ↗
+                </a>
+              )}
+            </div>
+          ) : (
+            <p style={{ margin: 0, color: "#475569" }}>Thank you for letting us know.</p>
+          )}
+        </div>
       )}
     </div>
   );

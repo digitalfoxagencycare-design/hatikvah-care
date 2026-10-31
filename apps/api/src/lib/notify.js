@@ -59,7 +59,7 @@ export const templateText = (v, max = 1000) => String(v ?? "").replace(/\s*[\r\n
 export function buildWhatsAppMessage(cfg, m, inWindow) {
   const base = { messaging_product: "whatsapp", recipient_type: "individual", to: m.to };
   if (m.payload && inWindow === true) return { payload: { ...m.payload, ...base }, via: "bot" }; // bot replies answer the customer, so the window is open
-  if (m.document?.link) {
+  if (m.document?.link && inWindow === true) {
     return {
       payload: {
         ...base,
@@ -72,6 +72,23 @@ export function buildWhatsAppMessage(cfg, m, inWindow) {
       },
       via: "document"
     };
+  }
+  const docTpl = cfg.waTemplates?.quote_doc;
+  if (m.document?.link && docTpl && m.template) {
+    const lang = { code: cfg.waTemplateLang || "en" };
+    const spec = WA_TEMPLATES[m.template.kind] || WA_TEMPLATES.quote_doc;
+    const components = [
+      {
+        type: "header",
+        parameters: [{ type: "document", document: { link: m.document.link, filename: m.document.filename || "Quotation.pdf" } }]
+      },
+      {
+        type: "body",
+        parameters: spec.body.map((_, i) => ({ type: "text", text: templateText(m.template.params?.[i]) }))
+      }
+    ];
+    if (m.template.button) components.push({ type: "button", sub_type: "url", index: "0", parameters: [{ type: "text", text: String(m.template.button) }] });
+    return { payload: { ...base, type: "template", template: { name: docTpl, language: lang, components } }, via: `template:${docTpl}` };
   }
   const freeForm = () => (m.button
     ? { payload: { ...base, type: "interactive", interactive: { type: "cta_url", body: { text: m.body.slice(0, 1024) }, action: { name: "cta_url", parameters: { display_text: m.button.label, url: m.button.url } } } }, via: "link" }

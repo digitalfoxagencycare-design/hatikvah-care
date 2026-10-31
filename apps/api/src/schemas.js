@@ -43,10 +43,18 @@ const lines = z.array(lineInput).min(1, "Add at least one item").max(150);
 export const quoteInput = z.object({
   customerId: id.min(1, "Choose a customer"), enquiryId: id.default(""), items: lines, validUntil: optDate,
   notes: text(2000).default(""), terms: text(3000).default(""), placeOfSupply: stateCode,
+  paymentTerms: z.enum(["prepaid", "credit"]).default("prepaid"),
+  creditDays: z.number().int().min(0).max(180).default(30),
+  shippingType: z.enum(["free", "shadowfax", "custom"]).default("free"),
+  shippingCharge: z.number().int().min(0).max(100_000_00).default(0),
 }).strict();
 
 export const orderInput = z.object({
   customerId: id.min(1, "Choose a customer"), items: lines, expectedDate: optDate, notes: text(2000).default(""), placeOfSupply: stateCode, poNumber: text(60).default(""),
+  paymentTerms: z.enum(["prepaid", "credit"]).default("prepaid"),
+  creditDays: z.number().int().min(0).max(180).default(30),
+  shippingType: z.enum(["free", "shadowfax", "custom"]).default("free"),
+  shippingCharge: z.number().int().min(0).max(100_000_00).default(0),
 }).strict();
 /** Direct booking from an enquiry: customerId picks a customer, customer creates one, neither matches the enquiry's phone. */
 export const bookingInput = z.object({

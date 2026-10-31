@@ -18,7 +18,7 @@ import { createNotifier } from "./lib/notify.js";
 export function createApp({ cfg, store, log = console, fetchImpl }) {
   const app = express();
   const notifier = createNotifier({ cfg, store, log, ...(fetchImpl ? { fetchImpl } : {}) });
-  const automation = createAutomation({ cfg, store, notifier, log });
+  const automation = createAutomation({ cfg, store, notifier, log, ...(fetchImpl ? { fetchImpl } : {}) });
   app.locals.automation = automation;
   app.disable("x-powered-by");
   app.set("trust proxy", cfg.trustProxy);

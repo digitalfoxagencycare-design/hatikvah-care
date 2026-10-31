@@ -26,7 +26,34 @@ export default function QuoteDetail() {
     if (isNew) nav(`/admin/quotes/${out.id}`, { replace: true }); else { setEditing(false); s.reload(); }
   });
   const act = (path, body, ok) => run(async () => { const r = await api(`/api/admin/quotes/${id}/${path}`, { method: "POST", body }); s.reload(); return r; }, ok);
-  const extra = (f, set) => <label className="field"><span>Valid until (blank = standard)</span><input type="date" value={f.validUntil || ""} onChange={(e) => set("validUntil", e.target.value)} /></label>;
+  const extra = (f, set) => (
+    <div className="grid2">
+      <label className="field"><span>Valid until (blank = standard)</span><input type="date" value={f.validUntil || ""} onChange={(e) => set("validUntil", e.target.value)} /></label>
+      <label className="field"><span>Payment Terms</span>
+        <select value={f.paymentTerms || "prepaid"} onChange={(e) => set("paymentTerms", e.target.value)}>
+          <option value="prepaid">Prepaid / Advance Payment (Default)</option>
+          <option value="credit">Credit / Pay Later</option>
+        </select>
+      </label>
+      {f.paymentTerms === "credit" && (
+        <label className="field"><span>Credit Period (Days)</span>
+          <input type="number" min="0" max="180" value={f.creditDays ?? 30} onChange={(e) => set("creditDays", Number(e.target.value) || 0)} />
+        </label>
+      )}
+      <label className="field"><span>Delivery / Courier</span>
+        <select value={f.shippingType || "free"} onChange={(e) => set("shippingType", e.target.value)}>
+          <option value="free">Free Delivery (₹0)</option>
+          <option value="shadowfax">Shadowfax Courier / Express</option>
+          <option value="custom">Custom Transporter / Courier</option>
+        </select>
+      </label>
+      {f.shippingType !== "free" && (
+        <label className="field"><span>Courier Charge (₹)</span>
+          <input type="number" min="0" step="any" value={((f.shippingCharge || 0) / 100) || ""} onChange={(e) => set("shippingCharge", Math.round((Number(e.target.value) || 0) * 100))} placeholder="e.g. 150" />
+        </label>
+      )}
+    </div>
+  );
 
   if (isNew || editing) return (
     <>
@@ -34,7 +61,7 @@ export default function QuoteDetail() {
       <h1>{isNew ? "New quotation" : `Edit ${q.number}`}</h1>
       {!isNew && q.status === "sent" && <p className="notice">This quote was already sent. Saving creates version {(q.version || 1) + 1}; send it again so the customer sees the change.</p>}
       <DocEditor kind="quote" busy={st.busy} error={st.error} onSave={save} extra={extra}
-        initial={isNew ? { customerId: sp.get("customer") || "", items: [], notes: "", terms: "", validUntil: "", placeOfSupply: "" } : { customerId: q.customerId, enquiryId: q.enquiryId || "", items: strip(q.items), notes: q.notes, terms: q.terms, validUntil: q.validUntil, placeOfSupply: q.placeOfSupply }} />
+        initial={isNew ? { customerId: sp.get("customer") || "", items: [], notes: "", terms: "", validUntil: "", placeOfSupply: "", paymentTerms: "prepaid", creditDays: 30, shippingType: "free", shippingCharge: 0 } : { customerId: q.customerId, enquiryId: q.enquiryId || "", items: strip(q.items), notes: q.notes, terms: q.terms, validUntil: q.validUntil, placeOfSupply: q.placeOfSupply, paymentTerms: q.paymentTerms || "prepaid", creditDays: q.creditDays ?? 30, shippingType: q.shippingType || "free", shippingCharge: q.shippingCharge ?? 0 }} />
     </>
   );
   return (
@@ -95,7 +122,17 @@ export default function QuoteDetail() {
             </div>
           )}
 
-          <DocView d={q} extraInfo={<p className="muted small-print">Valid until {fmtDate(q.validUntil)}{q.sentAt && <><br />Sent {fmtTime(q.sentAt)}</>}{q.customerResponse && <><br />Customer: {q.customerResponse.name} {q.customerResponse.note}</>}</p>}>
+          <DocView d={q} extraInfo={<div className="muted small-print">
+            <p>Valid until {fmtDate(q.validUntil)}{q.sentAt && <><br />Sent {fmtTime(q.sentAt)}</>}{q.customerResponse && <><br />Customer: {q.customerResponse.name} {q.customerResponse.note}</>}</p>
+            <p style={{ marginTop: "6px" }}>
+              <span style={{ display: "inline-block", padding: "2px 8px", borderRadius: "4px", background: q.paymentTerms === "credit" ? "#EFF6FF" : "#F0FDF4", color: q.paymentTerms === "credit" ? "#1D4ED8" : "#15803D", fontWeight: 600, marginRight: "8px" }}>
+                {q.paymentTerms === "credit" ? `Credit (${q.creditDays ?? 30} days)` : "Advance / Prepaid"}
+              </span>
+              <span style={{ display: "inline-block", padding: "2px 8px", borderRadius: "4px", background: "#F1F5F9", color: "#475569", fontWeight: 600 }}>
+                {q.shippingType === "shadowfax" ? `Shadowfax${q.shippingCharge ? ` (₹${(q.shippingCharge/100).toFixed(2)})` : ""}` : q.shippingType === "custom" ? `Custom Courier${q.shippingCharge ? ` (₹${(q.shippingCharge/100).toFixed(2)})` : ""}` : "Free Delivery"}
+              </span>
+            </p>
+          </div>}>
             {q.terms && <><h3>Terms</h3><p className="pre small-print">{q.terms}</p></>}
           </DocView>
           <div className="btn-row">

@@ -1,5 +1,6 @@
 import { addDays, daysBetween, todayIST } from "./gst.js";
 import { balance, createOrderFromQuote, logActivity, now, stockBuckets } from "./sales.js";
+import { createPaymentLink } from "./razorpay.js";
 import { getSettings } from "../model.js";
 
 /** Every automation the business runs. "event" rules fire when something happens; the others run on the schedule (every few minutes, or daily). */
@@ -36,7 +37,7 @@ export const quoteTpl = (q) => ({ kind: "quote", params: [name(q.customer), q.nu
 export const invoiceTpl = (inv, amount) => ({ kind: "invoice", params: [name(inv.customer), inv.number, money(amount), inv.dueDate], button: inv.token });
 export const dispatchTpl = (o, details) => ({ kind: "dispatch", params: [name(o.customer), o.number, details], button: o.token });
 
-export function createAutomation({ cfg, store, notifier, log = console }) {
+export function createAutomation({ cfg, store, notifier, fetchImpl = globalThis.fetch, log = console }) {
   const base = () => cfg.publicUrl || `http://localhost:${cfg.port}`;
   const docLink = (kind, t) => `${base()}/doc/${kind}/${t}`;
 
@@ -103,8 +104,50 @@ export function createAutomation({ cfg, store, notifier, log = console }) {
     const [a, company] = await Promise.all([config(), getSettings(store)]);
     let order = null;
     if (isOn(a, "quoteAccepted") && q.status === "accepted") order = await createOrderFromQuote(store, q, by);
-    await send(await teamTargets(a, company, (await store.customers.get(q.customerId))?.assignedTo), { event: "quoteAccepted", ref: q.number, subject: `Quote ${q.number} accepted by ${q.customer.name}`,
-      body: `${q.customer.name} accepted quotation ${q.number} (${money(q.totals.total)}).${order ? `\nSales order ${order.number} created.` : ""}\nOpen: ${base()}/admin/${order ? "orders/" + order.id : "quotes/" + q.id}` });
+
+    let payLink = q.payLink;
+    if (q.paymentTerms !== "credit" && cfg.razorpayKeyId && cfg.razorpaySecret && order && !payLink?.url) {
+      try {
+        payLink = await createPaymentLink(cfg, order, {
+          fetchImpl,
+          callbackUrl: `${base()}/doc/quote/${q.token}`,
+          notes: { quoteId: q.id, orderId: order.id, source: "quote_acceptance" }
+        });
+        await store.orders.update(order.id, { payLink });
+        await store.quotes.update(q.id, { payLink });
+      } catch (err) {
+        log.warn?.("Failed to generate Razorpay link for accepted quote:", err.message);
+      }
+    }
+
+    if (q.customer?.phone) {
+      const isCredit = q.paymentTerms === "credit";
+      const days = q.creditDays || 30;
+      const custMsg = isCredit
+        ? `Dear ${name(q.customer)},\nThank you for accepting quotation ${q.number}! Your order ${order ? order.number : ""} for ${money(q.totals.total)} (incl. GST) is confirmed on ${days} days credit terms.\nOur warehouse team is preparing your items for packing and dispatch. We will share your live tracking link as soon as your shipment is dispatched.\n– ${company.name}`
+        : `Dear ${name(q.customer)},\nThank you for accepting quotation ${q.number}! Your order ${order ? order.number : ""} for ${money(q.totals.total)} (incl. GST) is confirmed.${payLink?.url ? `\n\nTo initiate immediate packing and dispatch, please complete the advance payment using this link:\n${payLink.url}` : `\n\nOur accounts team will share payment details to begin packing.`}\n– ${company.name}`;
+
+      const btn = !isCredit && payLink?.url
+        ? { label: "Pay Now", url: payLink.url }
+        : { label: "View Order", url: `${base()}/doc/quote/${q.token}` };
+
+      await notifier.queue({
+        channel: "whatsapp",
+        to: q.customer.phone,
+        event: "quoteAccepted",
+        ref: q.number,
+        subject: `Order ${order ? order.number : q.number} Confirmed`,
+        body: custMsg,
+        button: btn,
+      });
+    }
+
+    await send(await teamTargets(a, company, (await store.customers.get(q.customerId))?.assignedTo), {
+      event: "quoteAccepted",
+      ref: q.number,
+      subject: `Quote ${q.number} accepted by ${q.customer.name}`,
+      body: `${q.customer.name} accepted quotation ${q.number} (${money(q.totals.total)}).\nTerms: ${q.paymentTerms === "credit" ? `Credit (${q.creditDays || 30} days)` : "Advance / Prepaid"}.${order ? `\nSales order ${order.number} created.` : ""}${payLink?.url ? `\nPayment link: ${payLink.url}` : ""}\nOpen: ${base()}/admin/${order ? "orders/" + order.id : "quotes/" + q.id}`
+    });
     await notifier.flush();
     return order;
   }

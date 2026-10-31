@@ -61,7 +61,13 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
     const c = await customerOr404(d.customerId, res); if (!c) return;
     const s = await getSettings(store);
     const doc = await priced(store, { items: d.items, customer: c, placeOfSupply: d.placeOfSupply });
-    const base = { customerId: c.id, customer: customerSnapshot(c), enquiryId: d.enquiryId, ...doc, notes: d.notes, terms: d.terms || s.quoteTerms, validUntil: d.validUntil || addDays(todayIST(), s.quoteValidityDays), updatedAt: now() };
+    const base = {
+      customerId: c.id, customer: customerSnapshot(c), enquiryId: d.enquiryId, ...doc,
+      notes: d.notes, terms: d.terms || s.quoteTerms, validUntil: d.validUntil || addDays(todayIST(), s.quoteValidityDays),
+      paymentTerms: d.paymentTerms || "prepaid", creditDays: d.creditDays ?? 30,
+      shippingType: d.shippingType || "free", shippingCharge: d.shippingCharge ?? 0,
+      updatedAt: now()
+    };
     if (cur) {
       if (!["draft", "sent"].includes(cur.status)) return bad(res, `A ${cur.status} quote cannot be changed. Duplicate it instead.`, 409);
       const q = await store.quotes.update(cur.id, { ...base, version: cur.status === "sent" ? (cur.version || 1) + 1 : cur.version || 1 });
@@ -174,7 +180,10 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
     const doc = await priced(store, { items: d.items, customer: c, placeOfSupply: d.placeOfSupply });
     await assertStockAvailable(store, doc.items);
     const o = await store.orders.insert({ number: await nextNumber(store, "SO"), token: token(), quoteId: "", quoteNumber: "", customerId: c.id, customer: customerSnapshot(c), ...doc,
-      poNumber: d.poNumber, status: "confirmed", expectedDate: d.expectedDate, notes: d.notes, dispatch: null, challanNumber: "", invoiceId: "", createdBy: by(req), createdAt: now(), updatedAt: now() });
+      poNumber: d.poNumber, status: "confirmed", expectedDate: d.expectedDate, notes: d.notes,
+      paymentTerms: d.paymentTerms || "prepaid", creditDays: d.creditDays ?? 30,
+      shippingType: d.shippingType || "free", shippingCharge: d.shippingCharge ?? 0,
+      dispatch: null, challanNumber: "", invoiceId: "", createdBy: by(req), createdAt: now(), updatedAt: now() });
     await logActivity(store, { entity: "customer", entityId: c.id, text: `Order ${o.number} created`, by: by(req) });
     await audit(req, "order.create", o.number); res.status(201).json(o);
   }));
@@ -185,7 +194,12 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
     const c = await customerOr404(d.customerId, res); if (!c) return;
     const doc = await priced(store, { items: d.items, customer: c, placeOfSupply: d.placeOfSupply });
     await assertStockAvailable(store, doc.items, o.id);
-    const upd = await store.orders.update(o.id, { customerId: c.id, customer: customerSnapshot(c), ...doc, poNumber: d.poNumber, expectedDate: d.expectedDate, notes: d.notes, updatedAt: now() });
+    const upd = await store.orders.update(o.id, {
+      customerId: c.id, customer: customerSnapshot(c), ...doc, poNumber: d.poNumber, expectedDate: d.expectedDate, notes: d.notes,
+      paymentTerms: d.paymentTerms || o.paymentTerms || "prepaid", creditDays: d.creditDays ?? o.creditDays ?? 30,
+      shippingType: d.shippingType || o.shippingType || "free", shippingCharge: d.shippingCharge ?? o.shippingCharge ?? 0,
+      updatedAt: now()
+    });
     await audit(req, "order.update", o.number); res.json(upd);
   }));
   r.post("/orders/:id/status", requirePerm("orders"), atomicWrap(store, async (req, res) => {

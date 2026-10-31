@@ -53,19 +53,46 @@ export default function OrderDetail() {
       <Loader s={s}>{o && (
         <>
           {o.source === "website" && <p className="notice">Website order · {o.paymentStatus === "paid" ? "paid online (invoice raised automatically)" : o.paymentStatus === "pending" ? "customer chose online payment, not paid yet: wait before dispatching" : "pay later: raise the GST invoice to send bank / UPI details"}</p>}
+          {o.status === "packed" && (
+            <div className="panel" style={{ background: "#EFF6FF", border: "1px solid #3B82F6", borderRadius: "8px", padding: "14px 18px", marginBottom: "16px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
+              <div>
+                <strong style={{ color: "#1E40AF", fontSize: "1rem" }}>📦 Order is Packed & Ready for Dispatch</strong>
+                <p style={{ margin: "4px 0 0", color: "#1E3A8A", fontSize: "0.88rem" }}>
+                  Delivery PIN: <strong>{o.customer?.deliveryPincode || o.customer?.shippingAddress?.match(/\b\d{6}\b/)?.[0] || "Auto-fill"}</strong> · Book a Shadowfax bike rider now to generate Challan and send live tracking to customer.
+                </p>
+              </div>
+              <button className="btn" style={{ background: "#2563EB", color: "#fff", fontWeight: 700 }} onClick={() => setShadowfax(true)}>
+                🚀 1-Click Dispatch via Shadowfax
+              </button>
+            </div>
+          )}
           <div className="row-between"><h1>Order {o.number}</h1>
             <div className="btn-row">
               {["confirmed", "packed"].includes(o.status) && !o.invoiceId && <button className="btn ghost" onClick={() => setEditing(true)}>Edit</button>}
+              {o.status === "confirmed" && <button className="btn" onClick={async () => { await api(`/api/admin/orders/${id}/status`, { method: "POST", body: { status: "packed" } }); s.reload(); setShadowfax(true); }}>📦 Mark Packed & Dispatch</button>}
               {dispatchable(o) && <button className="btn" onClick={() => setShadowfax(true)}>{DISPATCH_LABEL}</button>}
               {["confirmed", "packed"].includes(o.status) && <button className="btn ghost" onClick={() => setDispatch({ transporter: "", trackingNo: "", vehicleNo: "", date: today(), notes: "", courier: "", dropPincode: "", weightKg: 1, packages: 1 })}>Own delivery</button>}
             </div></div>
           <Msg st={st} />
-          <DocView d={o} extraInfo={<p className="muted small-print">{o.quoteNumber && <>From quote <Link to={`/admin/quotes/${o.quoteId}`}>{o.quoteNumber}</Link><br /></>}{o.enquiryRef && <>From enquiry {o.enquiryRef}<br /></>}{o.poNumber && <>Customer PO {o.poNumber}<br /></>}{o.expectedDate && <>Expected {fmtDate(o.expectedDate)}<br /></>}
-            {o.dispatch && <>Dispatched {fmtDate(o.dispatch.date)} {o.dispatch.transporter} {o.dispatch.trackingNo}<br />Challan {o.challanNumber}</>}</p>} />
+          <DocView d={o} extraInfo={<div className="muted small-print">
+            {o.quoteNumber && <p>From quote <Link to={`/admin/quotes/${o.quoteId}`}>{o.quoteNumber}</Link></p>}
+            {o.enquiryRef && <p>From enquiry {o.enquiryRef}</p>}
+            {o.poNumber && <p>Customer PO {o.poNumber}</p>}
+            {o.expectedDate && <p>Expected {fmtDate(o.expectedDate)}</p>}
+            {o.dispatch && <p>Dispatched {fmtDate(o.dispatch.date)} {o.dispatch.transporter} {o.dispatch.trackingNo}<br />Challan {o.challanNumber}</p>}
+            <p style={{ marginTop: "6px" }}>
+              <span style={{ display: "inline-block", padding: "2px 8px", borderRadius: "4px", background: o.paymentTerms === "credit" ? "#EFF6FF" : "#F0FDF4", color: o.paymentTerms === "credit" ? "#1D4ED8" : "#15803D", fontWeight: 600, marginRight: "8px" }}>
+                {o.paymentTerms === "credit" ? `Credit (${o.creditDays ?? 30} days)` : "Advance / Prepaid"}
+              </span>
+              <span style={{ display: "inline-block", padding: "2px 8px", borderRadius: "4px", background: "#F1F5F9", color: "#475569", fontWeight: 600 }}>
+                {o.shippingType === "shadowfax" ? `Shadowfax${o.shippingCharge ? ` (₹${(o.shippingCharge/100).toFixed(2)})` : ""}` : o.shippingType === "custom" ? `Custom Courier${o.shippingCharge ? ` (₹${(o.shippingCharge/100).toFixed(2)})` : ""}` : "Free Delivery"}
+              </span>
+            </p>
+          </div>} />
           <ShipmentPanel o={o} onBook={() => setPickup(true)} />
           {!o.invoiceId && o.status !== "cancelled" && o.paymentStatus !== "paid" && <div className="panel"><h2>Online payment</h2><PayLinkActions base={`/api/admin/orders/${id}`} doc={o} due={o.totals.total} onChange={() => s.reload()} /></div>}
           <div className="btn-row">
-            {o.status === "confirmed" && <button className="btn ghost" onClick={() => status("packed")}>Mark packed</button>}
+            {o.status === "confirmed" && <button className="btn ghost" onClick={() => status("packed")}>Mark packed only</button>}
             {o.status === "packed" && <button className="btn ghost" onClick={() => status("confirmed")}>Back to confirmed</button>}
             {o.status === "dispatched" && <button className="btn ghost" onClick={() => status("delivered")}>Mark delivered</button>}
             {can(me, "invoices") && !o.invoiceId && o.status !== "cancelled" && <button className="btn" onClick={() => run(async () => { const inv = await api(`/api/admin/orders/${id}/invoice`, { method: "POST" }); nav(`/admin/invoices/${inv.id}`); })}>Create GST invoice</button>}
