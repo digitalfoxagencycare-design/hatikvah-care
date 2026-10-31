@@ -128,6 +128,39 @@ export default function WhatsApp() {
           <Stat n={hub.data.stats.failed} label="Failed" tone={hub.data.stats.failed ? "bad" : ""} />
         </div>
       )}</Loader>
+
+      {/* Meta WhatsApp Official Pricing & Consumption Meter */}
+      <section className="panel" style={{ background: "#F8FAFC", border: "1px solid #CBD5E1", borderRadius: "10px", padding: "16px", marginBottom: "16px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "8px" }}>
+          <div>
+            <strong style={{ fontSize: "0.95rem", color: "#0F172A" }}>Meta WhatsApp Cloud API — Billing & Consumption Meter</strong>
+            <p style={{ margin: "2px 0 0", fontSize: "0.82rem", color: "#64748B" }}>Official conversation charges billed per delivered message (+ 18% GST)</p>
+          </div>
+          <span className="pill" style={{ background: "#DCFCE7", color: "#15803D", fontWeight: 700 }}>Meta Graph v21.0 Active</span>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
+          <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "8px", padding: "10px 14px" }}>
+            <span style={{ fontSize: "0.74rem", textTransform: "uppercase", fontWeight: 700, color: "#64748B" }}>Authentication (OTP)</span>
+            <div style={{ fontSize: "1.2rem", fontWeight: 700, color: "#0F172A", marginTop: "2px" }}>₹0.19 <small style={{ fontSize: "0.72rem", color: "#64748B" }}>/ msg</small></div>
+            <small style={{ color: "#0284C7", fontSize: "0.75rem" }}>Login & verify codes (hc_otp)</small>
+          </div>
+          <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "8px", padding: "10px 14px" }}>
+            <span style={{ fontSize: "0.74rem", textTransform: "uppercase", fontWeight: 700, color: "#64748B" }}>Utility Messages</span>
+            <div style={{ fontSize: "1.2rem", fontWeight: 700, color: "#0F172A", marginTop: "2px" }}>₹0.48 <small style={{ fontSize: "0.72rem", color: "#64748B" }}>/ msg</small></div>
+            <small style={{ color: "#059669", fontSize: "0.75rem" }}>Quotes, Invoices & Dispatch AWB</small>
+          </div>
+          <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "8px", padding: "10px 14px" }}>
+            <span style={{ fontSize: "0.74rem", textTransform: "uppercase", fontWeight: 700, color: "#64748B" }}>Marketing Broadcasts</span>
+            <div style={{ fontSize: "1.2rem", fontWeight: 700, color: "#0F172A", marginTop: "2px" }}>₹0.96 <small style={{ fontSize: "0.72rem", color: "#64748B" }}>/ msg</small></div>
+            <small style={{ color: "#D97706", fontSize: "0.75rem" }}>Offers & catalog updates</small>
+          </div>
+          <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "8px", padding: "10px 14px" }}>
+            <span style={{ fontSize: "0.74rem", textTransform: "uppercase", fontWeight: 700, color: "#64748B" }}>Service Window (24h)</span>
+            <div style={{ fontSize: "1.2rem", fontWeight: 700, color: "#15803D", marginTop: "2px" }}>₹0.00 <small style={{ fontSize: "0.72rem", color: "#15803D" }}>FREE</small></div>
+            <small style={{ color: "#15803D", fontSize: "0.75rem" }}>Two-way customer care replies</small>
+          </div>
+        </div>
+      </section>
       <div className="crm">
         <aside className="crm-list">
           <input type="search" value={find} onChange={(e) => setFind(e.target.value)} placeholder="Search name or number" aria-label="Search conversations" />

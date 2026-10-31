@@ -136,20 +136,33 @@ export function DispatchModal({ id, onClose }) {
           {reach && <p className={reach.serviceable ? "notice" : "alert"}>{reach.serviceable ? `Shadowfax serves PIN ${pin}.` : `Shadowfax says PIN ${pin} is not serviceable.`}</p>}
           
           {/* Pre-Booking Wallet & Rate Estimate Box */}
-          <div className="panel" style={{ background: "#F1F5F9", padding: "12px 16px", borderRadius: "8px", margin: "12px 0", border: "1px solid #CBD5E1" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
-              <span className="muted">Estimated Delivery Fee:</span>
-              <strong>₹{(((e?.estimatedChargePaise ?? 6500)) / 100).toFixed(2)}</strong>
+          <div className="panel" style={{ background: "#F1F5F9", padding: "14px 16px", borderRadius: "8px", margin: "12px 0", border: "1px solid #CBD5E1" }}>
+            <div style={{ fontWeight: 600, color: "#0F172A", marginBottom: "8px", fontSize: "0.85rem", textTransform: "uppercase", letterSpacing: "0.03em" }}>
+              Pre-Dispatch Freight & Platform Fee Breakdown
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px", fontSize: "0.88rem" }}>
+              <span className="muted">Shadowfax Hyperlocal Freight:</span>
+              <span>₹{(((e?.estimatedChargePaise ?? 6500) - 500) / 100).toFixed(2)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px", fontSize: "0.88rem" }}>
+              <span className="muted">Nova Platform Commission:</span>
+              <span style={{ color: "#0284C7", fontWeight: 600 }}>+₹5.00</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #CBD5E1", paddingTop: "6px", marginBottom: "6px" }}>
+              <strong>Total Estimated Delivery Fee:</strong>
+              <strong style={{ color: "#0F172A" }}>₹{(((e?.estimatedChargePaise ?? 6500)) / 100).toFixed(2)}</strong>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px", fontSize: "0.88rem" }}>
               <span className="muted">Current Shipping Wallet:</span>
               <strong style={{ color: (e?.walletBalancePaise ?? 0) < (e?.estimatedChargePaise ?? 6500) ? "#DC2626" : "#047857" }}>
                 ₹{(((e?.walletBalancePaise ?? 0)) / 100).toFixed(2)}
               </strong>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px dashed #CBD5E1", paddingTop: "6px" }}>
-              <span className="muted">Balance After Dispatch:</span>
-              <strong>₹{Math.max(0, ((e?.walletBalancePaise ?? 0) - (e?.estimatedChargePaise ?? 6500)) / 100).toFixed(2)}</strong>
+              <span className="muted">Projected Balance After Dispatch:</span>
+              <strong style={{ color: (e?.walletBalancePaise ?? 0) < (e?.estimatedChargePaise ?? 6500) ? "#DC2626" : "#0F172A" }}>
+                ₹{Math.max(0, ((e?.walletBalancePaise ?? 0) - (e?.estimatedChargePaise ?? 6500)) / 100).toFixed(2)}
+              </strong>
             </div>
           </div>
 

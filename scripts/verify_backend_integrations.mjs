@@ -181,6 +181,13 @@ async function testCloudRunAdmin() {
       console.log("✅ Hub & Courier Wallet Status:");
       console.log(`   • Courier Wallet Balance: ₹${((hubData.hubs?.courierWallet?.balancePaise || 0) / 100).toFixed(2)}`);
       console.log(`   • Initial Credit Seeded: ₹${((hubData.hubs?.courierWallet?.initialCreditPaise || 0) / 100).toFixed(2)}`);
+
+      // 5. Check Live Shadowfax Status
+      const sfxRes = await fetch(`${CONFIG.cloudRunUrl}/api/admin/logistics/shadowfax/status`, {
+        headers: { Cookie: sessionCookie }
+      });
+      const sfxData = await sfxRes.json();
+      console.log("🚚 Live Shadowfax Status on Cloud Run:", sfxData);
     } else {
       console.error("❌ Admin Login Failed:", loginData);
     }

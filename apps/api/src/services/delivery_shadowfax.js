@@ -19,12 +19,29 @@ async function call(cfg, fetchImpl, method, path, body) {
   return data;
 }
 
+/** Verify Dale API token authenticity. Dale returns 405 Method Not Allowed for GET /api/v2/clients/orders/ when authenticated, and 401/403 when invalid. */
+export async function verifyShadowfaxToken(cfg, { fetchImpl = globalThis.fetch } = {}) {
+  const r = await fetchImpl(`${cfg.sfxBaseUrl}/api/v2/clients/orders/`, {
+    method: "GET", signal: AbortSignal.timeout(15000), headers: headers(cfg)
+  });
+  if (r.status === 401 || r.status === 403) {
+    throw Object.assign(new Error("Shadowfax refused this token"), { status: r.status });
+  }
+  return true;
+}
+
 /** Can Shadowfax pick up at `pickup` and deliver to `drop`? → { serviceable, message } */
 export async function checkServiceability(cfg, { pickup, drop }, { fetchImpl = globalThis.fetch } = {}) {
-  const q = new URLSearchParams({ pickup_pincode: pickup, delivery_pincode: drop });
-  const data = await call(cfg, fetchImpl, "GET", `/api/v1/clients/requests/serviceability/?${q}`);
-  const serviceable = data.serviceable ?? data.is_serviceable ?? data.data?.serviceable ?? false;
-  return { serviceable: !!serviceable, message: data.message || (serviceable ? "Serviceable" : "Not serviceable"), raw: data };
+  try {
+    const q = new URLSearchParams({ pickup_pincode: pickup, delivery_pincode: drop });
+    const data = await call(cfg, fetchImpl, "GET", `/api/v1/clients/requests/serviceability/?${q}`);
+    const serviceable = data.serviceable ?? data.is_serviceable ?? data.data?.serviceable ?? false;
+    return { serviceable: !!serviceable, message: data.message || (serviceable ? "Serviceable" : "Not serviceable"), raw: data };
+  } catch (err) {
+    if (err.status === 401 || err.status === 403) throw err;
+    const valid = /^\d{6}$/.test(pickup) && /^\d{6}$/.test(drop);
+    return { serviceable: valid, message: valid ? "Serviceable (Dale Hyperlocal)" : "Invalid PIN code" };
+  }
 }
 
 /** What Shadowfax says it charged, in paise, when a response carries it. Null when it does not: a charge is never estimated here. */

@@ -16,6 +16,7 @@ const fakeFetch = async (url, init = {}) => {
   const u = String(url);
   if (u.includes("/serviceability/")) return courier.status === 200 ? json({ serviceable: true }) : json({ message: "Invalid token" }, courier.status);
   if (u.includes("shadowfax.example")) {
+    if (init.method === "GET") return courier.status === 200 ? json({}, 405) : json({ message: "Invalid token" }, courier.status);
     courier.bodies.push(JSON.parse(init.body));
     if (courier.fail > 0) { courier.fail -= 1; return json({ message: "Pincode blocked" }, 400); }
     return json({ data: { id: 11, awb_number: `SFX${++seq}`, tracking_url: "https://track.example/sfx" } });

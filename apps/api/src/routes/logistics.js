@@ -5,7 +5,7 @@ import { dispatchOrder, logActivity, now, userError } from "../lib/sales.js";
 import { pieces } from "../lib/units.js";
 import { getSettings } from "../model.js";
 import { shipmentChargeInput, shipmentInput } from "../schemas.js";
-import { checkServiceability, createPickup, parseWebhook, pincodeOf, shadowfaxOn, webhookAuthorised } from "../services/delivery_shadowfax.js";
+import { checkServiceability, createPickup, parseWebhook, pincodeOf, shadowfaxOn, verifyShadowfaxToken, webhookAuthorised } from "../services/delivery_shadowfax.js";
 import { createPorterPickup, parsePorterWebhook, porterOn, porterWebhookAuthorised } from "../services/delivery_porter.js";
 import { wrap } from "./public.js";
 import { bad, notFound, parse } from "./shared.js";
@@ -114,7 +114,7 @@ export function logisticsRoutes({ cfg, store, audit, automation, fetchImpl }) {
     const pickup = cfg.sfxPickupPincode || pincodeOf((await getSettings(store)).address);
     if (!shadowfaxOn(cfg)) return res.json({ connected: false, verified: false, pickup, message: "No Shadowfax token on the server (SHADOWFAX_API_TOKEN)" });
     if (!/^\d{6}$/.test(pickup)) return res.json({ connected: true, verified: false, pickup, message: "Token is set. Add the pickup PIN to check it (SHADOWFAX_PICKUP_PINCODE)" });
-    try { await checkServiceability(cfg, { pickup, drop: pickup }, fetchImpl ? { fetchImpl } : {}); res.json({ connected: true, verified: true, pickup, message: "Token connected: Shadowfax answered just now" }); }
+    try { await verifyShadowfaxToken(cfg, fetchImpl ? { fetchImpl } : {}); res.json({ connected: true, verified: true, pickup, message: "Token connected: Shadowfax active on Dale" }); }
     catch (e) { res.json({ connected: true, verified: false, pickup, message: [401, 403].includes(e.status) ? "Shadowfax refused this token" : `Shadowfax did not answer: ${e.message}` }); }
   }));
   r.get("/logistics/estimate/:id", wrap(async (req, res) => {
