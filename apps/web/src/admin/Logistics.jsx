@@ -75,7 +75,7 @@ export function DispatchModal({ id, onClose }) {
   useEffect(() => {
     if (f || !order.data || !a || !e) return;
     const c = order.data.customer, address = c.shippingAddress || c.billingAddress || "";
-    setF({ dropName: c.contactName || c.name, dropPhone: c.phone || "", dropAddress: address, dropPincode: pinOf(address), pickupPincode: a.pickup || "500034", weightKg: e.weightKg, packages: 1, lengthCm: "", breadthCm: "", heightCm: "" });
+    setF({ dropName: c.contactName || c.name, dropPhone: c.phone || "", dropAddress: address, dropPincode: c.deliveryPincode || pinOf(address), pickupPincode: e?.pickupPincode || a.pickup || "500084", weightKg: e.weightKg, packages: 1, lengthCm: "", breadthCm: "", heightCm: "" });
   }, [f, order.data, a, e]);
   const pin = f?.dropPincode || "", pickup = f?.pickupPincode || "", live = !!a?.verified;
   useEffect(() => { // a hint only: Shadowfax still decides at booking
@@ -137,16 +137,25 @@ export function DispatchModal({ id, onClose }) {
           
           {/* Pre-Booking Wallet & Rate Estimate Box */}
           <div className="panel" style={{ background: "#F1F5F9", padding: "14px 16px", borderRadius: "8px", margin: "12px 0", border: "1px solid #CBD5E1" }}>
-            <div style={{ fontWeight: 600, color: "#0F172A", marginBottom: "8px", fontSize: "0.85rem", textTransform: "uppercase", letterSpacing: "0.03em" }}>
-              Pre-Dispatch Freight & Platform Fee Breakdown
+            <div style={{ fontWeight: 600, color: "#0F172A", marginBottom: "8px", fontSize: "0.85rem", textTransform: "uppercase", letterSpacing: "0.03em", display: "flex", justifyContent: "space-between" }}>
+              <span>Pre-Dispatch Freight & Route Breakdown</span>
+              <span style={{ color: "#0284C7", textTransform: "none", fontWeight: 500 }}>
+                📍 {e?.pickupLocation?.plusCode ? "F9C3+CC JV Hills" : "JV Hills"} ({e?.pickupPincode || "500084"})
+              </span>
             </div>
+            {e?.breakdown?.distanceKm != null && (
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px", fontSize: "0.84rem", background: "#E2E8F0", padding: "4px 8px", borderRadius: "4px" }}>
+                <span>Route Distance: <strong>{e.breakdown.distanceKm} km</strong> ({e.breakdown.deliveryType || "hyperlocal"})</span>
+                <span>Destination: <strong>PIN {f?.dropPincode}</strong></span>
+              </div>
+            )}
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px", fontSize: "0.88rem" }}>
-              <span className="muted">Shadowfax Hyperlocal Freight:</span>
-              <span>₹{(((e?.estimatedChargePaise ?? 6500) - 500) / 100).toFixed(2)}</span>
+              <span className="muted">Courier Freight Charge ({e?.weightKg || 1} kg):</span>
+              <span>₹{(((e?.breakdown?.freightChargePaise ?? ((e?.estimatedChargePaise ?? 6500) - 500))) / 100).toFixed(2)}</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px", fontSize: "0.88rem" }}>
               <span className="muted">Nova Platform Commission:</span>
-              <span style={{ color: "#0284C7", fontWeight: 600 }}>+₹5.00</span>
+              <span style={{ color: "#0284C7", fontWeight: 600 }}>+₹{(((e?.breakdown?.platformFeePaise ?? 500)) / 100).toFixed(2)}</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #CBD5E1", paddingTop: "6px", marginBottom: "6px" }}>
               <strong>Total Estimated Delivery Fee:</strong>

@@ -47,6 +47,13 @@ export default function Settings() {
           <label className="field"><span>Bank details (printed on invoices)</span><textarea rows="3" maxLength={500} value={f.bankDetails} onChange={set("bankDetails")} placeholder={"Bank: …\nA/c no: …\nIFSC: …"} /></label>
           <label className="field"><span>Standard quotation terms</span><textarea rows="4" maxLength={3000} value={f.quoteTerms} onChange={set("quoteTerms")} /></label>
           <label className="field"><span>Invoice terms / declaration</span><textarea rows="2" maxLength={3000} value={f.invoiceTerms} onChange={set("invoiceTerms")} /></label>
+          <h2>Logistics & Dispatch Warehouse</h2>
+          <p className="muted">Default origin for courier pickups (Shadowfax, Porter) and distance/freight calculations.</p>
+          <div className="grid2">
+            <label className="field"><span>Dispatch Plus Code</span><input value={f.dispatchPlusCode || ""} onChange={set("dispatchPlusCode")} placeholder="F9C3+CC JV Hills, Hyderabad, Telangana" /></label>
+            <label className="field"><span>Dispatch PIN Code</span><input inputMode="numeric" maxLength={6} value={f.dispatchPincode || ""} onChange={(e) => set("dispatchPincode")(e.target.value.replace(/\D/g, ""))} placeholder="500084" /></label>
+          </div>
+          <label className="field"><span>Warehouse Dispatch Address</span><textarea rows="2" value={f.dispatchAddress || ""} onChange={set("dispatchAddress")} placeholder="Eshwar Nilayam, Plot No. 4-1447, Kondapur Golden Tulip Estate, JV Hills, Gachibowli, Hyderabad, Telangana – 500084" /></label>
           <h2>Online shop</h2>
           <p className="muted">Cart and checkout show only for products with a price, while “Show prices” is on. Online payment needs the Razorpay keys and WhatsApp sign-in needs the WhatsApp keys on the server; until then those options stay hidden from buyers.</p>
           {[["shopEnabled", "Cart & checkout", "Buyers can order priced products from the website. Off = quote requests only."],

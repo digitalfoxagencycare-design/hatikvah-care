@@ -10,6 +10,7 @@ import { createPorterPickup, parsePorterWebhook, porterOn, porterWebhookAuthoris
 import { wrap } from "./public.js";
 import { bad, notFound, parse } from "./shared.js";
 import { atomicWrap } from "./atomic.js";
+import { calculateDeliveryEstimate, DEFAULT_WAREHOUSE } from "../lib/geo.js";
 
 const COURIERS = {
   shadowfax: { label: "Shadowfax", on: shadowfaxOn, book: createPickup, env: "SHADOWFAX_API_TOKEN" },
@@ -30,7 +31,7 @@ export function estimateWeightKg(items, productsById) {
 /** The delivery details a booking needs, with what staff typed over the customer's record. Checked before a challan is raised, so a missing PIN costs nothing. */
 function deliveryFor(cfg, company, order, d, label) {
   const customer = { ...order.customer, ...(d.dropName ? { contactName: d.dropName } : {}), ...(d.dropPhone ? { phone: d.dropPhone } : {}), ...(d.dropAddress ? { shippingAddress: d.dropAddress } : {}) };
-  const pickupPincode = d.pickupPincode || cfg.sfxPickupPincode || pincodeOf(company.address);
+  const pickupPincode = d.pickupPincode || company.dispatchPincode || cfg.sfxPickupPincode || pincodeOf(company.address) || "500084";
   const dropPincode = d.dropPincode || pincodeOf(customer.shippingAddress || customer.billingAddress);
   if (!/^\d{6}$/.test(pickupPincode) || !/^\d{6}$/.test(dropPincode)) throw userError(`Pickup and delivery PIN codes are needed for ${label}`);
   if (String(customer.phone || "").replace(/\D/g, "").length < 10) throw userError(`${label} needs the delivery phone number`);
@@ -124,11 +125,31 @@ export function logisticsRoutes({ cfg, store, audit, automation, fetchImpl }) {
     const weightKg = estimateWeightKg(o.items, byId);
     const piecesCount = o.items.reduce((n, i) => n + pieces(i), 0);
     const { wallet } = await getDeliveryWallet(store, "shadowfax");
+    const company = await getSettings(store);
     
-    // Check serviceability and base rate if customer pincode exists
-    const dropPin = pincodeOf(o.customer?.shippingAddress || o.customer?.billingAddress);
-    const pickupPin = cfg.sfxPickupPincode || pincodeOf((await getSettings(store)).address);
-    let serviceable = true, estimatedChargePaise = 6500; // default base charge: 65 INR
+    const customer = o.customer || {};
+    const dropPin = customer.deliveryPincode || pincodeOf(customer.shippingAddress || customer.billingAddress);
+    const pickupPin = company.dispatchPincode || cfg.sfxPickupPincode || pincodeOf(company.address) || "500084";
+    
+    const pickup = {
+      plusCode: company.dispatchPlusCode || DEFAULT_WAREHOUSE.plusCode,
+      pincode: pickupPin,
+      address: company.dispatchAddress || company.address || DEFAULT_WAREHOUSE.address,
+      lat: company.dispatchLat || DEFAULT_WAREHOUSE.lat,
+      lng: company.dispatchLng || DEFAULT_WAREHOUSE.lng
+    };
+
+    const drop = {
+      plusCode: customer.plusCode || "",
+      pincode: dropPin,
+      lat: customer.lat,
+      lng: customer.lng,
+      stateCode: customer.stateCode || ""
+    };
+
+    const estimate = calculateDeliveryEstimate({ pickup, drop, weightKg });
+
+    let serviceable = true;
     if (dropPin && pickupPin && /^\d{6}$/.test(dropPin) && /^\d{6}$/.test(pickupPin) && shadowfaxOn(cfg)) {
       try {
         const sfx = await checkServiceability(cfg, { pickup: pickupPin, drop: dropPin }, fetchImpl ? { fetchImpl } : {});
@@ -139,13 +160,44 @@ export function logisticsRoutes({ cfg, store, audit, automation, fetchImpl }) {
     res.json({
       weightKg,
       pieces: piecesCount,
-      estimatedChargePaise,
+      estimatedChargePaise: estimate.totalChargePaise,
+      breakdown: {
+        baseFarePaise: estimate.baseFarePaise,
+        distanceFarePaise: estimate.distanceFarePaise,
+        weightFarePaise: estimate.weightFarePaise,
+        freightChargePaise: estimate.freightChargePaise,
+        platformFeePaise: estimate.platformFeePaise,
+        totalChargePaise: estimate.totalChargePaise,
+        distanceKm: estimate.distanceKm,
+        deliveryType: estimate.deliveryType,
+      },
       walletBalancePaise: wallet?.balance || 0,
-      sufficientBalance: (wallet?.balance || 0) >= estimatedChargePaise,
+      sufficientBalance: (wallet?.balance || 0) >= estimate.totalChargePaise,
       serviceable,
       dropPincode: dropPin,
       pickupPincode: pickupPin,
+      pickupLocation: estimate.pickupLocation,
+      dropLocation: estimate.dropLocation
     });
+  }));
+
+  r.post("/logistics/calculate-rate", wrap(async (req, res) => {
+    const { dropPincode, dropPlusCode, weightKg = 1 } = req.body || {};
+    const company = await getSettings(store);
+    const pickupPin = company.dispatchPincode || cfg.sfxPickupPincode || pincodeOf(company.address) || "500084";
+    const pickup = {
+      plusCode: company.dispatchPlusCode || DEFAULT_WAREHOUSE.plusCode,
+      pincode: pickupPin,
+      address: company.dispatchAddress || company.address || DEFAULT_WAREHOUSE.address,
+      lat: company.dispatchLat || DEFAULT_WAREHOUSE.lat,
+      lng: company.dispatchLng || DEFAULT_WAREHOUSE.lng
+    };
+    const drop = {
+      plusCode: dropPlusCode || "",
+      pincode: dropPincode || ""
+    };
+    const estimate = calculateDeliveryEstimate({ pickup, drop, weightKg: Number(weightKg) || 1 });
+    res.json(estimate);
   }));
   /** Staff copy a charge from the Shadowfax statement when the API did not report one. */
   r.put("/orders/:id/shipment/charge", requirePerm("orders"), wrap(async (req, res) => {

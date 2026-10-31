@@ -18,6 +18,8 @@ export const customerInput = z.object({
   billingAddress: text(400).default(""), shippingAddress: text(400).default(""), priceListId: id.default(""),
   paymentTermsDays: z.number().int().min(0).max(365).default(30), reorderDays: z.number().int().min(0).max(365).default(0),
   tags: z.array(text(30).min(1)).max(10).default([]), notes: text(2000).default(""), assignedTo: id.default(""), followUpAt: optDate, source: text(80).default(""),
+  plusCode: text(60).default(""), deliveryPincode: z.union([z.literal(""), z.string().regex(/^\d{6}$/)]).default(""),
+  lat: z.number().optional(), lng: z.number().optional(),
 }).strict();
 
 export const activityInput = z.object({

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { api } from "../api.js";
 import { Msg, PersonSelect, StateSelect, useAction, useAsync } from "./ui.jsx";
 
-const EMPTY = { name: "", contactName: "", phone: "", email: "", gstin: "", stateCode: "", city: "", billingAddress: "", shippingAddress: "", priceListId: "", paymentTermsDays: 30, reorderDays: 0, tags: [], notes: "", assignedTo: "", followUpAt: "", source: "" };
+const EMPTY = { name: "", contactName: "", phone: "", email: "", gstin: "", stateCode: "", city: "", billingAddress: "", shippingAddress: "", plusCode: "", deliveryPincode: "", priceListId: "", paymentTermsDays: 30, reorderDays: 0, tags: [], notes: "", assignedTo: "", followUpAt: "", source: "" };
 
 /** Add / edit a customer. onSaved(customer). */
 export default function CustomerForm({ customer, onSaved }) {
@@ -31,6 +31,10 @@ export default function CustomerForm({ customer, onSaved }) {
       <div className="grid2">
         <label className="field"><span>Billing address</span><textarea rows="2" maxLength={400} value={f.billingAddress} onChange={set("billingAddress")} /></label>
         <label className="field"><span>Shipping address (blank = same)</span><textarea rows="2" maxLength={400} value={f.shippingAddress} onChange={set("shippingAddress")} /></label>
+      </div>
+      <div className="grid2">
+        <label className="field"><span>Delivery Location / Plus Code</span><input maxLength={60} value={f.plusCode || ""} onChange={set("plusCode")} placeholder="e.g. F9C3+CC or Google Maps Plus Code" /></label>
+        <label className="field"><span>Delivery PIN Code</span><input inputMode="numeric" maxLength={6} value={f.deliveryPincode || ""} onChange={(e) => setF({ ...f, deliveryPincode: e.target.value.replace(/\D/g, "") })} placeholder="e.g. 500084" /></label>
       </div>
       <div className="grid3">
         <label className="field"><span>Payment terms (days)</span><input type="number" min="0" max="365" value={f.paymentTermsDays} onChange={set("paymentTermsDays")} /></label>

@@ -98,6 +98,12 @@ export const settingsInput = z.object({
   ga4Id: z.union([z.literal(""), z.string().trim().regex(/^G-[A-Z0-9]{4,15}$/, "Google Analytics ID looks like G-XXXXXXX")]).default(""),
   metaPixelId: z.union([z.literal(""), z.string().trim().regex(/^\d{5,20}$/, "Meta Pixel ID is digits only")]).default(""),
   brochureUrl: z.union([z.literal(""), z.string().regex(/^\/media\/[0-9a-f-]{36}$/)]).default(""),
+  // Central Logistics Dispatch Warehouse Location
+  dispatchPlusCode: text(60).default("F9C3+CC JV Hills, Hyderabad, Telangana"),
+  dispatchAddress: text(400).default("Eshwar Nilayam, Plot No. 4-1447, Kondapur Golden Tulip Estate, JV Hills, Gachibowli, Hyderabad, Telangana – 500084"),
+  dispatchPincode: z.string().regex(/^\d{6}$/).default("500084"),
+  dispatchLat: z.number().default(17.4710),
+  dispatchLng: z.number().default(78.3535),
   // Online shop switches. Payments and OTP also need their keys in the environment; without them they stay off whatever is ticked here.
   shopEnabled: z.boolean().default(true), onlinePayments: z.boolean().default(true), otpLogin: z.boolean().default(true), payLater: z.boolean().default(true),
 }).strict();
@@ -117,6 +123,11 @@ export const DEFAULT_SETTINGS = {
   quoteTerms: "1. Prices are exclusive of freight unless stated.\n2. Delivery within 7–10 working days of order confirmation.\n3. We declare that this quotation shows the actual price of the goods described and that all particulars are true and correct.",
   invoiceTerms: "We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct. Subject to Hyderabad jurisdiction.",
   quoteValidityDays: 15, paymentTermsDays: 30, ga4Id: "", metaPixelId: "", brochureUrl: "",
+  dispatchPlusCode: "F9C3+CC JV Hills, Hyderabad, Telangana",
+  dispatchAddress: "Eshwar Nilayam, Plot No. 4-1447, Kondapur Golden Tulip Estate, JV Hills, Gachibowli, Hyderabad, Telangana – 500084",
+  dispatchPincode: "500084",
+  dispatchLat: 17.4710,
+  dispatchLng: 78.3535,
   shopEnabled: true, onlinePayments: true, otpLogin: true, payLater: true,
 };
 /** Company settings with defaults filled in for fields added after the database was created. */

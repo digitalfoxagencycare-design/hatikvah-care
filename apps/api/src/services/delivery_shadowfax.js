@@ -56,7 +56,7 @@ export async function createPickup(cfg, { order, company, pickupPincode, dropPin
   const body = {
     order_details: { client_order_id: order.challanNumber || order.number, actual_weight: Math.round(weightKg * 1000), product_value: Math.round(order.totals.total / 100), payment_mode: "Prepaid", total_amount: 0, cod_amount: 0, num_of_packages: packages, ...(dimensions ? { volumetric_weight: Math.round((dimensions.lengthCm * dimensions.breadthCm * dimensions.heightCm) / 5) } : {}), ...(pickupSlot ? { pickup_slot: `${pickupSlot.date} ${pickupSlot.window}` } : {}) },
     customer_details: { name: (c.contactName || c.name).slice(0, 100), contact: c.phone.replace(/\D/g, "").slice(-10), address_line_1: (c.shippingAddress || c.billingAddress).slice(0, 250), pincode: dropPincode, state: c.state || "" },
-    pickup_details: { name: company.name, contact: String(company.phone || "").replace(/\D/g, "").slice(-10), address_line_1: (company.address || company.billingAddress || "").slice(0, 250), pincode: pickupPincode, state: company.state || "" },
+    pickup_details: { name: company.name, contact: String(company.phone || "").replace(/\D/g, "").slice(-10), address_line_1: (company.dispatchAddress || company.address || company.billingAddress || "").slice(0, 250), pincode: pickupPincode, state: company.state || "" },
     product_details: order.items.slice(0, 50).map((it) => ({ sku_name: it.name.slice(0, 100), sku_id: it.sku || "", hsn_code: it.hsn || "", price: Math.round((it.rate || 0) / 100), qty: it.qty })),
   };
   const data = await call(cfg, fetchImpl, "POST", "/api/v3/clients/orders/", body);
