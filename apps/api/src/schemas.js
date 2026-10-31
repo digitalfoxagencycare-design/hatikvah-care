@@ -97,7 +97,7 @@ export const creditNoteInput = z.object({
 
 /** Counter sale: invoice and (optionally) payment in one step. No customer = walk-in, found or created by phone. */
 export const posInput = z.object({
-  customerId: id.default(""), walkIn: z.object({ name: text(160).min(2), phone, gstin, stateCode }).strict().optional(),
+  customerId: id.default(""), walkIn: z.object({ name: text(160).min(2), phone, gstin, stateCode, address: text(400).default(""), pincode: z.union([z.literal(""), z.string().regex(/^\d{6}$/)]).default("") }).strict().optional(),
   items: lines, placeOfSupply: stateCode, notes: text(500).default(""),
   payment: z.object({ mode: z.enum(["cash", "upi", "card", "bank", "cheque"]), reference: text(100).default(""), amount: paise.optional() }).strict().nullable().default(null),
   credit: z.boolean().default(false), // pay later, on the customer's agreed terms

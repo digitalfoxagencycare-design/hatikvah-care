@@ -26,12 +26,45 @@ export function posRoutes({ cfg, store, audit, automation, fetchImpl, log = cons
     const all = await store.customers.all();
     let c = ph.length === 10 ? all.find((x) => x.phone && digits10(x.phone) === ph) : all.find((x) => x.name === WALK_IN);
     if (!c) {
-      c = await store.customers.insert({ name: ph.length === 10 ? w.name : WALK_IN, contactName: ph.length === 10 ? w.name : "", phone: w.phone || "", email: "", gstin: ph.length === 10 ? w.gstin : "",
-        stateCode: ph.length === 10 ? w.stateCode : "", city: "", billingAddress: "", shippingAddress: "", priceListId: "", paymentTermsDays: 0, reorderDays: 0, tags: ["walk-in"], notes: "",
-        assignedTo: "", followUpAt: "", source: "pos", createdAt: now(), updatedAt: now() });
+      c = await store.customers.insert({
+        name: ph.length === 10 ? w.name : (w.name || WALK_IN),
+        contactName: ph.length === 10 ? w.name : "",
+        phone: w.phone || "",
+        email: "",
+        gstin: ph.length === 10 ? w.gstin : "",
+        stateCode: ph.length === 10 ? w.stateCode : "",
+        city: "",
+        billingAddress: w.address || "",
+        shippingAddress: w.address || "",
+        deliveryPincode: w.pincode || "",
+        priceListId: "",
+        paymentTermsDays: 0,
+        reorderDays: 0,
+        tags: ["walk-in"],
+        notes: "",
+        assignedTo: "",
+        followUpAt: "",
+        source: "pos",
+        createdAt: now(),
+        updatedAt: now(),
+      });
+    } else if (ph.length === 10 && (w.address || w.pincode)) {
+      await store.customers.update(c.id, {
+        ...(w.address ? { shippingAddress: w.address } : {}),
+        ...(w.pincode ? { deliveryPincode: w.pincode } : {}),
+        updatedAt: now(),
+      });
+      c = await store.customers.get(c.id);
     }
-    // the shared walk-in record carries no name or GSTIN: this bill shows what was typed at the counter
-    return c.name === WALK_IN ? { ...c, name: w.name, gstin: w.gstin, stateCode: w.stateCode || c.stateCode } : c;
+    return {
+      ...c,
+      name: w.name || c.name,
+      phone: w.phone || c.phone,
+      shippingAddress: w.address || c.shippingAddress,
+      deliveryPincode: w.pincode || c.deliveryPincode,
+      gstin: w.gstin || c.gstin,
+      stateCode: w.stateCode || c.stateCode,
+    };
   }
 
   r.post("/pos/invoice", requirePerm("pos"), wrap(async (req, res) => {

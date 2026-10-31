@@ -13,7 +13,7 @@ import { Icon, Photo } from "./visual.jsx";
 const RATES = [0, 5, 12, 18, 28];
 const NOTES = [50, 100, 200, 500];
 const CHIP_ICONS = { all: "all", amenities: "amenity", linen: "linen", dispensers: "dispenser", kits: "kit" };
-const EMPTY_BUYER = { name: "", gstin: "", stateCode: "" };
+const EMPTY_BUYER = { name: "", phone: "", address: "", pincode: "", gstin: "", stateCode: "" };
 const NEW_PAY = { reference: "", tendered: "", approved: false };
 const isPhone = (s) => /^[+\d][\d\s-]{5,}$/.test(s.trim());
 
@@ -105,9 +105,18 @@ export default function POS() {
   const reset = () => { setLines([]); setBuyer(EMPTY_BUYER); setWho(""); setCustomerId(""); setPos(""); setDisc(""); setPay(NEW_PAY); setOpen(null); rates.reload(); };
 
   const bill = () => !hold && lines.length > 0 && run(async () => {
-    const typed = who.trim(), phone = isPhone(typed) ? typed : "";
+    const typed = who.trim(), rawPhone = buyer.phone?.trim() || (isPhone(typed) ? typed : "");
     const body = {
-      ...(customerId ? { customerId } : { walkIn: { name: buyer.name.trim() || (phone ? "" : typed) || "Walk-in customer", phone, gstin: buyer.gstin, stateCode: buyer.stateCode } }),
+      ...(customerId ? { customerId } : {
+        walkIn: {
+          name: buyer.name.trim() || (!buyer.phone && !isPhone(typed) ? typed : "") || "Walk-in customer",
+          phone: rawPhone,
+          address: buyer.address?.trim() || "",
+          pincode: buyer.pincode?.trim() || "",
+          gstin: buyer.gstin,
+          stateCode: buyer.stateCode,
+        },
+      }),
       items: billLines.map(({ uoms, image, amount, tax, total, ...l }) => ({ ...l, qty: Number(l.qty) })),
       placeOfSupply: pos, credit: mode === "credit",
       payment: mode === "credit" || useQr ? null : { mode, reference: pay.reference },
@@ -157,6 +166,13 @@ export default function POS() {
               <span className="big">{rs(done.invoice.totals.total)}</span>
               <p>{done.credit ? `On credit, due ${done.invoice.dueDate}` : done.payment ? `Paid by ${done.payment.mode}` : "Not paid yet"}</p>
               {done.change > 0 && <p className="pos-change"><span>Change to give</span><span>{rs(done.change)}</span></p>}
+              {done.invoice.customer && (
+                <div style={{ background: "#F1F5F9", borderRadius: "8px", padding: "8px 12px", margin: "10px 0", fontSize: "0.85rem", textAlign: "left", width: "100%", boxSizing: "border-box" }}>
+                  <div><strong>👤 {done.invoice.customer.name}</strong></div>
+                  {done.invoice.customer.phone && <div style={{ color: "#0F766E", marginTop: "2px" }}>📱 WhatsApp: {done.invoice.customer.phone}</div>}
+                  {done.invoice.customer.shippingAddress && <div style={{ color: "#475569", marginTop: "2px" }}>📍 {done.invoice.customer.shippingAddress}{done.invoice.customer.deliveryPincode ? ` (${done.invoice.customer.deliveryPincode})` : ""}</div>}
+                </div>
+              )}
               <a className="btn" href={`/doc/invoice/${done.invoice.token}`} target="_blank" rel="noopener noreferrer">Print bill</a>
               {can(me, "invoices") && <button className="btn btn-whatsapp" disabled={sendSt.busy} onClick={whatsapp}>Send on WhatsApp</button>}
               <Msg st={sendSt} />
@@ -166,21 +182,43 @@ export default function POS() {
             </div>
           ) : <>
             {cust ? (
-              <div className="pos-chosen"><span><strong>{cust.name}</strong><small>{cust.phone}{termsDays ? ` · ${termsDays} days credit` : ""}</small></span><button className="link" onClick={() => { setCustomerId(""); setWho(""); }}>Change</button></div>
+              <div className="pos-chosen" style={{ background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: "8px", padding: "10px 14px", marginBottom: "12px" }}>
+                <span>
+                  <strong>{cust.name}</strong>
+                  <small style={{ display: "block", color: "#1E40AF" }}>📱 {cust.phone || "No phone"}{cust.shippingAddress ? ` · 📍 ${cust.shippingAddress}` : ""}{termsDays ? ` · ${termsDays}d credit` : ""}</small>
+                </span>
+                <button className="link" onClick={() => { setCustomerId(""); setWho(""); setBuyer(EMPTY_BUYER); }}>Change</button>
+              </div>
             ) : (
-              <div className="pos-who">
-                <input value={who} maxLength={160} onChange={(e) => setWho(e.target.value)} placeholder="Customer phone or hotel name (blank = walk-in)" inputMode="search" aria-label="Customer phone or name" />
-                {found.length > 0 && <ul>{found.map((c) => <li key={c.id}><button type="button" onClick={() => { setCustomerId(c.id); setWho(""); }}>{c.name}<small>{c.phone}{c.paymentTermsDays ? ` · ${c.paymentTermsDays} days credit` : ""}</small></button></li>)}</ul>}
+              <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "8px", padding: "12px 14px", marginBottom: "12px" }}>
+                <div style={{ fontWeight: 600, fontSize: "0.82rem", color: "#475569", textTransform: "uppercase", marginBottom: "8px", display: "flex", justifyContent: "space-between" }}>
+                  <span>Customer Details</span>
+                  <span style={{ fontWeight: 400, color: "#64748B", textTransform: "none" }}>For WhatsApp Invoice & Delivery</span>
+                </div>
+                <div className="pos-who" style={{ marginBottom: "8px" }}>
+                  <input value={who} maxLength={160} onChange={(e) => setWho(e.target.value)} placeholder="🔍 Search saved hotel or phone…" inputMode="search" aria-label="Customer search" />
+                  {found.length > 0 && <ul>{found.map((c) => <li key={c.id}><button type="button" onClick={() => { setCustomerId(c.id); setWho(""); }}>{c.name}<small>{c.phone}{c.paymentTermsDays ? ` · ${c.paymentTermsDays} days credit` : ""}</small></button></li>)}</ul>}
+                </div>
+                <div className="grid2" style={{ gap: "8px" }}>
+                  <input type="tel" maxLength={20} value={buyer.phone} onChange={(e) => setBuyer({ ...buyer, phone: e.target.value })} placeholder="Mobile / WhatsApp Phone *" aria-label="Customer phone" />
+                  <input maxLength={100} value={buyer.name} onChange={(e) => setBuyer({ ...buyer, name: e.target.value })} placeholder="Hotel / Customer Name" aria-label="Customer name" />
+                </div>
+                <details className="pos-more" style={{ marginTop: "8px" }}>
+                  <summary style={{ cursor: "pointer", fontSize: "0.85rem", color: "#0284C7" }}>+ Delivery Address & PIN (for Shadowfax bike dispatch)</summary>
+                  <div className="form" style={{ marginTop: "6px" }}>
+                    <textarea rows="2" maxLength={300} value={buyer.address} onChange={(e) => setBuyer({ ...buyer, address: e.target.value })} placeholder="Delivery street, landmark, area" />
+                    <input inputMode="numeric" maxLength={6} value={buyer.pincode} onChange={(e) => setBuyer({ ...buyer, pincode: e.target.value.replace(/\D/g, "") })} placeholder="Delivery PIN (e.g. 500084)" />
+                  </div>
+                </details>
+                <details className="pos-more" style={{ marginTop: "4px" }}>
+                  <summary style={{ cursor: "pointer", fontSize: "0.85rem", color: "#64748B" }}>GST details ({inter ? "IGST" : "CGST + SGST"})</summary>
+                  <div className="form" style={{ marginTop: "6px" }}>
+                    <input maxLength={15} value={buyer.gstin} onChange={(e) => setBuyer({ ...buyer, gstin: e.target.value.toUpperCase() })} placeholder="GSTIN (B2B, e.g. 36ABCDE1234F1Z5)" />
+                    <StateSelect label="Place of supply" value={pos} onChange={setPos} />
+                  </div>
+                </details>
               </div>
             )}
-            <details className="pos-more">
-              <summary>GST details ({inter ? "IGST" : "CGST + SGST"})</summary>
-              <div className="form">
-                {!cust && <><label className="field"><span>Buyer / hotel name</span><input maxLength={160} value={buyer.name} onChange={(e) => setBuyer({ ...buyer, name: e.target.value })} /></label>
-                  <label className="field"><span>GSTIN (B2B)</span><input maxLength={15} value={buyer.gstin} onChange={(e) => setBuyer({ ...buyer, gstin: e.target.value.toUpperCase() })} /></label></>}
-                <StateSelect label="Place of supply" value={pos} onChange={setPos} />
-              </div>
-            </details>
 
             <ul className="pos-cart">
               {lines.length === 0 && <li className="pos-empty">Tap a product to start the bill.</li>}

@@ -12,7 +12,7 @@ export const token = () => crypto.randomBytes(18).toString("base64url");
 export const userError = (message, status = 400) => Object.assign(new Error(message), { status, userError: true });
 
 export function customerSnapshot(c) {
-  return { name: c.name, contactName: c.contactName || "", phone: c.phone || "", email: c.email || "", gstin: c.gstin || "", stateCode: c.stateCode || "", state: stateName(c.stateCode || ""), billingAddress: c.billingAddress || "", shippingAddress: c.shippingAddress || c.billingAddress || "" };
+  return { name: c.name, contactName: c.contactName || "", phone: c.phone || "", email: c.email || "", gstin: c.gstin || "", stateCode: c.stateCode || "", state: stateName(c.stateCode || ""), billingAddress: c.billingAddress || "", shippingAddress: c.shippingAddress || c.billingAddress || "", deliveryPincode: c.deliveryPincode || "" };
 }
 
 /** Builds the money part of a document: place of supply decides CGST+SGST (same state) or IGST (other state). */

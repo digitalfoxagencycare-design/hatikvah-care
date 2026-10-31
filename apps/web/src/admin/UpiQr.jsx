@@ -44,9 +44,12 @@ export function UpiQrModal({ invoice, onPaid, onCancelled }) {
       <div className="upi-box" role="status" aria-live="polite">
         <strong className="upi-amount">{rs(v?.balance ?? invoice.totals.total)}</strong>
         {waiting && (imgFailed
-          ? <p><a className="btn" href={v.qr.imageUrl} target="_blank" rel="noopener noreferrer">Open the QR code</a></p>
+          ? <p><a className="btn" href={v?.payUrl || v.qr.imageUrl} target="_blank" rel="noopener noreferrer">Open Razorpay Payment Page</a></p>
           : <img className="upi-qr" src={v.qr.imageUrl} alt={`UPI QR code for ${rs(v.qr.amount)}`} onError={() => setImgFailed(true)} />)}
-        {waiting && <p className="muted">Scan with any UPI app. This screen updates by itself{clock && ` · ${clock} left`}</p>}
+        {waiting && <p className="muted">Scan with Google Pay, PhonePe, Paytm or any UPI app. Screen auto-updates upon payment{clock && ` · ${clock} left`}</p>}
+        {waiting && v?.payUrl && (
+          <p style={{ margin: "6px 0 10px" }}><a className="btn ghost small" href={v.payUrl} target="_blank" rel="noopener noreferrer">Open Payment Page / Send to Buyer ↗</a></p>
+        )}
         {v?.status === "expired" && <><p>This QR code has expired.</p><button className="btn" disabled={st.busy} onClick={show}>Show a new QR code</button></>}
         {!v && st.busy && <p className="muted">Getting the QR code from Razorpay…</p>}
         {!v && !st.busy && st.error && <button className="btn" onClick={show}>Try again</button>}
