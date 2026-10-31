@@ -4,7 +4,7 @@ import { api } from "../api.js";
 import { can, useMe } from "./AdminApp.jsx";
 import { DocView } from "./DocParts.jsx";
 import { Loader, useLoad } from "./hooks.jsx";
-import { PickupModal, shipmentOpen, ShipmentPanel } from "./Logistics.jsx";
+import { DISPATCH_LABEL, dispatchable, DispatchModal, PickupModal, shipmentOpen, ShipmentPanel } from "./Logistics.jsx";
 import { PayLinkActions } from "./PayLink.jsx";
 import { DocEditor, fmtDate, Modal, Msg, Timeline, today, useAction } from "./ui.jsx";
 import { ask } from "./toast.jsx";
@@ -20,9 +20,10 @@ export default function OrderDetail() {
   const [editing, setEditing] = useState(false);
   const [dispatch, setDispatch] = useState(null);
   const [pickup, setPickup] = useState(false);
+  const [shadowfax, setShadowfax] = useState(false);
   const [st, run] = useAction();
   const o = isNew ? null : s.data;
-  const tracking = shipmentOpen(o?.shipment) && !pickup && !dispatch && !editing;
+  const tracking = shipmentOpen(o?.shipment) && !pickup && !dispatch && !editing && !shadowfax;
   useEffect(() => { // webhooks update the shipment on the server; this keeps an open order page current
     if (!tracking) return undefined;
     const t = setInterval(() => { if (!document.hidden) s.reload(); }, 20000);
@@ -55,7 +56,8 @@ export default function OrderDetail() {
           <div className="row-between"><h1>Order {o.number}</h1>
             <div className="btn-row">
               {["confirmed", "packed"].includes(o.status) && !o.invoiceId && <button className="btn ghost" onClick={() => setEditing(true)}>Edit</button>}
-              {["confirmed", "packed"].includes(o.status) && <button className="btn" onClick={() => setDispatch({ transporter: "", trackingNo: "", vehicleNo: "", date: today(), notes: "", courier: "", dropPincode: "", weightKg: 1, packages: 1 })}>Dispatch</button>}
+              {dispatchable(o) && <button className="btn" onClick={() => setShadowfax(true)}>{DISPATCH_LABEL}</button>}
+              {["confirmed", "packed"].includes(o.status) && <button className="btn ghost" onClick={() => setDispatch({ transporter: "", trackingNo: "", vehicleNo: "", date: today(), notes: "", courier: "", dropPincode: "", weightKg: 1, packages: 1 })}>Own delivery</button>}
             </div></div>
           <Msg st={st} />
           <DocView d={o} extraInfo={<p className="muted small-print">{o.quoteNumber && <>From quote <Link to={`/admin/quotes/${o.quoteId}`}>{o.quoteNumber}</Link><br /></>}{o.enquiryRef && <>From enquiry {o.enquiryRef}<br /></>}{o.poNumber && <>Customer PO {o.poNumber}<br /></>}{o.expectedDate && <>Expected {fmtDate(o.expectedDate)}<br /></>}
@@ -71,6 +73,7 @@ export default function OrderDetail() {
             {["confirmed", "packed"].includes(o.status) && <button className="link danger" onClick={async () => { if (await ask("Cancel this order?", { danger: true, confirmLabel: "Cancel order" })) status("cancelled"); }}>Cancel order</button>}
           </div>
           <div className="panel"><h2>History</h2><Timeline entity="order" entityId={o.id} items={o.activities} onAdded={s.reload} /></div>
+          {shadowfax && <DispatchModal id={o.id} onClose={() => { setShadowfax(false); s.reload(); }} />}
           {pickup && <PickupModal o={o} onClose={() => setPickup(false)} onBooked={() => { setPickup(false); s.reload(); }} />}
           {dispatch && (
             <Modal title={`Dispatch ${o.number}`} onClose={() => setDispatch(null)}>

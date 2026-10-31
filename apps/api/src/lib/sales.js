@@ -116,6 +116,20 @@ async function deductForInvoiceCore(store, inv, by) {
   if(inv.id)await store.invoices.update(inv.id,{stockConsumedAt:now(),stockAllocations,allocationStatus:'verified'});
 }
 
+/** Confirmed or packed order: raises the delivery challan and takes the goods out of stock. Stock sold on an invoice has already left, so it is not taken twice. */
+export function dispatchOrder(store, orderId, dispatch, by) {
+  return store.atomic(async () => {
+    const o = await store.orders.get(orderId); if (!o) throw userError("Order not found", 404);
+    if (!["confirmed", "packed"].includes(o.status)) throw userError("Order cannot be dispatched from its current state", 409);
+    const challanNumber = await nextNumber(store, "DC");
+    const invoice = o.invoiceId ? await store.invoices.get(o.invoiceId) : null;
+    const stockAllocations = invoice?.stockAllocations || await consumeStock(store, o.items, { ref: o.number, by, excludeOrderId: o.id });
+    const result = await store.orders.update(o.id, { status: "dispatched", dispatch: { ...dispatch, date: dispatch.date || todayIST() }, challanNumber, stockConsumedAt: now(), stockAllocations, dispatchedAt: now(), updatedAt: now() });
+    await logActivity(store, { entity: "order", entityId: o.id, text: `Dispatched (challan ${challanNumber})`, by });
+    return result;
+  });
+}
+
 export async function logActivity(store, { entity, entityId, kind = "system", text, by = "system" }) {
   return store.activities.insert({ entity, entityId, kind, text, by, at: now() });
 }
@@ -266,14 +280,14 @@ async function refreshInvoiceCore(store, invoiceId) {
 }
 
 export function recordPayment(store, ...args) { return store.atomic(() => recordPaymentCore(store, ...args)); }
-async function recordPaymentCore(store, inv, { amount, date, mode, reference = "", notes = "", by, external = "" }) {
+async function recordPaymentCore(store, inv, { amount, date, mode, method = "", reference = "", notes = "", by, external = "" }) {
   inv=(await store.invoices.get(inv.id))||inv;
   try { safePaise(amount); } catch { throw userError('Payment must be safe-integer paise'); }
   if (amount <= 0) throw userError('Payment must be positive');
   if(external){const old=await store.payments.findBy('external',external);if(old){if(old.invoiceId!==inv.id||old.amount!==amount)throw userError('External payment identity mismatch',409);return{payment:old,invoice:await store.invoices.get(inv.id),duplicate:true};}}
   if(!external && (inv.status==='void'||amount>balance(inv)))throw userError('Payment exceeds current balance or invoice is void',409);
   const appliedAmount=Math.min(amount,balance(inv)),unappliedAmount=amount-appliedAmount;
-  const p = await store.payments.insert({ invoiceId: inv.id, invoiceNumber: inv.number, customerId: inv.customerId, customerName: inv.customer.name, amount, appliedAmount, unappliedAmount, reconciliationStatus:unappliedAmount?'refund_or_allocation_required':'allocated', date: date || todayIST(), mode, reference, notes, external, by, createdAt: now() });
+  const p = await store.payments.insert({ invoiceId: inv.id, invoiceNumber: inv.number, customerId: inv.customerId, customerName: inv.customer.name, amount, method, appliedAmount, unappliedAmount, reconciliationStatus:unappliedAmount?'refund_or_allocation_required':'allocated', date: date || todayIST(), mode, reference, notes, external, by, createdAt: now() });
   const receiptLines=[{account:ledgerAccount(mode),debit:amount,credit:0},...(appliedAmount?[{account:'accounts_receivable',debit:0,credit:appliedAmount}]:[]),...(unappliedAmount?[{account:'customer_credits',debit:0,credit:unappliedAmount}]:[])];
   await postLedger(store, { sourceKey: "payment:" + p.id, lines: receiptLines, date: p.date, account: ledgerAccount(mode), kind: "receipt", amount, ref: inv.number, paymentId: p.id, invoiceId: inv.id, party: inv.customer.name, narration: `${mode}${reference ? " " + reference : ""}`, by });
   await logActivity(store, { entity: "invoice", entityId: inv.id, text: `Payment ₹${(amount / 100).toFixed(2)} received (${mode}${reference ? " " + reference : ""})`, by });

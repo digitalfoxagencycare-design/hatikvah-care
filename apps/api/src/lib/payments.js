@@ -50,7 +50,7 @@ export async function applyQrPayment({ store, automation }, { qrId, invoiceId, p
     await holdForReconciliation(store, pay, { qrId, reference: "invoiceId", documentId: invoiceId });
     return { reconciliationRequired: true };
   }
-  const out = await recordPayment(store, inv, { amount: pay.amount, mode: "razorpay", reference: pay.id, notes: "Counter UPI QR", by: "razorpay", external: pay.id });
+  const out = await recordPayment(store, inv, { amount: pay.amount, mode: "razorpay", method: "upi", reference: pay.id, notes: "Counter UPI QR", by: "razorpay", external: pay.id });
   if (inv.upiQr?.id === qrId) await store.invoices.update(inv.id, { upiQr: { ...inv.upiQr, status: "paid", paymentId: pay.id }, updatedAt: now() });
   await logActivity(store, { entity: "invoice", entityId: inv.id, text: `UPI QR paid (${pay.vpa || pay.id})`, by: "razorpay" });
   await store.webhookEvents.insert({ eventKey, status: "processed", paymentId: pay.id, qrId, amount: pay.amount, invoiceId: inv.id, createdAt: now() });

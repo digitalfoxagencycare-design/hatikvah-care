@@ -30,6 +30,11 @@ export const DEFAULT_AUTOMATION = {
   staleHours: 24, quoteReminderDays: [3, 7], overdueDays: [1, 7, 15], dailyHour: 9, rrIndex: 0, lastDaily: "", lastRunAt: "", lastResult: null,
 };
 const money = (p) => "₹" + (p / 100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const name = (c) => c.contactName || c.name;
+// Template variables for messages outside WhatsApp's 24-hour window (order and meaning: WA_TEMPLATES in notify.js)
+export const quoteTpl = (q) => ({ kind: "quote", params: [name(q.customer), q.number, money(q.totals.total)], button: q.token });
+export const invoiceTpl = (inv, amount) => ({ kind: "invoice", params: [name(inv.customer), inv.number, money(amount), inv.dueDate], button: inv.token });
+export const dispatchTpl = (o, details) => ({ kind: "dispatch", params: [name(o.customer), o.number, details], button: o.token });
 
 export function createAutomation({ cfg, store, notifier, log = console }) {
   const base = () => cfg.publicUrl || `http://localhost:${cfg.port}`;
@@ -54,11 +59,6 @@ export function createAutomation({ cfg, store, notifier, log = console }) {
   }
   const toCustomer = (c) => [c.email && { channel: "email", to: c.email }, c.phone && { channel: "whatsapp", to: c.phone }].filter(Boolean);
   async function send(targets, { subject, body, event, ref, button = null, template = null }) { for (const t of targets) await notifier.queue({ ...t, subject, body, event, ref, button, template }); }
-  // Template variables for messages outside WhatsApp's 24-hour window (order and meaning: WA_TEMPLATES in notify.js)
-  const name = (c) => c.contactName || c.name;
-  const quoteTpl = (q) => ({ kind: "quote", params: [name(q.customer), q.number, money(q.totals.total)], button: q.token });
-  const invoiceTpl = (inv, amount) => ({ kind: "invoice", params: [name(inv.customer), inv.number, money(amount), inv.dueDate], button: inv.token });
-  const dispatchTpl = (o, details) => ({ kind: "dispatch", params: [name(o.customer), o.number, details], button: o.token });
 
   // ---------- events
   async function enquiryCreated(enq) {

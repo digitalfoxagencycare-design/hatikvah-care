@@ -97,11 +97,10 @@ describe("over the API", () => {
     assert.equal(r.data.invoice.dueDate, r.data.invoice.date);
     assert.equal(r.data.invoice.status, "paid");
   });
-  it("the payments hub shows that bill with its method", async () => {
+  it("the payments hub leaves that cash bill out, and still lists what is owed", async () => {
     const h = (await owner.get("/api/admin/hubs/payments")).data;
-    assert.ok(h.today > 0);
-    assert.equal(h.transactions[0].mode, "cash");
-    assert.equal(h.transactions[0].customerName, "Hotel Sitara");
+    assert.equal(h.today, 0);
+    assert.equal(h.transactions.length, 0);
     assert.ok(h.open.some((i) => i.customer === "Hotel Sitara"));
   });
   it("the dashboard reports the last seven days of sales", async () => {

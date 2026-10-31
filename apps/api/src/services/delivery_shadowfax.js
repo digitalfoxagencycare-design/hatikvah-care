@@ -27,11 +27,17 @@ export async function checkServiceability(cfg, { pickup, drop }, { fetchImpl = g
   return { serviceable: !!serviceable, message: data.message || (serviceable ? "Serviceable" : "Not serviceable"), raw: data };
 }
 
+/** What Shadowfax says it charged, in paise, when a response carries it. Null when it does not: a charge is never estimated here. */
+function chargeOf(d = {}) {
+  const v = Number(d.total_charges ?? d.shipping_charges ?? d.freight_charges ?? d.charges ?? d.charge);
+  return Number.isFinite(v) && v > 0 ? Math.round(v * 100) : null;
+}
+
 /** Pickup request for a dispatched order (delivery challan). Returns the shipment record kept on the order. */
-export async function createPickup(cfg, { order, company, pickupPincode, dropPincode, weightKg = 1, packages = 1, pickupSlot = null }, { fetchImpl = globalThis.fetch } = {}) {
+export async function createPickup(cfg, { order, company, pickupPincode, dropPincode, weightKg = 1, packages = 1, pickupSlot = null, dimensions = null }, { fetchImpl = globalThis.fetch } = {}) {
   const c = order.customer;
   const body = {
-    order_details: { client_order_id: order.challanNumber || order.number, actual_weight: Math.round(weightKg * 1000), product_value: Math.round(order.totals.total / 100), payment_mode: "Prepaid", total_amount: 0, cod_amount: 0, num_of_packages: packages, ...(pickupSlot ? { pickup_slot: `${pickupSlot.date} ${pickupSlot.window}` } : {}) },
+    order_details: { client_order_id: order.challanNumber || order.number, actual_weight: Math.round(weightKg * 1000), product_value: Math.round(order.totals.total / 100), payment_mode: "Prepaid", total_amount: 0, cod_amount: 0, num_of_packages: packages, ...(dimensions ? { volumetric_weight: Math.round((dimensions.lengthCm * dimensions.breadthCm * dimensions.heightCm) / 5) } : {}), ...(pickupSlot ? { pickup_slot: `${pickupSlot.date} ${pickupSlot.window}` } : {}) },
     customer_details: { name: (c.contactName || c.name).slice(0, 100), contact: c.phone.replace(/\D/g, "").slice(-10), address_line_1: (c.shippingAddress || c.billingAddress).slice(0, 250), pincode: dropPincode, state: c.state || "" },
     pickup_details: { name: company.name, contact: String(company.phone || "").replace(/\D/g, "").slice(-10), address_line_1: (company.address || company.billingAddress || "").slice(0, 250), pincode: pickupPincode, state: company.state || "" },
     product_details: order.items.slice(0, 50).map((it) => ({ sku_name: it.name.slice(0, 100), sku_id: it.sku || "", hsn_code: it.hsn || "", price: Math.round((it.rate || 0) / 100), qty: it.qty })),
@@ -41,7 +47,7 @@ export async function createPickup(cfg, { order, company, pickupPincode, dropPin
   const awb = String(d.awb_number || d.awb || d.tracking_id || "");
   return {
     provider: "shadowfax", awb, sfxOrderId: String(d.id || d.order_id || ""), status: "created", trackingUrl: d.tracking_url || d.track_url || (awb ? trackingUrl(cfg, awb) : ""),
-    riderName: "", riderPhone: "", pickupPincode, dropPincode, createdAt: new Date().toISOString(), history: [{ status: "created", at: new Date().toISOString() }],
+    riderName: "", riderPhone: "", chargePaise: chargeOf(d), pickupPincode, dropPincode, createdAt: new Date().toISOString(), history: [{ status: "created", at: new Date().toISOString() }],
   };
 }
 export const trackingUrl = (cfg, awb) => (cfg.sfxTrackingUrl || "https://tracker.shadowfax.in/#/track/{awb}").replace("{awb}", encodeURIComponent(awb));
@@ -66,7 +72,7 @@ export function parseWebhook(b = {}) {
     awb: String(d.awb_number || d.awb || d.tracking_id || ""), clientOrderId: String(d.client_order_id || d.order_id || ""),
     status: normaliseStatus(d.status || d.order_status || d.event || ""), rawStatus: String(d.status || d.order_status || d.event || ""),
     riderName: String(d.rider_name || d.rider?.name || ""), riderPhone: String(d.rider_contact || d.rider_phone || d.rider?.contact || ""),
-    trackingUrl: String(d.tracking_url || d.track_url || ""), at: d.timestamp || d.event_time || new Date().toISOString(),
+    chargePaise: chargeOf(d), trackingUrl: String(d.tracking_url || d.track_url || ""), at: d.timestamp || d.event_time || new Date().toISOString(),
   };
 }
 

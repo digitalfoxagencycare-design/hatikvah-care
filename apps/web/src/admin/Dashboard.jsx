@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { can, useMe } from "./AdminApp.jsx";
 import { Loader, useLoad } from "./hooks.jsx";
-import { PickupModal } from "./Logistics.jsx";
+import { DISPATCH_LABEL, DispatchModal, PickupModal } from "./Logistics.jsx";
 import { Pill, rs, useMeta } from "./ui.jsx";
 import { Icon, Photo } from "./visual.jsx";
 
@@ -35,7 +35,7 @@ function LowCard({ p }) {
   );
 }
 
-function DispatchCard({ o, couriers, onBook }) {
+function DispatchCard({ o, couriers, onBook, onDispatch }) {
   const shipped = o.status === "dispatched", waiting = ["pending", "reconcile"].includes(o.booking);
   return (
     <li className="queue-card">
@@ -47,7 +47,7 @@ function DispatchCard({ o, couriers, onBook }) {
       <div className="queue-tags"><Pill s={o.status} />{o.courier ? <Courier name={COURIERS[o.courier] || o.courier} /> : <Courier name="No courier" off />}</div>
       <div className="queue-acts">
         {shipped && !waiting && couriers.length > 0 && <button className="btn small" onClick={() => onBook(o)}>Book Rider</button>}
-        {!shipped && <Link className="btn small" to={`/admin/orders/${o.id}`}>Dispatch order</Link>}
+        {!shipped && <button className="btn small" onClick={() => onDispatch(o)}>{DISPATCH_LABEL}</button>}
         {o.challanNumber && <a className="btn ghost small" href={`/doc/label/${o.token}`} target="_blank" rel="noopener noreferrer">Print 4x6 Label</a>}
       </div>
     </li>
@@ -74,6 +74,7 @@ export default function Dashboard() {
   const s = useLoad("/api/admin/dashboard");
   const couriers = useMeta().channels.couriers || [];
   const [booking, setBooking] = useState(null);
+  const [sending, setSending] = useState(null);
   const d = s.data;
   const hour = new Date().getHours();
   const days = d?.revenueDays, sold = days?.at(-1).total ?? 0, before = days?.at(-2).total ?? 0;
@@ -105,7 +106,7 @@ export default function Dashboard() {
           {d.dispatchQueue && (
             <section className="panel">
               <div className="row-between"><h2>Dispatch queue</h2><Link to="/admin/logistics-hub">Logistics</Link></div>
-              {d.dispatchQueue.length === 0 ? <p className="muted">Nothing waiting to go out.{d.inTransit ? ` ${d.inTransit} in transit.` : ""}</p> : <ul className="queue">{d.dispatchQueue.slice(0, 5).map((o) => <DispatchCard key={o.id} o={o} couriers={couriers} onBook={setBooking} />)}</ul>}
+              {d.dispatchQueue.length === 0 ? <p className="muted">Nothing waiting to go out.{d.inTransit ? ` ${d.inTransit} in transit.` : ""}</p> : <ul className="queue">{d.dispatchQueue.slice(0, 5).map((o) => <DispatchCard key={o.id} o={o} couriers={couriers} onBook={setBooking} onDispatch={setSending} />)}</ul>}
             </section>
           )}
           {d.aging && <section className="panel"><div className="row-between"><h2>Receivables aging</h2><span className="muted">{rs(d.outstanding)} due</span></div><Aging rows={d.aging} /></section>}
@@ -120,6 +121,7 @@ export default function Dashboard() {
           {d.inboxUnread > 0 && <Link className="panel inbox-note" to="/admin/whatsapp"><Icon name="chat" size={20} />{d.inboxUnread} unread WhatsApp message{d.inboxUnread === 1 ? "" : "s"}</Link>}
         </div>
       </>}</Loader>
+      {sending && <DispatchModal id={sending.id} onClose={() => { setSending(null); s.reload(); }} />}
       {booking && <PickupModal o={booking} onClose={() => setBooking(null)} onBooked={() => { setBooking(null); s.reload(); }} />}
     </div>
   );

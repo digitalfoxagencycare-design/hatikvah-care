@@ -4,6 +4,7 @@ import { api } from "../api.js";
 import { DocView } from "./DocParts.jsx";
 import { Loader, useLoad } from "./hooks.jsx";
 import { ask, askText } from "./toast.jsx";
+import { InvoiceDispatch } from "./Logistics.jsx";
 import { PayLinkActions } from "./PayLink.jsx";
 import { DocEditor, fmtDate, Modal, Msg, rs, Timeline, today, toPaise, useAction } from "./ui.jsx";
 
@@ -63,6 +64,7 @@ export default function InvoiceDetail() {
           <div className="row-between"><h1>Invoice {inv.number}</h1>
             <div className="btn-row">
               <a className="btn ghost" href={`/doc/invoice/${inv.token}`} target="_blank" rel="noopener noreferrer">View / print PDF</a>
+              {inv.status !== "void" && <InvoiceDispatch inv={inv} onClose={() => s.reload()} />}
               {inv.status !== "void" && <button type="button" className="btn btn-whatsapp" onClick={openWhatsApp}>📱 Send via WhatsApp</button>}
               {inv.status !== "void" && <button className="btn ghost" onClick={() => run(async () => { await api(`/api/admin/invoices/${id}/send`, { method: "POST" }); s.reload(); }, "Sent to the customer again ✓")}>Send to customer</button>}
               {inv.status !== "void" && <button className="btn ghost" onClick={() => setCredit({ reason: "return", restock: true, notes: "", lines: inv.items.map(() => ({ qty: "", rate: "", batch: "" })) })}>Issue credit note</button>}

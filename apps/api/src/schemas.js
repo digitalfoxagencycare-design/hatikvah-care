@@ -108,8 +108,12 @@ export const shipmentInput = z.object({
   weightKg: z.number().positive().max(1000).default(1), packages: z.number().int().min(1).max(500).default(1),
   pickupDate: z.union([z.literal(""), z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a date like 2026-10-31")]).default(""), pickupWindow: z.union([z.literal(""), z.enum(PICKUP_WINDOWS)]).default(""),
   dropLat: z.number().min(-90).max(90).optional(), dropLng: z.number().min(-180).max(180).optional(), // Porter routes by map location, not PIN code
+  dropName: text(100).default(""), dropPhone: z.union([z.literal(""), z.string().regex(/^[+\d][\d\s-]{9,17}$/, "Enter the delivery phone number")]).default(""), dropAddress: text(250).default(""), // walk-in buyers often have none on file
+  lengthCm: z.number().positive().max(300).optional(), breadthCm: z.number().positive().max(300).optional(), heightCm: z.number().positive().max(300).optional(),
 }).strict().refine((d) => !d.pickupDate === !d.pickupWindow, { message: "Choose both the pickup date and the time slot", path: ["pickupWindow"] })
   .refine((d) => d.provider !== "porter" || (d.dropLat !== undefined && d.dropLng !== undefined), { message: "Porter needs the delivery location (latitude and longitude)", path: ["dropLat"] });
+
+export const shipmentChargeInput = z.object({ amount: paise }).strict();
 
 export const upiCloseInput = z.object({ payment: z.object({ mode: z.enum(["cash", "card", "bank", "cheque"]), reference: text(100).default("") }).strict().nullable().default(null) }).strict();
 

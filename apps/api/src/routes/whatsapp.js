@@ -1,8 +1,9 @@
 import crypto from "node:crypto";
 import express, { Router } from "express";
 import { requirePerm } from "../lib/permissions.js";
-import { logActivity, now } from "../lib/sales.js";
-import { templateLibrary } from "../lib/notify.js";
+import { dispatchTpl, invoiceTpl, quoteTpl } from "../lib/automation.js";
+import { balance, logActivity, now } from "../lib/sales.js";
+import { templateLibrary, WA_TEMPLATES } from "../lib/notify.js";
 import { getSettings } from "../model.js";
 import { wrap } from "./public.js";
 import { bad, notFound } from "./shared.js";
@@ -171,9 +172,80 @@ export function whatsappWebhook({ cfg, store, automation, notifier, log = consol
 }
 
 /** Admin: the WhatsApp inbox (customer messages), replies inside the 24-hour window, and the outbox delivery log. */
+const TEAM_EVENTS = new Set(["enquiryAlert", "lowStock", "followUps", "dailySummary"]); // these go to staff phones, not customers
+const TEMPLATE_DOCS = { quote: { path: "quote", list: "quotes" }, invoice: { path: "invoice", list: "invoices" }, dispatch: { path: "challan", list: "orders" } };
+
+/** One row per customer number across what they sent us and what we sent them, newest first. */
+export function conversationList(inbox, outbox, customers) {
+  const names = Object.fromEntries(customers.filter((c) => c.phone).map((c) => [digits10(c.phone), c]));
+  const by = new Map();
+  const row = (phone) => {
+    const key = digits10(phone);
+    if (!by.has(key)) by.set(key, { key, phone: String(phone).replace(/\D/g, ""), name: names[key]?.name || "", customerId: names[key]?.id || "", lastAt: "", lastInboundAt: "", preview: "", unread: 0 });
+    return by.get(key);
+  };
+  const seen = (t, at, text) => { if (at > t.lastAt) { t.lastAt = at; t.preview = String(text || "").slice(0, 80); } };
+  for (const m of inbox) {
+    const t = row(m.from);
+    t.name ||= m.name || m.customerName || ""; t.customerId ||= m.customerId || "";
+    if (m.at > t.lastInboundAt) t.lastInboundAt = m.at;
+    if (!m.readAt) t.unread += 1;
+    seen(t, m.at, m.text || `[${m.type}]`);
+  }
+  for (const m of outbox) if (m.channel === "whatsapp" && !TEAM_EVENTS.has(m.event)) seen(row(m.to), m.sentAt || m.createdAt, m.body);
+  return [...by.values()].sort((a, b) => (a.lastAt < b.lastAt ? 1 : -1));
+}
+
 export function whatsappAdminRoutes({ cfg, store, notifier, audit }) {
   const r = Router();
   r.use("/whatsapp", requirePerm("enquiries", "automation"));
+  const docUrl = (path, tok) => `${cfg.publicUrl || `http://localhost:${cfg.port}`}/doc/${path}/${tok}`;
+  const lists = async () => { const [inbox, outbox, customers] = await Promise.all([store.inbox.all({ sort: { at: -1 } }), store.outbox.all({ sort: { createdAt: -1 } }), store.customers.all()]); return { inbox, outbox, customers }; };
+  r.get("/whatsapp/threads", wrap(async (_req, res) => { const l = await lists(); res.json(conversationList(l.inbox, l.outbox, l.customers)); }));
+  /** One conversation, oldest first, with each sent document's current status and the customer's documents a template can carry. */
+  r.get("/whatsapp/threads/:phone", wrap(async (req, res) => {
+    const key = digits10(req.params.phone);
+    if (key.length !== 10) return bad(res, "Enter the WhatsApp number");
+    const [l, quotes, invoices, orders] = await Promise.all([lists(), store.quotes.all({ sort: { createdAt: -1 } }), store.invoices.all({ sort: { createdAt: -1 } }), store.orders.all({ sort: { createdAt: -1 } })]);
+    const own = (d) => digits10(d.customer?.phone) === key;
+    const docOf = (ref) => {
+      if (!ref) return null;
+      const q = quotes.find((d) => d.number === ref); if (q) return { kind: "Quotation", number: q.number, status: q.status, url: docUrl("quote", q.token) };
+      const i = invoices.find((d) => d.number === ref); if (i) return { kind: "Invoice", number: i.number, status: i.status, url: docUrl("invoice", i.token) };
+      const o = orders.find((d) => d.number === ref); if (o) return { kind: "Order", number: o.number, status: o.shipment?.status || o.status, url: o.shipment?.trackingUrl || (o.challanNumber ? docUrl("challan", o.token) : "") };
+      return null;
+    };
+    const inbound = l.inbox.filter((m) => digits10(m.from) === key).map((m) => ({ id: m.id, dir: "in", text: m.text || `[${m.type}]`, at: m.at, items: m.items || [], enquiryId: m.enquiryId || "" }));
+    const outbound = l.outbox.filter((m) => m.channel === "whatsapp" && !TEAM_EVENTS.has(m.event) && digits10(m.to) === key)
+      .map((m) => ({ id: m.id, dir: "out", text: m.body, at: m.sentAt || m.createdAt, event: m.event, status: m.deliveryStatus || m.status, error: m.error || "", button: m.button?.label || "", manualLink: m.manualLink || "", doc: docOf(m.ref) }));
+    const summary = conversationList(l.inbox, l.outbox, l.customers).find((t) => t.key === key) || { key, phone: req.params.phone.replace(/\D/g, ""), name: quotes.concat(invoices, orders).find(own)?.customer.name || "", customerId: "", lastAt: "", lastInboundAt: "", preview: "", unread: 0 };
+    res.json({ ...summary, messages: [...inbound, ...outbound].sort((a, b) => (a.at < b.at ? -1 : 1)),
+      docs: { quote: quotes.filter(own).slice(0, 8).map((d) => ({ id: d.id, number: d.number, status: d.status })), invoice: invoices.filter((d) => own(d) && d.status !== "void").slice(0, 8).map((d) => ({ id: d.id, number: d.number, status: d.status })),
+        dispatch: orders.filter((d) => own(d) && d.challanNumber).slice(0, 8).map((d) => ({ id: d.id, number: d.number, status: d.shipment?.status || d.status })) } });
+  }));
+  r.post("/whatsapp/threads/:phone/read", wrap(async (req, res) => {
+    const key = digits10(req.params.phone), rows = (await store.inbox.all()).filter((m) => digits10(m.from) === key && !m.readAt);
+    for (const m of rows) await store.inbox.update(m.id, { readAt: now(), readBy: req.admin.email });
+    res.json({ read: rows.length });
+  }));
+  /** hc_quote, hc_dispatch or hc_invoice for one of this customer's documents. The notifier sends it free-form inside the 24-hour window and as the approved template outside it. */
+  r.post("/whatsapp/threads/:phone/template", wrap(async (req, res) => {
+    const key = digits10(req.params.phone), kind = String(req.body?.kind || ""), spec = Object.hasOwn(TEMPLATE_DOCS, kind) ? TEMPLATE_DOCS[kind] : null;
+    if (key.length !== 10) return bad(res, "Enter the WhatsApp number");
+    if (!spec) return bad(res, "Choose a template");
+    const doc = await store[spec.list].get(String(req.body?.docId || ""));
+    if (!doc || digits10(doc.customer?.phone) !== key) return bad(res, "Choose one of this customer's documents");
+    if (kind === "dispatch" && !doc.challanNumber) return bad(res, "This order has not been dispatched", 409);
+    const details = kind === "dispatch" ? [doc.dispatch?.transporter && `Courier: ${doc.dispatch.transporter}.`, (doc.shipment?.awb || doc.dispatch?.trackingNo) && `Tracking no: ${doc.shipment?.awb || doc.dispatch.trackingNo}.`].filter(Boolean).join(" ") || "Details on the challan." : "";
+    const template = kind === "quote" ? quoteTpl(doc) : kind === "invoice" ? invoiceTpl(doc, balance(doc) || doc.totals.total) : dispatchTpl(doc, details);
+    const body = WA_TEMPLATES[kind].sample.replace(/\{\{(\d)\}\}/g, (_, n) => template.params[n - 1] ?? "");
+    const label = { quote: "View & approve", invoice: "View invoice", dispatch: "View challan" }[kind];
+    const m = await notifier.queue({ channel: "whatsapp", to: req.params.phone, body, event: { quote: "quoteSend", invoice: "invoiceSend", dispatch: "orderDispatched" }[kind], ref: doc.number, button: { label, url: docUrl(spec.path, doc.token) }, template });
+    if (!m) return bad(res, "That number cannot receive WhatsApp");
+    await notifier.flush();
+    await audit(req, "whatsapp.template", doc.number, { kind });
+    res.status(201).json(await store.outbox.get(m.id));
+  }));
   r.get("/whatsapp/inbox", wrap(async (req, res) => {
     let rows = await store.inbox.all({ sort: { at: -1 } });
     if (req.query.customerId) rows = rows.filter((m) => m.customerId === req.query.customerId);

@@ -6,7 +6,7 @@ import { channels } from "../lib/notify.js";
 import { requirePerm } from "../lib/permissions.js";
 import { refreshPayLink } from "../lib/payments.js";
 import { createPaymentLink } from "../lib/razorpay.js";
-import { balance, bucketOf, stockBuckets, createCreditNote, createInvoice, createOrderFromQuote, customerSnapshot, deductForInvoice, logActivity, moveStock, now, priced, rateFor, recordPayment, refreshInvoice, refundDue, resolveCustomer, removePaymentLedger, postLedger, assertStockAvailable, consumeStock, token } from "../lib/sales.js";
+import { balance, bucketOf, stockBuckets, createCreditNote, createInvoice, createOrderFromQuote, dispatchOrder, customerSnapshot, deductForInvoice, logActivity, moveStock, now, priced, rateFor, recordPayment, refreshInvoice, refundDue, resolveCustomer, removePaymentLedger, postLedger, assertStockAvailable, consumeStock, token } from "../lib/sales.js";
 import { measureLabel, pieces, uomOptions } from "../lib/units.js";
 import { nextNumber } from "../lib/gst.js";
 import { getSettings } from "../model.js";
@@ -201,15 +201,7 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
   r.post("/orders/:id/dispatch", requirePerm("orders"), wrap(async (req, res) => {
     const d = parse(dispatchInput, req.body || {}, res); if (!d) return;
     const { courier, dropPincode, weightKg, packages, ...dispatch } = d;
-    let upd=await store.atomic(async()=>{
-      const o=await store.orders.get(req.params.id);if(!o)throw Object.assign(new Error('Order not found'),{userError:true,status:404});
-      if(!['confirmed','packed'].includes(o.status))throw Object.assign(new Error('Order cannot be dispatched from its current state'),{userError:true,status:409});
-      const challanNumber=await nextNumber(store,'DC');
-      const invoice=o.invoiceId?await store.invoices.get(o.invoiceId):null;
-      const stockAllocations=invoice?.stockAllocations || await consumeStock(store,o.items,{ref:o.number,by:by(req),excludeOrderId:o.id});
-      const result=await store.orders.update(o.id,{status:'dispatched',dispatch:{...dispatch,date:d.date||todayIST()},challanNumber,stockConsumedAt:now(),stockAllocations,dispatchedAt:now(),updatedAt:now()});
-      await logActivity(store,{entity:'order',entityId:o.id,text:'Dispatched (challan '+challanNumber+')',by:by(req)});return result;
-    });
+    let upd = await dispatchOrder(store, req.params.id, dispatch, by(req));
     const o=upd, challanNumber=upd.challanNumber;
     if (courier === "shadowfax") { // the challan stands even if the courier booking fails: staff can retry from the order
       if (!shadowfaxOn(cfg)) await logActivity(store, { entity: "order", entityId: o.id, text: "Shadowfax pickup not booked: Shadowfax is not connected", by: by(req) });
@@ -217,6 +209,18 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
       catch (e) { await logActivity(store, { entity: "order", entityId: o.id, text: `Shadowfax pickup not booked: ${e.message}`, by: by(req) }); }
     }
     await automation.on.orderDispatched(upd); await audit(req, "order.dispatch", o.number, { challanNumber }); res.json(upd);
+  }));
+  /** Counter and direct invoices have no sales order: this makes one for the delivery, so they reach the same dispatch queue. The stock left with the invoice. */
+  r.post("/invoices/:id/delivery-order", requirePerm("orders"), atomicWrap(store, async (req, res) => {
+    const inv = await store.invoices.get(req.params.id); if (!inv) return notFound(res, "Invoice");
+    if (inv.status === "void") return bad(res, "This invoice is void", 409);
+    if (inv.orderId) { const held = await store.orders.get(inv.orderId); if (held) return res.json(held); }
+    const { items, totals, interState, placeOfSupply, placeOfSupplyName } = inv;
+    const o = await store.orders.insert({ number: await nextNumber(store, "SO"), token: token(), quoteId: "", quoteNumber: "", customerId: inv.customerId || "", customer: inv.customer, items, totals, interState, placeOfSupply, placeOfSupplyName,
+      source: "counter", poNumber: inv.poNumber || "", status: "confirmed", expectedDate: "", notes: `Delivery for invoice ${inv.number}`, dispatch: null, challanNumber: "", invoiceId: inv.id, invoiceNumber: inv.number, createdBy: by(req), createdAt: now(), updatedAt: now() });
+    await store.invoices.update(inv.id, { orderId: o.id, orderNumber: o.number, updatedAt: now() });
+    await logActivity(store, { entity: "invoice", entityId: inv.id, text: `Delivery order ${o.number} created`, by: by(req) });
+    await audit(req, "order.create", o.number); res.status(201).json(o);
   }));
   r.post("/orders/:id/paylink", requirePerm("orders"), wrap(async (req, res) => {
     const o = await store.orders.get(req.params.id); if (!o) return notFound(res, "Order");

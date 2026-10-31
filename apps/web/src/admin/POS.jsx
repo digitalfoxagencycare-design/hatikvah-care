@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api.js";
 import { can, useMe } from "./AdminApp.jsx";
 import { useLoad } from "./hooks.jsx";
+import { InvoiceDispatch } from "./Logistics.jsx";
 import { posCategory, POS_CATEGORIES } from "./posCategories.js";
 import { cashChange } from "./posMath.js";
 import { calcTotals, Msg, rs, StateSelect, toPaise, useAction, useAsync, useMeta } from "./ui.jsx";
@@ -159,6 +160,7 @@ export default function POS() {
               <a className="btn" href={`/doc/invoice/${done.invoice.token}`} target="_blank" rel="noopener noreferrer">Print bill</a>
               {can(me, "invoices") && <button className="btn btn-whatsapp" disabled={sendSt.busy} onClick={whatsapp}>Send on WhatsApp</button>}
               <Msg st={sendSt} />
+              <InvoiceDispatch inv={done.invoice} className="btn ghost" />
               <Link className="btn ghost" to={`/admin/invoices/${done.invoice.id}`}>Open invoice</Link>
               <button className="btn green pos-go" onClick={() => { setDone(null); search.current?.focus(); }}>New bill</button>
             </div>

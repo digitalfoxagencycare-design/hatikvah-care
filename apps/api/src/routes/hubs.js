@@ -31,6 +31,17 @@ export function collection(payments, invoices, today) {
   return { today: sum((p) => p.date === today), month: sum((p) => p.date.startsWith(today.slice(0, 7))), activeLinks: owed.filter((i) => i.payLink?.url && i.payLink.amount === balance(i)).length };
 }
 
+/** How a Razorpay payment came in. Payments from before the method was kept read just "Razorpay". */
+const METHODS = { upi: "UPI", card: "Card", netbanking: "NetBanking", wallet: "Wallet", emi: "EMI" };
+export const paymentVia = (p) => (p.notes === "Counter UPI QR" ? "UPI QR" : METHODS[p.method] || "Razorpay");
+/** Online collections for the month, counter QR against everything paid by link. */
+export function channelSplit(online, today) {
+  const month = online.filter((p) => p.date.startsWith(today.slice(0, 7)));
+  const qr = month.filter((p) => paymentVia(p) === "UPI QR"), links = month.filter((p) => paymentVia(p) !== "UPI QR");
+  const sum = (xs) => xs.reduce((n, p) => n + p.amount, 0);
+  return { qr: { count: qr.length, amount: sum(qr) }, links: { count: links.length, amount: sum(links) } };
+}
+
 /** Orders waiting to go out: not yet dispatched, or dispatched with no live courier booking. */
 export const dispatchQueue = (orders) => orders.filter((o) => ["confirmed", "packed"].includes(o.status) || (o.status === "dispatched" && !LIVE(o)));
 
@@ -50,9 +61,10 @@ export function hubRoutes({ cfg, store, audit }) {
   r.get("/hubs/payments", requirePerm("invoices"), wrap(async (_req, res) => {
     const [payments, invoices] = await Promise.all([store.payments.all({ sort: { createdAt: -1 } }), store.invoices.all({ sort: { createdAt: -1 } })]);
     const open = invoices.filter((i) => ["unpaid", "partial"].includes(i.status));
-    res.json({ ...collection(payments, invoices, todayIST()),
-      transactions: payments.slice(0, 50).map((p) => ({ id: p.id, date: p.date, customerName: p.customerName, invoiceId: p.invoiceId, invoiceNumber: p.invoiceNumber, amount: p.amount, mode: p.mode, reference: p.reference || "", razorpay: p.mode === "razorpay" })),
-      open: open.slice(0, 12).map((i) => ({ id: i.id, number: i.number, customer: i.customer.name, balance: balance(i), payLink: i.payLink || null })) });
+    const online = payments.filter((p) => p.mode === "razorpay" && !p.reversedAt), phones = Object.fromEntries(invoices.map((i) => [i.id, i.customer.phone || ""]));
+    res.json({ ...collection(online, invoices, todayIST()), ...channelSplit(online, todayIST()),
+      transactions: online.slice(0, 100).map((p) => ({ id: p.id, paymentId: p.reference || p.external || "", date: p.date, customerName: p.customerName, customerPhone: phones[p.invoiceId] || "", invoiceId: p.invoiceId, invoiceNumber: p.invoiceNumber, amount: p.amount, via: paymentVia(p), status: "Captured" })),
+      open: open.slice(0, 12).map((i) => ({ id: i.id, number: i.number, customer: i.customer.name, phone: i.customer.phone || "", balance: balance(i), payLink: i.payLink || null })) });
   }));
 
   const walletRow = () => store.settings.findBy("key", "courierWallet");
@@ -60,7 +72,12 @@ export function hubRoutes({ cfg, store, audit }) {
     const [orders, thumbs, saved] = await Promise.all([store.orders.all({ sort: { createdAt: -1 } }), images(), walletRow()]);
     const card = (o) => ({ id: o.id, number: o.number, token: o.token, customer: o.customer.name, address: o.customer.shippingAddress || o.customer.billingAddress || "", status: o.status, challanNumber: o.challanNumber || "",
       weightKg: o.shipment?.weightKg ?? null, items: o.items.slice(0, 4).map((i) => ({ name: i.name, qty: i.qty, image: thumbs[i.productId] || "" })), more: Math.max(0, o.items.length - 4), shipment: o.shipment || null });
-    res.json({ couriers: channels(cfg).couriers, wallets: saved?.wallets || {}, queue: dispatchQueue(orders).map(card), moving: orders.filter((o) => LIVE(o) && o.shipment.status !== "delivered").slice(0, 20).map(card) });
+    const live = orders.filter(LIVE), at = (...statuses) => live.filter((o) => statuses.includes(o.shipment.status)).slice(0, 20).map(card);
+    const shipped = live.filter((o) => (o.shipment.provider || "shadowfax") === "shadowfax");
+    res.json({ couriers: channels(cfg).couriers, wallets: saved?.wallets || {}, queue: dispatchQueue(orders).map(card),
+      pending: at("created", "assigned"), outForDelivery: at("picked", "in_transit", "out_for_delivery"), delivered: at("delivered"),
+      charges: shipped.slice(0, 50).map((o) => ({ id: o.id, number: o.number, customer: o.customer.name, awb: o.shipment.awb, date: o.shipment.createdAt, weightKg: o.shipment.weightKg ?? null, status: o.shipment.status, charge: o.shipment.chargePaise ?? null, enteredBy: o.shipment.chargeBy || "" })),
+      chargedTotal: shipped.reduce((n, o) => n + (o.shipment.chargePaise || 0), 0) });
   }));
 
   /** No courier integration reports a wallet balance, so staff type in what the courier's portal shows and the hub warns when it runs low. */

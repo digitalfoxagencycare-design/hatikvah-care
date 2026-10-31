@@ -86,10 +86,11 @@ describe("courier pickup", () => {
     assert.equal(r.data.dispatch.transporter, "Porter", "the label names the courier actually booked");
   });
 
-  it("needs a dispatched order, and both slot fields together", async () => {
+  it("raises nothing without a delivery address, and needs both slot fields together", async () => {
     const customer = (await owner.post("/api/admin/customers", { name: "Hotel Two", phone: "+91 90000 22222", stateCode: "36" })).data;
     const order = (await owner.post("/api/admin/orders", { customerId: customer.id, items: [line()], notes: "", poNumber: "", expectedDate: "", placeOfSupply: "36" })).data;
-    assert.equal((await owner.post(`/api/admin/orders/${order.id}/shipment`, { provider: "shadowfax" })).status, 409);
+    assert.equal((await owner.post(`/api/admin/orders/${order.id}/shipment`, { courier: "shadowfax" })).status, 400);
+    assert.equal((await owner.get(`/api/admin/orders/${order.id}`)).data.status, "confirmed", "no challan is raised for a booking that cannot go through");
     const o = await dispatched();
     assert.equal((await owner.post(`/api/admin/orders/${o.id}/shipment`, { provider: "shadowfax", pickupDate: "2026-11-02" })).status, 400);
   });

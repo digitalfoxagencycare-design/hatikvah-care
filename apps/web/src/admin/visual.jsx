@@ -133,10 +133,10 @@ export function EmptyState({ title, body, children }) {
   return (
     <div className="empty">
       <svg width="120" height="96" viewBox="0 0 120 96" fill="none" aria-hidden="true">
-        <rect x="28" y="10" width="64" height="78" rx="8" fill="rgba(217,119,6,.08)" stroke="#D97706" strokeWidth="1.5" />
-        <path d="M40 30h40M40 42h40M40 54h24" stroke="#9CA3AF" strokeWidth="2.5" strokeLinecap="round" />
-        <circle cx="86" cy="70" r="15" fill="#111827" stroke="#10B981" strokeWidth="1.5" />
-        <path d="M79 70l5 5 9-10" stroke="#10B981" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+        <rect x="28" y="10" width="64" height="78" rx="8" fill="#FFFBEB" stroke="#B45309" strokeWidth="1.5" />
+        <path d="M40 30h40M40 42h40M40 54h24" stroke="#64748B" strokeWidth="2.5" strokeLinecap="round" />
+        <circle cx="86" cy="70" r="15" fill="#FFFFFF" stroke="#047857" strokeWidth="1.5" />
+        <path d="M79 70l5 5 9-10" stroke="#047857" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
       <strong>{title}</strong>
       {body && <p>{body}</p>}

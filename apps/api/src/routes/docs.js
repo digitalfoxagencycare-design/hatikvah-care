@@ -77,7 +77,7 @@ export function docRoutes({ cfg, store, automation }) {
     }
     if (!inv || !pay?.id) return res.json({ ok: true, ignored: "unknown invoice" });
     const amount = pay.amount;
-    if (amount > 0) { const out = await recordPayment(store, inv, { amount, mode: "razorpay", reference: pay.id, by: "razorpay", external: pay.id }); await automation.on.paymentReceived(out.invoice, out.payment); }
+    if (amount > 0) { const out = await recordPayment(store, inv, { amount, mode: "razorpay", method: pay.method || "", reference: pay.id, by: "razorpay", external: pay.id }); await automation.on.paymentReceived(out.invoice, out.payment); }
     await store.webhookEvents.insert({eventKey,status:"processed",paymentId:pay.id,linkId:link.id,amount:pay.amount,invoiceId:inv.id,createdAt:now()});
     res.json({ ok: true });
   }));

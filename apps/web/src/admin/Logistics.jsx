@@ -1,12 +1,19 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../api.js";
-import { fmtDate, Modal, Msg, today, useAction, useMeta } from "./ui.jsx";
+import { can, useMe } from "./AdminApp.jsx";
+import { Loader, useLoad } from "./hooks.jsx";
+import { fmtDate, Modal, Msg, Pill, today, useAction, useMeta } from "./ui.jsx";
 
 const COURIERS = { shadowfax: "Shadowfax", porter: "Porter" };
 const WINDOWS = ["09:00-12:00", "12:00-15:00", "15:00-18:00", "18:00-21:00"];
 const STEPS = ["Pickup scheduled", "Rider assigned", "In transit", "Delivered"];
 const STEP_OF = { created: 0, assigned: 1, picked: 2, in_transit: 2, out_for_delivery: 2, delivered: 3 };
 export const shipmentOpen = (s) => !!s && !["delivered", "cancelled", "returned"].includes(s.status);
+export const DISPATCH_LABEL = "📦 Dispatch via Shadowfax";
+const shipmentStopped = (s) => !s || ["cancelled", "returned"].includes(s.status);
+/** Confirmed or packed, or dispatched by hand with no live courier booking and none in doubt. */
+export const dispatchable = (o) => ["confirmed", "packed"].includes(o.status) || (o.status === "dispatched" && shipmentStopped(o.shipment) && !["pending", "reconcile"].includes(o.shipmentBooking?.status));
+const pinOf = (a = "") => (String(a).match(/\b\d{6}\b/g) || []).pop() || "";
 
 /** Pickup Scheduled → Rider Assigned → In Transit → Delivered, driven by the courier's webhooks. */
 function ShipmentTimeline({ shipment: s }) {
@@ -55,6 +62,105 @@ export function ShipmentPanel({ o, onBook }) {
         : <p className="muted small-print">Courier pickups appear here once Shadowfax or Porter is connected.</p>)}
     </div>
   );
+}
+
+/** One booking from any confirmed order, whatever channel it came from: the challan is raised with it, and the label is ready the moment Shadowfax answers. */
+export function DispatchModal({ id, onClose }) {
+  const order = useLoad(`/api/admin/orders/${id}`), account = useLoad("/api/admin/logistics/shadowfax/status"), estimate = useLoad(`/api/admin/logistics/estimate/${id}`);
+  const [f, setF] = useState(null);
+  const [booked, setBooked] = useState(null);
+  const [reach, setReach] = useState(null);
+  const [st, run] = useAction();
+  const o = booked || order.data, a = account.data, e = estimate.data;
+  useEffect(() => {
+    if (f || !order.data || !a || !e) return;
+    const c = order.data.customer, address = c.shippingAddress || c.billingAddress || "";
+    setF({ dropName: c.contactName || c.name, dropPhone: c.phone || "", dropAddress: address, dropPincode: pinOf(address), pickupPincode: a.pickup || "500034", weightKg: e.weightKg, packages: 1, lengthCm: "", breadthCm: "", heightCm: "" });
+  }, [f, order.data, a, e]);
+  const pin = f?.dropPincode || "", pickup = f?.pickupPincode || "", live = !!a?.verified;
+  useEffect(() => { // a hint only: Shadowfax still decides at booking
+    setReach(null);
+    if (!live || !/^\d{6}$/.test(pin) || !/^\d{6}$/.test(pickup)) return undefined;
+    let current = true;
+    api(`/api/admin/logistics/serviceability?pincode=${pin}&pickup=${pickup}`).then((r) => { if (current) setReach(r); }).catch(() => {});
+    return () => { current = false; };
+  }, [live, pin, pickup]);
+  const set = (k) => (ev) => setF({ ...f, [k]: ev.target.value });
+  const digits = (k) => (ev) => setF({ ...f, [k]: ev.target.value.replace(/\D/g, "") });
+  const submit = (ev) => {
+    ev.preventDefault();
+    const { lengthCm, breadthCm, heightCm, ...rest } = f;
+    const size = lengthCm && breadthCm && heightCm ? { lengthCm: Number(lengthCm), breadthCm: Number(breadthCm), heightCm: Number(heightCm) } : {};
+    run(async () => {
+      try { setBooked(await api(`/api/admin/orders/${id}/shipment`, { method: "POST", body: { courier: "shadowfax", ...rest, weightKg: Number(f.weightKg), packages: Number(f.packages), ...size } })); }
+      catch (err) { order.reload(); throw err; }
+    });
+  };
+  const s = o?.shipment;
+  return (
+    <Modal title={DISPATCH_LABEL} onClose={onClose} wide>
+      <Loader s={order}>{o && (!shipmentStopped(s) ? (
+        <div className="ship-done">
+          <p className="notice">{booked ? "Rider booked with Shadowfax." : "This order already has a Shadowfax booking."}</p>
+          <dl className="dl">
+            <dt>AWB</dt><dd><code>{s.awb || "—"}</code></dd>
+            <dt>Status</dt><dd><Pill s={s.status}>{s.status.replace(/_/g, " ")}</Pill></dd>
+            <dt>Challan</dt><dd>{o.challanNumber}</dd>
+            {s.trackingUrl && <><dt>Tracking</dt><dd><a href={s.trackingUrl} target="_blank" rel="noopener noreferrer">{s.trackingUrl}</a></dd></>}
+          </dl>
+          <div className="btn-row">
+            <a className="btn" href={`/doc/label/${o.token}`} target="_blank" rel="noopener noreferrer">Print 4x6 Barcode Shipping Label</a>
+            <button className="btn ghost" onClick={onClose}>Done</button>
+          </div>
+        </div>
+      ) : !dispatchable(o) ? (
+        <p className="alert" role="alert">{["pending", "reconcile"].includes(o.shipmentBooking?.status) ? "The last booking got no clear answer from Shadowfax. Check their dashboard before booking again." : `This order is ${o.status}, so it cannot be dispatched.`}</p>
+      ) : !f ? <p className="muted">Loading the booking details…</p> : (
+        <form className="form" onSubmit={submit}>
+          <p className="muted"><strong>{o.number}</strong> · {e.pieces.toLocaleString("en-IN")} pieces · from pickup PIN {pickup}</p>
+          {!a.connected && <p className="alert" role="alert">{a.message}. Nothing can be booked until the token is on the server.</p>}
+          {a.connected && !a.verified && <p className="alert" role="alert">{a.message}</p>}
+          {o.paymentStatus === "pending" && <p className="alert" role="alert">This website order has not been paid yet.</p>}
+          {o.status !== "dispatched" && <p className="muted small-print">{o.invoiceId ? "Booking raises the delivery challan. The stock already left with the invoice." : "Booking raises the delivery challan and takes the goods out of stock."}</p>}
+          <div className="grid2">
+            <label className="field"><span>Customer name</span><input required maxLength={100} value={f.dropName} onChange={set("dropName")} /></label>
+            <label className="field"><span>Destination phone</span><input required inputMode="tel" maxLength={18} value={f.dropPhone} onChange={set("dropPhone")} /></label>
+          </div>
+          <label className="field"><span>Delivery address</span><textarea required rows={2} maxLength={250} value={f.dropAddress} onChange={set("dropAddress")} /></label>
+          <div className="grid3">
+            <label className="field"><span>Delivery PIN</span><input required inputMode="numeric" pattern="\d{6}" maxLength={6} value={f.dropPincode} onChange={digits("dropPincode")} /></label>
+            <label className="field"><span>Pickup PIN</span><input required inputMode="numeric" pattern="\d{6}" maxLength={6} value={f.pickupPincode} onChange={digits("pickupPincode")} /></label>
+            <label className="field"><span>Estimated weight (kg)</span><input required type="number" min="0.1" max="1000" step="any" value={f.weightKg} onChange={set("weightKg")} /></label>
+            <label className="field"><span>Packages</span><input required type="number" min="1" max="500" step="1" value={f.packages} onChange={set("packages")} /></label>
+          </div>
+          {reach && <p className={reach.serviceable ? "notice" : "alert"}>{reach.serviceable ? `Shadowfax serves PIN ${pin}.` : `Shadowfax says PIN ${pin} is not serviceable.`}</p>}
+          <fieldset className="ship-size"><legend>Package size in cm, if it is bulky</legend>
+            <div className="grid3">
+              <label className="field"><span>Length</span><input type="number" min="1" max="300" step="any" value={f.lengthCm} onChange={set("lengthCm")} /></label>
+              <label className="field"><span>Breadth</span><input type="number" min="1" max="300" step="any" value={f.breadthCm} onChange={set("breadthCm")} /></label>
+              <label className="field"><span>Height</span><input type="number" min="1" max="300" step="any" value={f.heightCm} onChange={set("heightCm")} /></label>
+            </div>
+          </fieldset>
+          {st.error && <p className="alert" role="alert">{st.error}</p>}
+          <button className="btn" disabled={st.busy || !a.connected}>{st.busy ? "Booking…" : "Confirm & Book Rider"}</button>
+        </form>
+      ))}</Loader>
+    </Modal>
+  );
+}
+
+/** Counter and direct invoices get their delivery order here, the first time someone dispatches them. */
+export function InvoiceDispatch({ inv, className = "btn", onClose }) {
+  const me = useMe();
+  const [id, setId] = useState("");
+  const [st, run] = useAction();
+  if (!can(me, "orders")) return null;
+  const open = () => run(async () => setId((await api(`/api/admin/invoices/${inv.id}/delivery-order`, { method: "POST" })).id));
+  return <>
+    <button className={className} disabled={st.busy} onClick={open}>{DISPATCH_LABEL}</button>
+    <Msg st={st} />
+    {id && <DispatchModal id={id} onClose={() => { setId(""); onClose?.(); }} />}
+  </>;
 }
 
 /** Pickup request for a dispatched order. Blank PIN = taken from the delivery address. */
