@@ -92,6 +92,10 @@ export function createAutomation({ cfg, store, notifier, log = console }) {
     await send(toCustomer(q.customer), { event: "quoteSend", ref: q.number, subject: `Quotation ${q.number} from ${company.name}`,
       body: `Dear ${q.customer.contactName || q.customer.name},\nPlease find our quotation ${q.number} for ${money(q.totals.total)} (incl. GST)${q.validUntil ? `, valid until ${q.validUntil}` : ""}.\nView and accept online: ${docLink("quote", q.token)}${q.payLink?.url ? `\nPay now to confirm: ${q.payLink.url}` : ""}\n– ${company.name}`,
       button: { label: "View & approve", url: docLink("quote", q.token) }, template: quoteTpl(q) });
+    if (q.customer?.phone) {
+      const pdfUrl = `${base()}/doc/quote/${q.token}/pdf`;
+      await notifier.queue({ channel: "whatsapp", to: q.customer.phone, body: `Quotation PDF: ${q.number}`, event: "quoteSend", ref: q.number, document: { link: pdfUrl, filename: `Quotation_${q.number.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`, caption: `Quotation ${q.number} - ${company.name}` } });
+    }
     await notifier.flush();
   }
 

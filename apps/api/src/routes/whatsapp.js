@@ -250,6 +250,10 @@ export function whatsappAdminRoutes({ cfg, store, notifier, audit }) {
     const label = { quote: "View & approve", invoice: "View invoice", dispatch: "View challan" }[kind];
     const m = await notifier.queue({ channel: "whatsapp", to: doc.customer.phone, body, event: { quote: "quoteSend", invoice: "invoiceSend", dispatch: "orderDispatched" }[kind], ref: doc.number, button: { label, url: docUrl(spec.path, doc.token) }, template });
     if (!m) return bad(res, "That number cannot receive WhatsApp");
+    if (req.body?.sendPdf) {
+      const pdfUrl = `${cfg.publicUrl || `http://localhost:${cfg.port}`}/doc/${spec.path}/${doc.token}/pdf`;
+      await notifier.queue({ channel: "whatsapp", to: doc.customer.phone, body: `${kind.toUpperCase()} PDF: ${doc.number}`, event: { quote: "quoteSend", invoice: "invoiceSend", dispatch: "orderDispatched" }[kind], ref: doc.number, document: { link: pdfUrl, filename: `${kind.toUpperCase()}_${(doc.number || doc.challanNumber || "document").replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`, caption: `${kind === "quote" ? "Quotation" : "Tax Invoice"} ${doc.number} - HaTikvah Care` } });
+    }
     await notifier.flush();
     await audit(req, "whatsapp.template", doc.number, { kind });
     res.status(201).json(await store.outbox.get(m.id));

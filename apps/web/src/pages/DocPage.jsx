@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import QRCode from "qrcode";
 import { api, money } from "../api.js";
 const DispatchSlip = lazy(() => import("./DispatchSlip.jsx")); // the QR library loads only for slips
 const ShippingLabel = lazy(() => import("./ShippingLabel.jsx")); // same for the barcode library
@@ -19,9 +20,9 @@ function fmtMoney(p) {
 }
 
 export default function DocPage() {
-  const { kind, token } = useParams();
   const [s, setS] = useState({ loading: true });
   const [resp, setResp] = useState({ name: "", note: "", busy: false, error: null, done: null });
+  const [qrData, setQrData] = useState("");
 
   const load = () => api(`/api/public/doc/${kind}/${token}`).then((data) => setS({ data })).catch((e) => setS({ error: e.message }));
   useEffect(() => { load(); }, [kind, token]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -80,14 +81,21 @@ export default function DocPage() {
     .replace(/\s+Only$/i, "");
 
   const upiUrl = `upi://pay?pa=${c.upiId || "42157988420@sbi"}&pn=${encodeURIComponent(c.legalName || c.name)}&am=${(totalPaise / 100).toFixed(2)}&cu=INR`;
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=110x110&margin=4&data=${encodeURIComponent(upiUrl)}`;
+  useEffect(() => {
+    QRCode.toDataURL(upiUrl, { margin: 1, width: 120, errorCorrectionLevel: "M" })
+      .then(setQrData)
+      .catch(() => setQrData(""));
+  }, [upiUrl]);
 
   return (
     <div className="doc-page-container">
-      {/* Action buttons (Print / Save PDF / WhatsApp) */}
+      {/* Action buttons (Print / Download PDF / WhatsApp) */}
       <div className="doc-actions no-print">
-        <button className="btn" onClick={() => window.print()}>
-          🖨️ Print / Save as PDF
+        <a className="btn" href={`/api/public/doc/${kind}/${token}/pdf`} target="_blank" rel="noopener noreferrer">
+          📥 Download PDF
+        </a>
+        <button className="btn ghost" onClick={() => window.print()}>
+          🖨️ Print
         </button>
         {c.whatsapp && (
           <a
@@ -345,13 +353,17 @@ export default function DocPage() {
           {!credit && <div className="bill-upi-col">
             <p className="bottom-label"><strong>Pay using UPI:</strong></p>
             <div className="qr-container">
-              <img
-                src={qrUrl}
-                alt="UPI QR Code"
-                width="100"
-                height="100"
-                className="upi-qr-img"
-              />
+              {qrData ? (
+                <img
+                  src={qrData}
+                  alt="UPI QR Code"
+                  width="100"
+                  height="100"
+                  className="upi-qr-img"
+                />
+              ) : (
+                <div style={{ width: 100, height: 100, display: "flex", alignItems: "center", justifyContent: "center", background: "#f8fafc", border: "1px solid #e2e8f0", fontSize: "0.72rem", color: "#64748b" }}>Loading QR…</div>
+              )}
             </div>
           </div>}
 

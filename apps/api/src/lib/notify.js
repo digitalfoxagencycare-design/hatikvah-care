@@ -59,6 +59,20 @@ export const templateText = (v, max = 1000) => String(v ?? "").replace(/\s*[\r\n
 export function buildWhatsAppMessage(cfg, m, inWindow) {
   const base = { messaging_product: "whatsapp", recipient_type: "individual", to: m.to };
   if (m.payload && inWindow === true) return { payload: { ...m.payload, ...base }, via: "bot" }; // bot replies answer the customer, so the window is open
+  if (m.document?.link) {
+    return {
+      payload: {
+        ...base,
+        type: "document",
+        document: {
+          link: m.document.link,
+          filename: m.document.filename || "document.pdf",
+          caption: m.document.caption || ""
+        }
+      },
+      via: "document"
+    };
+  }
   const freeForm = () => (m.button
     ? { payload: { ...base, type: "interactive", interactive: { type: "cta_url", body: { text: m.body.slice(0, 1024) }, action: { name: "cta_url", parameters: { display_text: m.button.label, url: m.button.url } } } }, via: "link" }
     : { payload: { ...base, type: "text", text: { preview_url: true, body: m.body } }, via: "text" });
@@ -110,12 +124,13 @@ export function createNotifier({ cfg, store, fetchImpl = globalThis.fetch, log =
    * payload: a raw WhatsApp message object (interactive buttons, list…) for bot replies inside the customer's 24-hour window.
    * template: { kind: "quote" | "dispatch" | "invoice", params: [...], button: "doc token" } used when the window is closed (WA_TEMPLATES).
    */
-  async function queue({ channel, to, subject = "", body, event = "", ref = "", button = null, payload = null, template = null }) {
+  async function queue({ channel, to, subject = "", body, event = "", ref = "", button = null, payload = null, template = null, document = null }) {
     const dest = channel === "whatsapp" ? waNumber(to) : String(to || "").trim();
     if (channel === "whatsapp" ? dest.length < 10 : !emailOk(dest)) return null; // no usable address: nothing to send
     const live = on[channel] !== "off";
     const m = { channel, to: dest, subject, body: String(body).slice(0, 4000), event, ref, status: live ? "queued" : "logged", attempts: 0, error: live ? "" : "Sending provider is not configured; send by hand.", createdAt: new Date().toISOString(), sentAt: null,
       ...(channel === "whatsapp" && button?.url ? { button: { label: String(button.label || "Open").slice(0, 20), url: button.url } } : {}), ...(channel === "whatsapp" && payload ? { payload } : {}),
+      ...(channel === "whatsapp" && document?.link ? { document: { link: String(document.link), filename: String(document.filename || "document.pdf"), caption: String(document.caption || "") } } : {}),
       ...(channel === "whatsapp" && template && WA_TEMPLATES[template.kind] ? { template: { kind: template.kind, params: (template.params || []).map((p) => String(p ?? "")), button: String(template.button || "") } } : {}) };
     m.manualLink = manualLink(m);
     return store.outbox.insert(m);

@@ -6,8 +6,9 @@ export function whatsAppQuote(q) {
   const clean = rawPhone.replace(/\D/g, "");
   const waPhone = clean.length === 10 ? `91${clean}` : clean;
   const quoteUrl = `${window.location.origin}/doc/quote/${q.token}`;
+  const pdfUrl = `${window.location.origin}/doc/quote/${q.token}/pdf`;
   const total = ((q.totals?.total ?? q.total ?? 0) / 100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const text = `Hello ${q.customer?.name || "Customer"},\n\nPlease find your Quotation ${q.number} from HaTikvah Care.\nTotal Amount: ₹${total}\n\nYou can review, print, and approve your quotation online here:\n${quoteUrl}\n\nThank you,\nHaTikvah Care`;
+  const text = `Hello ${q.customer?.name || "Customer"},\n\nPlease find your Quotation ${q.number} from HaTikvah Care.\nTotal Amount: ₹${total} (incl. GST)\n\n📄 Download Official PDF:\n${pdfUrl}\n\n🔗 View, approve & pay online:\n${quoteUrl}\n\nThank you,\nHaTikvah Care`;
   return { waPhone, text, url: waPhone ? `https://wa.me/${waPhone}?text=${encodeURIComponent(text)}` : null };
 }
 
