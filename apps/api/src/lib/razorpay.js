@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import QRCode from "qrcode";
 
 const authHeader = (cfg) => "Basic " + Buffer.from(`${cfg.razorpayKeyId}:${cfg.razorpaySecret}`).toString("base64");
 
@@ -44,7 +45,7 @@ export async function createUpiQr(cfg, invoice, amount, { fetchImpl = globalThis
   } catch (err) {
     if (err.message?.includes("The requested URL was not found on the server") || err.status === 400 || err.status === 404) {
       const link = await createPaymentLink(cfg, invoice, { fetchImpl, notes: { invoiceId: invoice.id, source: "pos_upi" } });
-      const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=${encodeURIComponent(link.url)}`;
+      const qrImageUrl = await QRCode.toDataURL(link.url, { width: 300, margin: 1 });
       return {
         id: link.id,
         imageUrl: qrImageUrl,
