@@ -11,7 +11,21 @@ const Me = createContext(null);
 export const useMe = () => useContext(Me);
 export const can = (me, p) => me?.permissions?.includes(p);
 
-const page = (f) => lazy(f);
+const page = (f) => lazy(async () => {
+  try {
+    return await f();
+  } catch (err) {
+    const isChunkError = err?.message?.includes("dynamically imported module") || err?.message?.includes("Failed to fetch") || err?.name === "ChunkLoadError" || err instanceof TypeError;
+    const key = "hc_chunk_reload_ts";
+    const last = Number(sessionStorage.getItem(key) || 0);
+    if (isChunkError && Date.now() - last > 15000) {
+      sessionStorage.setItem(key, String(Date.now()));
+      window.location.reload();
+      return new Promise(() => {});
+    }
+    throw err;
+  }
+});
 const P = {
   Dashboard: page(() => import("./Dashboard.jsx")), Products: page(() => import("./Products.jsx")), ProductForm: page(() => import("./ProductForm.jsx")),
   Categories: page(() => import("./Categories.jsx")), Enquiries: page(() => import("./Enquiries.jsx")), Customers: page(() => import("./Customers.jsx")),

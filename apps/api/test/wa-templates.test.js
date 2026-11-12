@@ -28,6 +28,27 @@ describe("WhatsApp payloads (Graph API v21.0)", () => {
     });
   });
 
+  it("outside the window with document: uses doc template with document header", () => {
+    const docCfg = { ...cfg, waTemplates: { ...cfg.waTemplates, invoice_doc: "hc_invoice_doc" } };
+    const docRow = row({
+      template: { kind: "invoice", params: ["Hotel Sitara", "INV/2026-27/001", "₹5,000.00", "2026-11-20"], button: "tok_inv" },
+      document: { link: "https://example.com/inv.pdf", filename: "Invoice_INV_001.pdf" }
+    });
+    const out = buildWhatsAppMessage(docCfg, docRow, false);
+    assert.equal(out.via, "template:hc_invoice_doc");
+    assert.equal(out.payload.type, "template");
+    assert.equal(out.payload.template.name, "hc_invoice_doc");
+    const [header, body, button] = out.payload.template.components;
+    assert.equal(header.type, "header");
+    assert.equal(header.parameters[0].type, "document");
+    assert.equal(header.parameters[0].document.link, "https://example.com/inv.pdf");
+    assert.equal(header.parameters[0].document.filename, "Invoice_INV_001.pdf");
+    assert.equal(body.type, "body");
+    assert.deepEqual(body.parameters.map((p) => p.text), ["Hotel Sitara", "INV/2026-27/001", "₹5,000.00", "2026-11-20"]);
+    assert.equal(button.type, "button");
+    assert.equal(button.parameters[0].text, "tok_inv");
+  });
+
   it("sends exactly the variables the template declares, cleaned the way Meta requires", () => {
     const out = buildWhatsAppMessage(cfg, row({ template: { kind: "invoice", params: ["Ravi\nKumar", "INV/1", "", "2026-11-30", "extra"], button: "" } }), false);
     const [body, ...rest] = out.payload.template.components;

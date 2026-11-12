@@ -14,10 +14,26 @@ import NotFound from "./pages/NotFound.jsx";
 import "./styles.css";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 
-const Admin = lazy(() => import("./admin/AdminApp.jsx"));
-const DocPage = lazy(() => import("./pages/DocPage.jsx"));
-const Checkout = lazy(() => import("./pages/Checkout.jsx"));
-const Account = lazy(() => import("./buyer/BuyerPortal.jsx")); // buyer portal: quotes, orders, tracking, invoices, reorder
+const safeLazy = (f) => lazy(async () => {
+  try {
+    return await f();
+  } catch (err) {
+    const isChunkError = err?.message?.includes("dynamically imported module") || err?.message?.includes("Failed to fetch") || err?.name === "ChunkLoadError" || err instanceof TypeError;
+    const key = "hc_chunk_reload_ts";
+    const last = Number(sessionStorage.getItem(key) || 0);
+    if (isChunkError && Date.now() - last > 15000) {
+      sessionStorage.setItem(key, String(Date.now()));
+      window.location.reload();
+      return new Promise(() => {});
+    }
+    throw err;
+  }
+});
+
+const Admin = safeLazy(() => import("./admin/AdminApp.jsx"));
+const DocPage = safeLazy(() => import("./pages/DocPage.jsx"));
+const Checkout = safeLazy(() => import("./pages/Checkout.jsx"));
+const Account = safeLazy(() => import("./buyer/BuyerPortal.jsx")); // buyer portal: quotes, orders, tracking, invoices, reorder
 const wait = (el) => <Suspense fallback={<div className="center-note">Loading…</div>}>{el}</Suspense>;
 
 createRoot(document.getElementById("root")).render(

@@ -29,7 +29,7 @@ export function loadConfig(env = process.env) {
     resendKey: env.RESEND_API_KEY || "", mailFrom: env.MAIL_FROM || "", mailReplyTo: env.MAIL_REPLY_TO || "",
     waToken: env.WHATSAPP_TOKEN || "", waPhoneId: env.WHATSAPP_PHONE_ID || "", waTemplate: env.WHATSAPP_TEMPLATE || "", waTemplateLang: env.WHATSAPP_TEMPLATE_LANG || "en",
     // Approved Utility templates for messages sent outside the customer's 24-hour window (variables: see WA_TEMPLATES in lib/notify.js and docs/INTEGRATIONS.md)
-    waTemplates: { quote: env.WHATSAPP_TEMPLATE_QUOTE || "", quote_doc: env.WHATSAPP_TEMPLATE_QUOTE_DOC || "", dispatch: env.WHATSAPP_TEMPLATE_DISPATCH || "", invoice: env.WHATSAPP_TEMPLATE_INVOICE || "" },
+    waTemplates: { quote: env.WHATSAPP_TEMPLATE_QUOTE || "", quote_doc: env.WHATSAPP_TEMPLATE_QUOTE_DOC || "", dispatch: env.WHATSAPP_TEMPLATE_DISPATCH || "", invoice: env.WHATSAPP_TEMPLATE_INVOICE || "", invoice_doc: env.WHATSAPP_TEMPLATE_INVOICE_DOC || "" },
     waOtpTemplate: env.WHATSAPP_OTP_TEMPLATE || "", // an approved "Authentication" template; the login code is its only variable
     // Inbound webhook (Meta app > WhatsApp > Configuration): GET verification token, and the app secret that signs every POST (X-Hub-Signature-256).
     waVerifyToken: env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || "", waAppSecret: env.WHATSAPP_APP_SECRET || "", waBusinessId: env.WHATSAPP_BUSINESS_ACCOUNT_ID || "",
@@ -56,7 +56,7 @@ export function loadConfig(env = process.env) {
   if (cfg.novaUrl && !/^https:\/\//.test(cfg.novaUrl) && prod) problems.push("NOVA_URL must start with https://");
   if (!!cfg.novaUrl !== !!cfg.novaKey) problems.push("Set both NOVA_URL and NOVA_CLIENT_KEY, or neither");
   if (prod && cfg.waVerifyToken && !cfg.waAppSecret) problems.push("WHATSAPP_APP_SECRET is required with WHATSAPP_WEBHOOK_VERIFY_TOKEN (it proves webhook calls come from Meta)");
-  for (const [k, v] of Object.entries({ WHATSAPP_TEMPLATE: cfg.waTemplate, WHATSAPP_OTP_TEMPLATE: cfg.waOtpTemplate, WHATSAPP_TEMPLATE_QUOTE: cfg.waTemplates.quote, WHATSAPP_TEMPLATE_QUOTE_DOC: cfg.waTemplates.quote_doc, WHATSAPP_TEMPLATE_DISPATCH: cfg.waTemplates.dispatch, WHATSAPP_TEMPLATE_INVOICE: cfg.waTemplates.invoice })) {
+  for (const [k, v] of Object.entries({ WHATSAPP_TEMPLATE: cfg.waTemplate, WHATSAPP_OTP_TEMPLATE: cfg.waOtpTemplate, WHATSAPP_TEMPLATE_QUOTE: cfg.waTemplates.quote, WHATSAPP_TEMPLATE_QUOTE_DOC: cfg.waTemplates.quote_doc, WHATSAPP_TEMPLATE_DISPATCH: cfg.waTemplates.dispatch, WHATSAPP_TEMPLATE_INVOICE: cfg.waTemplates.invoice, WHATSAPP_TEMPLATE_INVOICE_DOC: cfg.waTemplates.invoice_doc })) {
     if (v && !/^[a-z0-9_]{1,512}$/.test(v)) problems.push(`${k} must be the template's name as approved in Meta (lowercase letters, numbers and _)`);
   }
   if (!/^[a-z]{2,3}(_[A-Z]{2})?$/.test(cfg.waTemplateLang)) problems.push("WHATSAPP_TEMPLATE_LANG must be a WhatsApp language code like en or en_US");

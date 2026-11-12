@@ -119,6 +119,17 @@ export async function createPickup(cfg, { order, company, pickupPincode, dropPin
 }
 export const trackingUrl = (cfg, awb) => (cfg.sfxTrackingUrl || "https://tracker.shadowfax.in/#/track/{awb}").replace("{awb}", encodeURIComponent(awb));
 
+/** Cancel an active pickup order on Shadowfax Dale API. */
+export async function cancelPickup(cfg, { awb, sfxOrderId }, { fetchImpl = globalThis.fetch } = {}) {
+  const requestId = awb || sfxOrderId;
+  if (!requestId) return { status: "ignored" };
+  const data = await call(cfg, fetchImpl, "POST", "/api/v1/clients/orders/cancel/", {
+    request_id: requestId,
+    cancel_remarks: "Order cancelled by store",
+  });
+  return data;
+}
+
 /** Shadowfax status words → ours: created, assigned, picked, in_transit, out_for_delivery, delivered, cancelled, returned. */
 export function normaliseStatus(s = "") {
   const v = String(s).toLowerCase().replace(/[\s-]+/g, "_");

@@ -38,10 +38,16 @@ export default function DocPage() {
     if (!s.data) return;
     const { doc: d, company: c } = s.data;
     const totalPaise = d.totals?.total ?? d.total ?? 0;
-    const payeeName = (c.legalName || c.name || "EXL Marketing").replace(/[^a-zA-Z0-9 ]/g, "").trim();
-    const upiId = (c.upiId && c.upiId !== "42157988420@sbi") ? c.upiId : "exlmarketing@icici";
-    const upiUrl = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${(totalPaise / 100).toFixed(2)}&cu=INR`;
-    QRCode.toDataURL(upiUrl, { margin: 1, width: 140, errorCorrectionLevel: "M" })
+    const payUrl = d.payLink?.url;
+    let qrTarget;
+    if (payUrl) {
+      qrTarget = payUrl;
+    } else {
+      const payeeName = (c.legalName || c.name || "EXL Marketing").replace(/[^a-zA-Z0-9 ]/g, "").trim();
+      const upiId = (c.upiId && c.upiId !== "exlmarketing@icici") ? c.upiId : "42157988420@sbi";
+      qrTarget = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${(totalPaise / 100).toFixed(2)}&cu=INR`;
+    }
+    QRCode.toDataURL(qrTarget, { margin: 1, width: 140, errorCorrectionLevel: "M" })
       .then(setQrData)
       .catch(() => setQrData(""));
   }, [s.data]);
@@ -100,6 +106,17 @@ export default function DocPage() {
     <div className="doc-page-container">
       {/* Action buttons (Print / Download PDF / WhatsApp) */}
       <div className="doc-actions no-print">
+        {d.payLink?.url && (d.balance > 0 || (d.amountPaid || 0) < totalPaise) && (
+          <a
+            className="btn btn-pay-online"
+            href={d.payLink.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ background: "#16a34a", color: "#fff", fontWeight: 700, boxShadow: "0 2px 8px rgba(22,163,74,0.3)" }}
+          >
+            💳 Pay ₹{fmtMoney(d.balance ?? totalPaise)} Online via Razorpay
+          </a>
+        )}
         <a className="btn" href={`/api/public/doc/${kind}/${token}/pdf`} target="_blank" rel="noopener noreferrer">
           📥 Download PDF
         </a>
@@ -362,21 +379,41 @@ export default function DocPage() {
         {/* Bottom Section: UPI QR + Bank Details + Authorized Signatory Stamp */}
         <div className="bill-bottom-grid">
           {!credit && <div className="bill-upi-col">
-            <p className="bottom-label"><strong>Pay using UPI:</strong></p>
+            <p className="bottom-label"><strong>{d.payLink?.url ? "Scan to Pay Online:" : "Pay using UPI:"}</strong></p>
             <div className="qr-container">
               {qrData ? (
-                <img
-                  src={qrData}
-                  alt="UPI QR Code"
-                  width="100"
-                  height="100"
-                  className="upi-qr-img"
-                />
+                d.payLink?.url ? (
+                  <a href={d.payLink.url} target="_blank" rel="noopener noreferrer" title="Click to pay online via Razorpay">
+                    <img
+                      src={qrData}
+                      alt="Payment QR Code"
+                      width="100"
+                      height="100"
+                      className="upi-qr-img"
+                    />
+                  </a>
+                ) : (
+                  <img
+                    src={qrData}
+                    alt="UPI QR Code"
+                    width="100"
+                    height="100"
+                    className="upi-qr-img"
+                  />
+                )
               ) : (
                 <div style={{ width: 100, height: 100, display: "flex", alignItems: "center", justifyContent: "center", background: "#f8fafc", border: "1px solid #e2e8f0", fontSize: "0.72rem", color: "#64748b" }}>Loading QR…</div>
               )}
             </div>
-            <p style={{ fontSize: "0.72rem", color: "#475569", margin: "4px 0 0 0", textAlign: "center" }}>{upiId}</p>
+            {d.payLink?.url ? (
+              <p style={{ fontSize: "0.72rem", color: "#0284c7", margin: "4px 0 0 0", textAlign: "center", fontWeight: 600 }}>
+                <a href={d.payLink.url} target="_blank" rel="noopener noreferrer" style={{ color: "#0284c7", textDecoration: "underline" }}>
+                  Razorpay Secure (Tap / Scan) ↗
+                </a>
+              </p>
+            ) : (
+              <p style={{ fontSize: "0.72rem", color: "#475569", margin: "4px 0 0 0", textAlign: "center" }}>{(c.upiId && c.upiId !== "exlmarketing@icici") ? c.upiId : "42157988420@sbi"}</p>
+            )}
           </div>}
 
           {!credit && <div className="bill-bank-col">

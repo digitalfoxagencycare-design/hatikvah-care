@@ -150,14 +150,24 @@ export async function generateDocumentPdf({ kind, doc, company }) {
       // 7. UPI QR Code & Bank Details & Stamp Section
       y += 60;
       if (!isChallan) {
-        // UPI QR
-        const payeeName = (company.legalName || company.name || "EXL MARKETING").replace(/[^a-zA-Z0-9 ]/g, "").trim();
-        const upiId = (company.upiId && company.upiId !== "42157988420@sbi") ? company.upiId : "exlmarketing@icici";
-        const upiUrl = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${(totalPaise / 100).toFixed(2)}&cu=INR`;
-        const qrBuffer = await QRCode.toBuffer(upiUrl, { width: 90, margin: 1, errorCorrectionLevel: "M" });
+        // Payment QR (Razorpay online payment link or UPI)
+        const payUrl = doc.payLink?.url;
+        let qrBuffer, labelTop, labelBottom;
+        if (payUrl) {
+          qrBuffer = await QRCode.toBuffer(payUrl, { width: 140, margin: 1, errorCorrectionLevel: "M" });
+          labelTop = "Scan to Pay Online";
+          labelBottom = "Razorpay Secure (UPI/Cards)";
+        } else {
+          const payeeName = (company.legalName || company.name || "EXL MARKETING").replace(/[^a-zA-Z0-9 ]/g, "").trim();
+          const upiId = (company.upiId && company.upiId !== "exlmarketing@icici") ? company.upiId : "42157988420@sbi";
+          const upiUrl = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${(totalPaise / 100).toFixed(2)}&cu=INR`;
+          qrBuffer = await QRCode.toBuffer(upiUrl, { width: 140, margin: 1, errorCorrectionLevel: "M" });
+          labelTop = "Scan UPI to Pay";
+          labelBottom = upiId;
+        }
         pdf.image(qrBuffer, 44, y, { width: 70 });
-        pdf.fontSize(7).font("Helvetica-Bold").fillColor("#0F172A").text("Scan UPI to Pay", 44, y + 74, { width: 70, align: "center" });
-        pdf.fontSize(6).font("Helvetica").fillColor("#64748B").text(upiId, 30, y + 83, { width: 98, align: "center" });
+        pdf.fontSize(7).font("Helvetica-Bold").fillColor("#0F172A").text(labelTop, 30, y + 74, { width: 98, align: "center" });
+        pdf.fontSize(6).font("Helvetica").fillColor("#0284C7").text(labelBottom, 20, y + 83, { width: 118, align: "center" });
 
         // Bank Details
         pdf.fontSize(8).font("Helvetica-Bold").text("Bank Details:", 130, y);

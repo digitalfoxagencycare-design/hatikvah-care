@@ -89,7 +89,7 @@ export default function OrderDetail() {
               </span>
             </p>
           </div>} />
-          <ShipmentPanel o={o} onBook={() => setPickup(true)} />
+          <ShipmentPanel o={o} onBook={() => setPickup(true)} onRefresh={() => s.reload()} />
           {!o.invoiceId && o.status !== "cancelled" && o.paymentStatus !== "paid" && <div className="panel"><h2>Online payment</h2><PayLinkActions base={`/api/admin/orders/${id}`} doc={o} due={o.totals.total} onChange={() => s.reload()} /></div>}
           <div className="btn-row">
             {o.status === "confirmed" && <button className="btn ghost" onClick={() => status("packed")}>Mark packed only</button>}

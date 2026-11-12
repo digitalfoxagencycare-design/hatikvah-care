@@ -56,8 +56,9 @@ export function createApp({ cfg, store, log = console, fetchImpl }) {
 
   if (fs.existsSync(path.join(cfg.webDist, "index.html"))) {
     app.use("/assets", express.static(path.join(cfg.webDist, "assets"), { immutable: true, maxAge: "1y" }));
+    app.use("/assets", (_req, res) => res.status(404).type("text/plain").send("Asset not found"));
     app.use(express.static(cfg.webDist, { maxAge: "1h", index: false }));
-    app.get(/^\/(?!api\/|media\/).*/, (req, res) => {
+    app.get(/^\/(?!api\/|media\/|assets\/).*/, (req, res) => {
       res.set("Cache-Control", "no-cache");
       if (req.path.startsWith("/admin") || req.path.startsWith("/doc/")) res.set("X-Robots-Tag", "noindex");
       res.sendFile(path.join(cfg.webDist, "index.html"));

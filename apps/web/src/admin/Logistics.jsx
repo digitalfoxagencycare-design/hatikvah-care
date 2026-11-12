@@ -37,13 +37,28 @@ function ShipmentTimeline({ shipment: s }) {
 }
 
 /** Courier status and the dispatch paperwork on a sales order. */
-export function ShipmentPanel({ o, onBook }) {
+export function ShipmentPanel({ o, onBook, onRefresh }) {
   const couriers = useMeta().channels.couriers || [];
+  const [cancelling, setCancelling] = useState(false);
   const s = o.shipment, stopped = ["cancelled", "returned"].includes(s?.status), booking = o.shipmentBooking?.status;
   const waiting = ["pending", "reconcile"].includes(booking);
   const canBook = o.status === "dispatched" && (!s || stopped) && !waiting;
   const doc = (kind, label) => <a className="btn ghost small" href={`/doc/${kind}/${o.token}`} target="_blank" rel="noopener noreferrer">{label}</a>;
   if (!o.challanNumber && !s) return null;
+
+  async function cancelCourier() {
+    if (!window.confirm("Cancel this courier pickup? The courier will be notified and the delivery fee will be refunded to your shipping wallet.")) return;
+    setCancelling(true);
+    try {
+      await api(`/api/admin/orders/${o.id}/shipment/cancel`, { method: "POST" });
+      onRefresh ? onRefresh() : window.location.reload();
+    } catch (err) {
+      alert("Failed to cancel courier pickup: " + err.message);
+    } finally {
+      setCancelling(false);
+    }
+  }
+
   return (
     <div className="panel">
       <div className="row-between"><h2>Logistics{s && ` · ${COURIERS[s.provider] || s.provider}`}</h2>{s?.trackingUrl && <a href={s.trackingUrl} target="_blank" rel="noopener noreferrer">Live tracking ↗</a>}</div>
@@ -56,6 +71,11 @@ export function ShipmentPanel({ o, onBook }) {
       {booking === "pending" && <p className="notice">Booking the pickup…</p>}
       {o.challanNumber && <div className="btn-row">
         {doc("label", "Download shipping label")}{doc("challan", "Delivery challan")}{doc("gatepass", "Gate pass")}{doc("packing", "Packing slip")}
+        {s && !stopped && s.status !== "delivered" && (
+          <button type="button" className="btn ghost danger small" disabled={cancelling} onClick={cancelCourier} style={{ color: "#DC2626", borderColor: "#FCA5A5" }}>
+            {cancelling ? "Cancelling…" : "✕ Cancel Courier Pickup"}
+          </button>
+        )}
       </div>}
       {canBook && (couriers.length
         ? <div className="btn-row"><button className="btn" onClick={onBook}>Book Courier Pickup</button></div>

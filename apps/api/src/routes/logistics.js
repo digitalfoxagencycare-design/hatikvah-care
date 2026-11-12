@@ -5,7 +5,7 @@ import { dispatchOrder, logActivity, now, userError } from "../lib/sales.js";
 import { pieces } from "../lib/units.js";
 import { getSettings } from "../model.js";
 import { shipmentChargeInput, shipmentInput } from "../schemas.js";
-import { checkServiceability, createPickup, parseWebhook, pincodeOf, shadowfaxOn, verifyShadowfaxToken, webhookAuthorised } from "../services/delivery_shadowfax.js";
+import { cancelPickup, checkServiceability, createPickup, parseWebhook, pincodeOf, shadowfaxOn, verifyShadowfaxToken, webhookAuthorised } from "../services/delivery_shadowfax.js";
 import { createPorterPickup, parsePorterWebhook, porterOn, porterWebhookAuthorised } from "../services/delivery_porter.js";
 import { createShiprocketPickup, shiprocketOn } from "../services/delivery_shiprocket.js";
 import { wrap } from "./public.js";
@@ -66,6 +66,18 @@ export async function deductDeliveryWallet(store, provider, amountPaise, orderNu
   return newBalance;
 }
 
+/** Refunds delivery charge back to tenant wallet on cancellation */
+export async function creditDeliveryWallet(store, provider, amountPaise, orderNumber, by) {
+  if (!amountPaise || amountPaise <= 0) return null;
+  const { row, wallet, wallets } = await getDeliveryWallet(store, provider);
+  const newBalance = (wallet.balance || 0) + amountPaise;
+  const history = [{ amount: amountPaise, type: "credit", orderNumber, reason: `Refund for cancelled shipment ${orderNumber}`, at: now(), by }, ...(wallet.history || []).slice(0, 99)];
+  const updated = { ...wallets, [provider]: { ...wallet, balance: newBalance, history, updatedAt: now(), updatedBy: by } };
+  if (row) await store.settings.update(row.id, { wallets: updated, updatedAt: now() });
+  else await store.settings.insert({ key: "courierWallet", wallets: updated, updatedAt: now() });
+  return newBalance;
+}
+
 /** Books a courier pickup for a dispatched order and keeps the AWB / tracking link on it. Shared by dispatch and the Book Courier Pickup modal. */
 export async function bookShipment({ cfg, store, fetchImpl }, order, d, by) {
   const courier = COURIERS[d.provider || "shadowfax"];
@@ -94,11 +106,19 @@ export async function bookShipment({ cfg, store, fetchImpl }, order, d, by) {
     await store.orders.update(order.id,{shipmentBooking:{claim,status:e.status>=400&&e.status<500&&!([408,429].includes(e.status))?'failed':'reconcile',at:now(),reason:'Confirm provider booking outcome before retry'}});throw e;
   }
 
-  // Deduct from tenant wallet if charge is known or estimated (fallback base 65 INR if provider doesn't return immediate charge)
-  const chargeToDeduct = shipment.chargePaise || 6500;
+  // Deduct from tenant wallet if charge is known or estimated (dynamic distance/weight estimate when provider doesn't return immediate charge)
+  let chargeToDeduct = shipment.chargePaise;
+  if (!chargeToDeduct) {
+    const dynamicEst = calculateDeliveryEstimate({
+      pickup: { pincode: pickupPincode, address: company.dispatchAddress || company.address, lat: company.dispatchLat, lng: company.dispatchLng },
+      drop: { pincode: dropPincode, lat: customer.lat || d.dropLat, lng: customer.lng || d.dropLng, stateCode: customer.stateCode },
+      weightKg
+    });
+    chargeToDeduct = dynamicEst.totalChargePaise || 6500;
+  }
   await deductDeliveryWallet(store, d.provider || "shadowfax", chargeToDeduct, order.number, by);
 
-  const upd = await store.orders.update(order.id, { shipment: { ...shipment, chargePaise: shipment.chargePaise ?? null, weightKg, packages, pickupSlot, dimensions }, shipmentBooking:{claim,status:'booked',at:now()}, dispatch: { ...(order.dispatch || {}), transporter: courier.label, trackingNo: shipment.awb || order.dispatch?.trackingNo || "" }, updatedAt: now() });
+  const upd = await store.orders.update(order.id, { shipment: { ...shipment, chargePaise: shipment.chargePaise ?? null, weightKg, packages, pickupSlot, dimensions }, shipmentBooking:{claim,status:'booked',walletDeductedPaise:chargeToDeduct,at:now()}, dispatch: { ...(order.dispatch || {}), transporter: courier.label, trackingNo: shipment.awb || order.dispatch?.trackingNo || "" }, updatedAt: now() });
   await logActivity(store, { entity: "order", entityId: order.id, text: `${courier.label} pickup booked${shipment.awb ? ` (AWB ${shipment.awb})` : ""}${pickupSlot ? ` for ${pickupSlot.date} ${pickupSlot.window}` : ""} (Wallet deducted: ₹${(chargeToDeduct/100).toFixed(2)})`, by });
   return upd;
 }
@@ -234,6 +254,38 @@ export function logisticsRoutes({ cfg, store, audit, automation, fetchImpl }) {
       await store.orders.update(o.id, { dispatchMessagePending: true });
       bad(res, `Challan ${o.challanNumber} is raised and the stock is out, but ${courier.label} did not take the booking: ${e.message}. Open the order to try again.`, 502);
     }
+  }));
+
+  r.post("/orders/:id/shipment/cancel", requirePerm("orders"), wrap(async (req, res) => {
+    const o = await store.orders.get(req.params.id); if (!o) return notFound(res, "Order");
+    if (!o.shipment) return bad(res, "This order has no courier booking to cancel", 409);
+    if (["cancelled", "delivered", "returned"].includes(o.shipment.status)) {
+      return bad(res, `Shipment is already ${o.shipment.status}`, 409);
+    }
+    if (o.shipment.provider === "shadowfax" && shadowfaxOn(cfg)) {
+      try {
+        await cancelPickup(cfg, { awb: o.shipment.awb, sfxOrderId: o.shipment.sfxOrderId }, fetchImpl ? { fetchImpl } : {});
+      } catch (e) {
+        // Continue even if courier API says already cancelled or returns 200/400
+      }
+    }
+    const charge = o.shipment.chargePaise || 6500;
+    await creditDeliveryWallet(store, o.shipment.provider || "shadowfax", charge, o.number, req.admin.email);
+
+    const shipment = {
+      ...o.shipment,
+      status: "cancelled",
+      cancelledAt: now(),
+      history: [...(o.shipment.history || []), { status: "cancelled", at: now(), note: "Cancelled by store" }]
+    };
+    const upd = await store.orders.update(o.id, {
+      shipment,
+      status: o.status === "dispatched" ? "packed" : o.status,
+      updatedAt: now()
+    });
+    await logActivity(store, { entity: "order", entityId: o.id, text: `Courier pickup cancelled (Wallet refunded: ₹${(charge / 100).toFixed(2)})`, by: req.admin.email });
+    await audit(req, "order.shipment_cancel", o.number, { provider: o.shipment.provider, awb: o.shipment.awb });
+    res.json(upd);
   }));
   return r;
 }

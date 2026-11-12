@@ -59,7 +59,7 @@ export function createAutomation({ cfg, store, notifier, fetchImpl = globalThis.
     return t;
   }
   const toCustomer = (c) => [c.email && { channel: "email", to: c.email }, c.phone && { channel: "whatsapp", to: c.phone }].filter(Boolean);
-  async function send(targets, { subject, body, event, ref, button = null, template = null }) { for (const t of targets) await notifier.queue({ ...t, subject, body, event, ref, button, template }); }
+  async function send(targets, { subject, body, event, ref, button = null, template = null, document = null }) { for (const t of targets) await notifier.queue({ ...t, subject, body, event, ref, button, template, document }); }
 
   // ---------- events
   async function enquiryCreated(enq) {
@@ -90,12 +90,13 @@ export function createAutomation({ cfg, store, notifier, fetchImpl = globalThis.
   async function quoteSent(q) {
     const [a, company] = await Promise.all([config(), getSettings(store)]);
     if (!isOn(a, "quoteSend")) return;
+    const pdfUrl = `${base()}/doc/quote/${q.token}/pdf`;
+    const docMeta = { link: pdfUrl, filename: `Quotation_${q.number.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`, caption: `Quotation ${q.number} - ${company.name}` };
     await send(toCustomer(q.customer), { event: "quoteSend", ref: q.number, subject: `Quotation ${q.number} from ${company.name}`,
       body: `Dear ${q.customer.contactName || q.customer.name},\nPlease find our quotation ${q.number} for ${money(q.totals.total)} (incl. GST)${q.validUntil ? `, valid until ${q.validUntil}` : ""}.\nView and accept online: ${docLink("quote", q.token)}${q.payLink?.url ? `\nPay now to confirm: ${q.payLink.url}` : ""}\n– ${company.name}`,
-      button: { label: "View & approve", url: docLink("quote", q.token) }, template: quoteTpl(q) });
+      button: { label: "View & approve", url: docLink("quote", q.token) }, template: quoteTpl(q), document: docMeta });
     if (q.customer?.phone) {
-      const pdfUrl = `${base()}/doc/quote/${q.token}/pdf`;
-      await notifier.queue({ channel: "whatsapp", to: q.customer.phone, body: `Quotation PDF: ${q.number}`, event: "quoteSend", ref: q.number, document: { link: pdfUrl, filename: `Quotation_${q.number.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`, caption: `Quotation ${q.number} - ${company.name}` } });
+      await notifier.queue({ channel: "whatsapp", to: q.customer.phone, body: `Quotation PDF: ${q.number}`, event: "quoteSend", ref: q.number, document: docMeta });
     }
     await notifier.flush();
   }
@@ -207,10 +208,29 @@ export function createAutomation({ cfg, store, notifier, fetchImpl = globalThis.
   async function invoiceCreated(inv) {
     const [a, company] = await Promise.all([config(), getSettings(store)]);
     if (!isOn(a, "invoiceSend")) return;
+    let payLink = inv.payLink;
+    if (cfg.razorpayKeyId && cfg.razorpaySecret && !payLink?.url && balance(inv) > 0) {
+      try {
+        payLink = await createPaymentLink(cfg, inv, {
+          fetchImpl,
+          callbackUrl: `${base()}/doc/invoice/${inv.token}`,
+          notes: { invoiceId: inv.id, source: "invoice_created" }
+        });
+        await store.invoices.update(inv.id, { payLink });
+        inv = { ...inv, payLink };
+      } catch (err) {
+        log.warn?.("Failed to generate Razorpay link for invoice:", err.message);
+      }
+    }
+    const pdfUrl = `${base()}/doc/invoice/${inv.token}/pdf`;
+    const docMeta = { link: pdfUrl, filename: `Invoice_${inv.number.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`, caption: `Tax Invoice ${inv.number} - ${company.name}` };
     await send(toCustomer(inv.customer), { event: "invoiceSend", ref: inv.number, subject: `Invoice ${inv.number} from ${company.name}`,
       body: `Dear ${inv.customer.contactName || inv.customer.name},\nInvoice ${inv.number} for ${money(inv.totals.total)} is due on ${inv.dueDate}.\nView / download: ${docLink("invoice", inv.token)}${inv.payLink?.url ? `\nPay online: ${inv.payLink.url}` : ""}${company.upiId ? `\nUPI: ${company.upiId}` : ""}\n– ${company.name}`,
       button: inv.payLink?.url && balance(inv) > 0 ? { label: "Pay now", url: inv.payLink.url } : { label: "View invoice", url: docLink("invoice", inv.token) },
-      template: invoiceTpl(inv, balance(inv) || inv.totals.total) });
+      template: invoiceTpl(inv, balance(inv) || inv.totals.total), document: docMeta });
+    if (inv.customer?.phone) {
+      await notifier.queue({ channel: "whatsapp", to: inv.customer.phone, body: `Invoice PDF: ${inv.number}`, event: "invoiceSend", ref: inv.number, document: docMeta });
+    }
     await notifier.flush();
   }
 

@@ -4,7 +4,7 @@ import express, { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { amountInWords, stateName } from "../lib/gst.js";
 import { applyQrPayment, holdForReconciliation } from "../lib/payments.js";
-import { verifyWebhook } from "../lib/razorpay.js";
+import { createPaymentLink, verifyWebhook } from "../lib/razorpay.js";
 import { balance, createInvoice, createOrderFromQuote, deductForInvoice, invoiceWebsiteOrder, logActivity, now, recordPayment, respondToQuote } from "../lib/sales.js";
 import { generateDocumentPdf } from "../lib/pdf.js";
 import { getSettings } from "../model.js";
@@ -25,15 +25,29 @@ export function docRoutes({ cfg, store, automation }) {
   };
 
   r.get("/api/public/doc/:kind/:token", limiter, wrap(async (req, res) => {
-    const d = await find(req.params.kind, req.params.token);
+    let d = await find(req.params.kind, req.params.token);
     if (!d || (["challan", "packing", "gatepass", "label"].includes(req.params.kind) && !d.challanNumber)) return res.status(404).json({ error: "NOT_FOUND", message: "This document link is not valid" });
+    if (req.params.kind === "invoice" && !d.payLink?.url && balance(d) > 0 && cfg.razorpayKeyId && cfg.razorpaySecret) {
+      try {
+        const link = await createPaymentLink(cfg, d, { notes: { invoiceId: d.id, source: "doc_view" } });
+        await store.invoices.update(d.id, { payLink: link });
+        d = { ...d, payLink: link };
+      } catch { /* proceed */ }
+    }
     res.set({ "Cache-Control": "no-store", "X-Robots-Tag": "noindex" });
     const extra = req.params.kind === "invoice" ? { balance: balance(d), amountInWords: amountInWords(d.totals.total) } : ["quote", "creditnote"].includes(req.params.kind) ? { amountInWords: amountInWords(d.totals.total) } : {};
     res.json({ kind: req.params.kind, doc: { ...strip(d), ...extra }, company: company(await getSettings(store)) });
   }));
   r.get(["/api/public/doc/:kind/:token/pdf", "/doc/:kind/:token/pdf"], limiter, wrap(async (req, res) => {
-    const d = await find(req.params.kind, req.params.token);
+    let d = await find(req.params.kind, req.params.token);
     if (!d || (["challan", "packing", "gatepass", "label"].includes(req.params.kind) && !d.challanNumber)) return res.status(404).json({ error: "NOT_FOUND", message: "This document link is not valid" });
+    if (req.params.kind === "invoice" && !d.payLink?.url && balance(d) > 0 && cfg.razorpayKeyId && cfg.razorpaySecret) {
+      try {
+        const link = await createPaymentLink(cfg, d, { notes: { invoiceId: d.id, source: "doc_pdf" } });
+        await store.invoices.update(d.id, { payLink: link });
+        d = { ...d, payLink: link };
+      } catch { /* proceed */ }
+    }
     const settings = await getSettings(store);
     const pdfBuf = await generateDocumentPdf({ kind: req.params.kind, doc: d, company: company(settings) });
     const filename = `${req.params.kind}_${(d.number || d.challanNumber || "document").replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`;

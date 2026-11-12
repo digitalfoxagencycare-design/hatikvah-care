@@ -59,28 +59,38 @@ export const templateText = (v, max = 1000) => String(v ?? "").replace(/\s*[\r\n
 export function buildWhatsAppMessage(cfg, m, inWindow) {
   const base = { messaging_product: "whatsapp", recipient_type: "individual", to: m.to };
   if (m.payload && inWindow === true) return { payload: { ...m.payload, ...base }, via: "bot" }; // bot replies answer the customer, so the window is open
-  if (m.document?.link && inWindow === true) {
-    return {
-      payload: {
-        ...base,
-        type: "document",
-        document: {
-          link: m.document.link,
-          filename: m.document.filename || "document.pdf",
-          caption: m.document.caption || ""
-        }
-      },
-      via: "document"
-    };
+  const freeForm = () => (m.button
+    ? { payload: { ...base, type: "interactive", interactive: { type: "cta_url", body: { text: m.body.slice(0, 1024) }, action: { name: "cta_url", parameters: { display_text: m.button.label, url: m.button.url } } } }, via: "link" }
+    : { payload: { ...base, type: "text", text: { preview_url: true, body: m.body } }, via: "text" });
+  if (inWindow === true) {
+    if (m.button) return freeForm();
+    if (m.document?.link) {
+      return {
+        payload: {
+          ...base,
+          type: "document",
+          document: {
+            link: m.document.link,
+            filename: m.document.filename || "document.pdf",
+            caption: m.document.caption || ""
+          }
+        },
+        via: "document"
+      };
+    }
+    return freeForm();
   }
-  const docTpl = cfg.waTemplates?.quote_doc;
+  // Outside 24h window:
+  // If document is present and doc template is configured (quote_doc or invoice_doc), send template with document header
+  const docKind = m.template ? `${m.template.kind}_doc` : null;
+  const docTpl = (docKind && cfg.waTemplates?.[docKind]) || (m.template?.kind === "quote" && cfg.waTemplates?.quote_doc) || (m.template?.kind === "invoice" && cfg.waTemplates?.invoice_doc);
   if (m.document?.link && docTpl && m.template) {
     const lang = { code: cfg.waTemplateLang || "en" };
-    const spec = WA_TEMPLATES[m.template.kind] || WA_TEMPLATES.quote_doc;
+    const spec = WA_TEMPLATES[m.template.kind];
     const components = [
       {
         type: "header",
-        parameters: [{ type: "document", document: { link: m.document.link, filename: m.document.filename || "Quotation.pdf" } }]
+        parameters: [{ type: "document", document: { link: m.document.link, filename: m.document.filename || (m.template.kind === "invoice" ? "Invoice.pdf" : "Quotation.pdf") } }]
       },
       {
         type: "body",
@@ -90,10 +100,6 @@ export function buildWhatsAppMessage(cfg, m, inWindow) {
     if (m.template.button) components.push({ type: "button", sub_type: "url", index: "0", parameters: [{ type: "text", text: String(m.template.button) }] });
     return { payload: { ...base, type: "template", template: { name: docTpl, language: lang, components } }, via: `template:${docTpl}` };
   }
-  const freeForm = () => (m.button
-    ? { payload: { ...base, type: "interactive", interactive: { type: "cta_url", body: { text: m.body.slice(0, 1024) }, action: { name: "cta_url", parameters: { display_text: m.button.label, url: m.button.url } } } }, via: "link" }
-    : { payload: { ...base, type: "text", text: { preview_url: true, body: m.body } }, via: "text" });
-  if (inWindow === true) return freeForm();
   const lang = { code: cfg.waTemplateLang || "en" };
   const named = m.template && cfg.waTemplates?.[m.template.kind];
   if (named) {

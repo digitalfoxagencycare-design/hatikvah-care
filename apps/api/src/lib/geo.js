@@ -76,7 +76,17 @@ export const HYDERABAD_PINCODES = {
   "500068": { lat: 17.3600, lng: 78.5500, area: "LB Nagar" },
   "500082": { lat: 17.4260, lng: 78.4500, area: "Somajiguda" },
   "500070": { lat: 17.3500, lng: 78.5800, area: "Vanasthalipuram" },
-  "500090": { lat: 17.5180, lng: 78.3980, area: "Nizampet" }
+  "500090": { lat: 17.5180, lng: 78.3980, area: "Nizampet" },
+  "500055": { lat: 17.5020, lng: 78.4350, area: "Quthbullapur / Jeedimetla" },
+  "500076": { lat: 17.4400, lng: 78.5400, area: "Nacharam / Mallapur" },
+  "500039": { lat: 17.4000, lng: 78.5700, area: "Uppal" },
+  "500079": { lat: 17.3480, lng: 78.5300, area: "Karmanghat / Saroornagar" },
+  "500097": { lat: 17.2400, lng: 78.4300, area: "Shamshabad / Airport" },
+  "501301": { lat: 17.5255, lng: 78.6811, area: "Keesara / Godumakunta" },
+  "501401": { lat: 17.6250, lng: 78.4830, area: "Medchal" },
+  "501505": { lat: 17.5950, lng: 78.5720, area: "Shamirpet" },
+  "501510": { lat: 17.5500, lng: 78.7500, area: "Ghatkesar" },
+  "502032": { lat: 17.5300, lng: 78.2600, area: "Patancheru" }
 };
 
 /** Resolves coordinates from plus code, pin code, or address */
@@ -92,9 +102,9 @@ export function resolveCoordinates({ plusCode, pincode, lat, lng }) {
     const pin = HYDERABAD_PINCODES[pincode];
     return { lat: pin.lat, lng: pin.lng, area: pin.area, source: "pincode_map" };
   }
-  if (pincode && String(pincode).startsWith("500")) {
-    // General Hyderabad fallback: approx 15 km from JV Hills
-    return { lat: 17.4100, lng: 78.4300, area: "Hyderabad Metro", source: "city_fallback" };
+  if (pincode && (String(pincode).startsWith("500") || String(pincode).startsWith("501") || String(pincode).startsWith("502"))) {
+    // General Greater Hyderabad / suburban fallback: approx 20-25 km from JV Hills
+    return { lat: 17.4200, lng: 78.4800, area: "Greater Hyderabad / Suburban", source: "city_fallback" };
   }
   return null;
 }
@@ -117,7 +127,7 @@ export function calculateDeliveryEstimate({
   }
 
   const dropPin = String(drop.pincode || "").trim();
-  const isHydMetro = dropPin.startsWith("500") || (distanceKm != null && distanceKm <= 35);
+  const isHydMetro = dropPin.startsWith("500") || dropPin.startsWith("501") || dropPin.startsWith("502") || (distanceKm != null && distanceKm <= 40);
   const isTelangana = dropPin.startsWith("50") || (drop.stateCode === "36");
 
   let deliveryType = "hyperlocal";
