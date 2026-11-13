@@ -40,7 +40,7 @@ const P = {
 };
 // [path, label, permission, component, icon]
 const NAV = [
-  ["", [["pos", "Counter Billing", "pos", "POS", "pos"], ["quotes", "Quotations", "quotes", "Quotes", "quote"], ["invoices", "Invoices", "invoices", "Invoices", "invoice"], ["purchase-orders", "Purchase Orders", "stock", "Purchases", "purchase"], ["vendors", "Suppliers", "stock", "Suppliers", "vendor"], ["products", "Products & Inventory", "catalog", "Products", "product"]]],
+  ["", [["pos", "Counter Billing", "pos", "POS", "pos"], ["quotes", "Quotations", "quotes", "Quotes", "quote"], ["invoices", "Invoices", "invoices", "Invoices", "invoice"], ["reports", "GSTR-1 & Reports", "reports", "Reports", "reports"], ["purchase-orders", "Purchase Orders", "stock", "Purchases", "purchase"], ["vendors", "Suppliers", "stock", "Suppliers", "vendor"], ["products", "Products & Inventory", "catalog", "Products", "product"]]],
   ["Automations & Channels", [["whatsapp", "WhatsApp Hub", "enquiries", "WhatsApp", "chat"], ["payments-hub", "Razorpay Payments", "invoices", "PaymentsHub", "card"], ["logistics-hub", "Logistics & Delivery", "orders", "LogisticsHub", "truck"]]],
 ];
 // Off the sidebar, on the More page: [path, label, permission, component, hint]

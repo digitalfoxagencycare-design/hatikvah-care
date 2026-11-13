@@ -3,6 +3,8 @@ import { toCsv } from "../csv.js";
 import { daysBetween, finYear, stateName, todayIST } from "../lib/gst.js";
 import { requirePerm } from "../lib/permissions.js";
 import { balance, stockLevels } from "../lib/sales.js";
+import { parseGstr1Period } from "../lib/gstr1/period.js";
+import { buildGstr1 } from "../lib/gstr1/builder.js";
 import { atomicWrap } from "./atomic.js";
 import { csvHeaders, rupees } from "./shared.js";
 
@@ -115,5 +117,61 @@ export function reportRoutes({ store }) {
     const rows = (await store.products.all({ sort: { order: 1 } })).filter((p) => p.stockTracked).map((p) => ({ sku: p.sku, name: p.name, qty: lv[p.id] || 0, reorder_level: p.reorderLevel || 0, cost_price: rupees(p.costPrice ?? null), stock_value: rupees(p.costPrice != null ? Math.round((lv[p.id] || 0) * p.costPrice) : null) }));
     csvHeaders(res, "stock.csv").send(toCsv(["sku", "name", "qty", "reorder_level", "cost_price", "stock_value"], rows));
   }));
+
+  // ---------- GSTR-1 Tax Hub (Official Government JSON & Preview)
+  r.get("/reports/gstr-1/preview", requirePerm("reports", "invoices"), wrap(async (req, res) => {
+    const period = parseGstr1Period(req.query);
+    const [invoices, creditNotes, settingsList] = await Promise.all([
+      store.invoices.all(),
+      store.creditNotes.all(),
+      store.settings.all(),
+    ]);
+    const { preview } = buildGstr1({ invoices, creditNotes, settings: settingsList[0] || {}, period });
+    res.json(preview);
+  }));
+
+  r.get("/reports/gstr-1.json", requirePerm("reports", "invoices"), wrap(async (req, res) => {
+    const period = parseGstr1Period(req.query);
+    const [invoices, creditNotes, settingsList] = await Promise.all([
+      store.invoices.all(),
+      store.creditNotes.all(),
+      store.settings.all(),
+    ]);
+    const { gstJson } = buildGstr1({ invoices, creditNotes, settings: settingsList[0] || {}, period });
+    const filename = `gstr1_${gstJson.gstin}_${period.fp}.json`;
+    res.set({
+      "Content-Type": "application/json",
+      "Content-Disposition": `attachment; filename="${filename}"`,
+      "Cache-Control": "no-store",
+    });
+    res.send(JSON.stringify(gstJson, null, 2));
+  }));
+
+  r.get("/reports/gstr-1/b2b.csv", requirePerm("reports", "invoices"), wrap(async (req, res) => {
+    const period = parseGstr1Period(req.query);
+    const [invoices, creditNotes, settingsList] = await Promise.all([
+      store.invoices.all(),
+      store.creditNotes.all(),
+      store.settings.all(),
+    ]);
+    const { preview } = buildGstr1({ invoices, creditNotes, settings: settingsList[0] || {}, period });
+    csvHeaders(res, `gstr1-b2b-${period.fp}.csv`).send(
+      toCsv(["gstin", "customerName", "invoiceNumber", "date", "value", "placeOfSupply", "itemsCount"], preview.b2b)
+    );
+  }));
+
+  r.get("/reports/gstr-1/hsn.csv", requirePerm("reports", "invoices"), wrap(async (req, res) => {
+    const period = parseGstr1Period(req.query);
+    const [invoices, creditNotes, settingsList] = await Promise.all([
+      store.invoices.all(),
+      store.creditNotes.all(),
+      store.settings.all(),
+    ]);
+    const { preview } = buildGstr1({ invoices, creditNotes, settings: settingsList[0] || {}, period });
+    csvHeaders(res, `gstr1-hsn-${period.fp}.csv`).send(
+      toCsv(["num", "hsn_sc", "desc", "uqc", "qty", "val", "txval", "camt", "samt", "iamt"], preview.hsn)
+    );
+  }));
+
   return r;
 }

@@ -1,0 +1,12 @@
+column_name,swipe_api_field,data_type,description,completeness_across_499_items
+"swipe_item_id","swipe_id","Text","Unique permanent integer ID assigned by Swipe billing platform","499 / 499 (100%)"
+"partner_product_id","id","Text / Null","External partner ID (null for native Swipe items)","0 / 499 (All null in native account)"
+"item_name","name","Text","Official product title/name as configured in Swipe billing","499 / 499 (100%)"
+"item_type","item_type","Enum","Type classification: ""Product"" or ""Service""","499 / 499 (100% Product)"
+"category","category","Text","Product category in Swipe (blank if unassigned in Swipe UI)","0 / 499 (Unassigned in Swipe account)"
+"hsn_sac_code","hsn_code","Text","Harmonized System of Nomenclature code for GST reporting","468 / 499 (93.8% populated, 31 blank)"
+"gst_percentage","tax_rate","Number / String","Applicable GST tax rate percentage (0, 5, 12, 18, 28)","488 / 499 populated (11 are 0%)"
+"unit","unit","Text","Unit of measurement (e.g. NOS, PCS, BOX, SET, PKT)","493 / 499 (98.8% populated, 6 blank)"
+"unit_price","unit_price","Decimal Rupees","Selling price per unit in Rupees (0 indicates custom priced per quote)","5 populated, 494 are ₹0"
+"active_status","N/A","Enum","Availability status in active catalogue query","499 / 499 (Active)"
+"extraction_timestamp","N/A","ISO 8601 Timestamp","Timestamp of verified API snapshot extraction","499 / 499 (2026-11-12T18:41:00+05:30)"

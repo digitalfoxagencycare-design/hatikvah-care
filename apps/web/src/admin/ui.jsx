@@ -5,7 +5,9 @@ import { Link } from "react-router-dom";
 import { api, money } from "../api.js";
 import { toast } from "./toast.jsx";
 import { WhatsAppMessageParser } from "./WhatsAppParser.jsx";
-import { Photo, ProductPicker, useThumbs } from "./visual.jsx";
+import { InvoiceLinePicker } from "./InvoiceLinePicker.jsx";
+import { GstinInput } from "./GstinInput.jsx";
+import { Photo, useThumbs } from "./visual.jsx";
 
 /** Shared admin building blocks: look-up data, formatting, pills, modal, timeline, document line editor. */
 export const rs = (p) => (p == null ? "—" : money(p));
@@ -97,7 +99,6 @@ export function DocEditor({ initial, kind, onSave, busy, error, extra }) {
   const [custBusy, setCustBusy] = useState(false);
   const [custErr, setCustErr] = useState("");
   const rates = useAsync(`/api/admin/rates${f.customerId ? `?customerId=${f.customerId}` : ""}`);
-  const [picking, setPicking] = useState(false);
   const thumbs = useThumbs();
   const cust = customers.data?.find((c) => c.id === f.customerId);
   const pos = f.placeOfSupply || cust?.stateCode || company.data?.stateCode || "";
@@ -133,6 +134,17 @@ export function DocEditor({ initial, kind, onSave, busy, error, extra }) {
         {extra?.(f, set)}
       </div>
       {cust && <p className="muted small-print">{cust.contactName} {cust.phone} {cust.gstin && `· GSTIN ${cust.gstin}`} {cust.priceListId && "· special price list applies"}</p>}
+
+      {/* Shared Compact Searchable Product Picker */}
+      <div style={{ marginTop: 14, marginBottom: 8 }}>
+        <InvoiceLinePicker
+          rates={rates.data || []}
+          onAddLine={addProduct}
+          buttonLabel={kind === "quote" ? "+ Add to Quote" : "+ Add Item"}
+          placeholder="🔍 Search products by name, SKU, or HSN (Click/focus for recent & catalog items)"
+        />
+      </div>
+
       <div className="tbl-wrap"><table className="tbl lines-tbl">
         <thead><tr><th>Item</th><th>HSN</th><th>Qty</th><th>Unit</th><th>Rate ₹</th><th>Disc %</th><th>GST %</th><th>Amount</th><th></th></tr></thead>
         <tbody>
@@ -154,15 +166,13 @@ export function DocEditor({ initial, kind, onSave, busy, error, extra }) {
               </tr>
             );
           })}
-          {f.items.length === 0 && <tr><td colSpan="9" className="muted">Add products below, or click "Paste from WhatsApp" to auto-extract items.</td></tr>}
+          {f.items.length === 0 && <tr><td colSpan="9" className="muted">Add products using the search bar above, or click "Paste from WhatsApp" to auto-extract items.</td></tr>}
         </tbody>
       </table></div>
       <div className="btn-row">
-        <button type="button" className="btn" onClick={() => setPicking(true)}>+ Add product</button>
         <button type="button" className="btn ghost" onClick={() => set("items", [...f.items, { productId: "", sku: "", name: "", hsn: "", unit: "pcs", qty: 1, rate: 0, discountPct: 0, gstRate: 18 }])}>+ Custom line</button>
         <button type="button" className="btn btn-whatsapp" onClick={() => setShowParser(true)}>📱 Paste from WhatsApp</button>
       </div>
-      {picking && <ProductPicker rows={rates.data} onPick={addProduct} onClose={() => setPicking(false)} />}
       {showParser && (
         <WhatsAppMessageParser
           catalog={rates.data || []}
@@ -183,7 +193,19 @@ export function DocEditor({ initial, kind, onSave, busy, error, extra }) {
               <label className="field"><span>Contact person</span><input maxLength={100} value={newCust.contactName} onChange={(e) => setNewCust({ ...newCust, contactName: e.target.value })} /></label>
               <label className="field"><span>Phone (WhatsApp) *</span><input required type="tel" maxLength={20} value={newCust.phone} onChange={(e) => setNewCust({ ...newCust, phone: e.target.value })} /></label>
               <label className="field"><span>Email</span><input type="email" maxLength={160} value={newCust.email} onChange={(e) => setNewCust({ ...newCust, email: e.target.value })} /></label>
-              <label className="field"><span>GSTIN</span><input maxLength={15} value={newCust.gstin} onChange={(e) => setNewCust({ ...newCust, gstin: e.target.value.toUpperCase() })} placeholder="36ABCDE1234F1Z5" /></label>
+              <GstinInput
+                value={newCust.gstin}
+                onChange={(v) => setNewCust({ ...newCust, gstin: v, stateCode: newCust.stateCode || (/^\d{2}/.test(v) ? v.slice(0, 2) : "") })}
+                onFetched={(data) => {
+                  setNewCust((prev) => ({
+                    ...prev,
+                    name: prev.name && prev.name.length > 3 ? prev.name : (data.tradeName || data.legalName),
+                    stateCode: data.stateCode || prev.stateCode,
+                    shippingAddress: prev.shippingAddress || data.address,
+                    deliveryPincode: prev.deliveryPincode || data.pincode,
+                  }));
+                }}
+              />
               <StateSelect value={newCust.stateCode} onChange={(v) => setNewCust({ ...newCust, stateCode: v })} label="State" />
             </div>
             <div className="grid2">

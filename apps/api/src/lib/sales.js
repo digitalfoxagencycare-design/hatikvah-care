@@ -258,6 +258,62 @@ async function createInvoiceCore(store, { customer, items, placeOfSupply, date, 
   return (await store.invoices.get(inv.id)) || inv;
 }
 
+export function saveDraftInvoice(store, ...args) { return store.atomic(() => saveDraftInvoiceCore(store, ...args)); }
+async function saveDraftInvoiceCore(store, { draftId = "", customer, items, placeOfSupply, date, dueDate, notes = "", poNumber = "", by = "system" }) {
+  const s = await getSettings(store);
+  const d = date || todayIST();
+  let existing = draftId ? await store.invoices.get(draftId) : null;
+  if (existing && existing.status !== "draft") throw userError("Only draft invoices can be modified as draft", 409);
+  const doc = await priced(store, { items, customer, placeOfSupply });
+  const draftData = {
+    customerId: customer.id, customer: customerSnapshot(customer),
+    date: d, dueDate: dueDate || addDays(d, customer.paymentTermsDays ?? s.paymentTermsDays),
+    notes, poNumber, ...doc, updatedAt: now(),
+  };
+  if (existing) {
+    const updated = await store.invoices.update(existing.id, draftData);
+    await logActivity(store, { entity: "invoice", entityId: existing.id, text: "Draft invoice updated", by });
+    return updated;
+  }
+  const draftNumber = `DRAFT-${token().slice(0, 8).toUpperCase()}`;
+  const inv = await store.invoices.insert({
+    number: draftNumber, token: token(), status: "draft", amountPaid: 0, payLink: null, remindersSent: [],
+    createdBy: by, createdAt: now(), ...draftData,
+  });
+  await logActivity(store, { entity: "invoice", entityId: inv.id, text: "Draft invoice saved", by });
+  return inv;
+}
+
+export function issueDraftInvoice(store, ...args) { return store.atomic(() => issueDraftInvoiceCore(store, ...args)); }
+async function issueDraftInvoiceCore(store, draftId, { by = "system", date, dueDate } = {}) {
+  const inv = await store.invoices.get(draftId);
+  if (!inv) throw userError("Invoice not found", 404);
+  if (inv.status !== "draft") throw userError("Only draft invoices can be issued", 409);
+  const s = await getSettings(store);
+  const d = date || inv.date || todayIST();
+  const customer = (await store.customers.get(inv.customerId)) || inv.customer;
+  const doc = await priced(store, { items: inv.items, customer, placeOfSupply: inv.placeOfSupply });
+  const number = await nextNumber(store, "INV", new Date(d + "T12:00:00Z"));
+  const updated = await store.invoices.update(inv.id, {
+    status: "unpaid", number, date: d,
+    dueDate: dueDate || inv.dueDate || addDays(d, customer.paymentTermsDays ?? s.paymentTermsDays),
+    customer: customerSnapshot(customer),
+    ...doc, issuedAt: now(), updatedAt: now(),
+  });
+  const lines = invoiceLines(updated.totals);
+  if (lines.length) {
+    await postLedger(store, {
+      sourceKey: "invoice:" + updated.id, kind: "invoice", account: "accounts_receivable",
+      amount: updated.totals.total, invoiceId: updated.id, ref: updated.number,
+      date: updated.date, party: updated.customer.name, by, lines,
+    });
+  }
+  await deductForInvoice(store, updated, by);
+  await logActivity(store, { entity: "invoice", entityId: updated.id, text: `Draft issued as invoice ${number}`, by });
+  await logActivity(store, { entity: "customer", entityId: updated.customerId, text: `Invoice ${number} issued`, by });
+  return (await store.invoices.get(updated.id)) || updated;
+}
+
 /** GST invoice for a paid website order (raised only once the money arrives, so abandoned checkouts never become invoices). Takes stock out, as dispatch then skips it. */
 export function invoiceWebsiteOrder(store, ...args) { return store.atomic(() => invoiceWebsiteOrderCore(store, ...args)); }
 async function invoiceWebsiteOrderCore(store, order) {
@@ -320,7 +376,7 @@ export function removePaymentLedger(store,paymentId,by='system') {
 }
 
 /** What the customer still owes: total less payments and credit notes (never below zero; see refundDue). */
-export const balance = (inv) => (inv.status === "void" ? 0 : Math.max(0, inv.totals.total - (inv.amountPaid || 0) - (inv.creditedAmount || 0)));
+export const balance = (inv) => (["void", "draft"].includes(inv.status) ? 0 : Math.max(0, inv.totals.total - (inv.amountPaid || 0) - (inv.creditedAmount || 0)));
 /** Money to give back when credit notes land on an invoice that was already paid. */
 export const refundDue = (inv) => (inv.status === "void" ? (inv.amountPaid || 0) : Math.max(0, (inv.amountPaid || 0) + (inv.creditedAmount || 0) - inv.totals.total));
 

@@ -4,15 +4,29 @@ import { can, requirePerm } from "../lib/permissions.js";
 import { stateName } from "../lib/gst.js";
 import { balance, bookEnquiry, logActivity, now } from "../lib/sales.js";
 import { activityInput, bookingInput, customerInput, priceListInput } from "../schemas.js";
+import { lookupGstinDetails } from "../services/sandbox_gst.js";
 import { atomicWrap } from "./atomic.js";
 import { wrap } from "./public.js";
 import { bad, csvHeaders, notFound, parse, rupees } from "./shared.js";
 
 /** Customers (companies you sell to), the activity timeline, price lists, and the lead side of enquiries. */
-export function crmRoutes({ store, audit, automation }) {
+export function crmRoutes({ cfg, store, audit, automation, fetchImpl }) {
   const r = Router();
   const activityPerm = { enquiry: "enquiries", customer: "customers", quote: "quotes", order: "orders", invoice: "invoices", purchase: "stock" };
   const fill = (d) => ({ ...d, stateCode: d.stateCode || (d.gstin ? d.gstin.slice(0, 2) : "") });
+
+  // ---------- GSTIN auto-fetch lookup
+  r.get("/gstin/:gstin", requirePerm("customers", "quotes", "invoices"), wrap(async (req, res) => {
+    try {
+      const result = await lookupGstinDetails(req.params.gstin, cfg, fetchImpl);
+      if (!result.ok) {
+        return res.status(400).json(result);
+      }
+      res.json(result.data);
+    } catch (err) {
+      res.status(400).json({ ok: false, error: "LOOKUP_FAILED", message: err.message || "Could not fetch GSTIN details" });
+    }
+  }));
 
   // ---------- customers
   r.get("/customers", requirePerm("customers", "quotes", "invoices"), wrap(async (_req, res) => {

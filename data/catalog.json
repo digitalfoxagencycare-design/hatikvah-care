@@ -1,3016 +1,3463 @@
 {
- "categories": [
-  {
-   "slug": "guest-amenities",
-   "name": "Guest Amenities",
-   "order": 1,
-   "description": "Dental, shaving, comb, vanity and sewing kits, slippers, loofahs, soaps and room cards for hotel rooms."
-  },
-  {
-   "slug": "eco-friendly",
-   "name": "Eco-Friendly Range",
-   "order": 2,
-   "description": "Bamboo and wheat-straw toothbrushes, combs and razors."
-  },
-  {
-   "slug": "biotique-dry-amenities",
-   "name": "Biotique Dry Amenities",
-   "order": 3,
-   "description": "Premium butter-paper packed Biotique kits: dental, shaving, comb, slipper, loofah, vanity, sewing and more."
-  },
-  {
-   "slug": "bath-body",
-   "name": "Bath & Body",
-   "order": 4,
-   "description": "Shampoo, conditioner, shower gel, body lotion, hand wash and soaps in miniatures, pump dispensers and 5-litre bulk cans."
-  },
-  {
-   "slug": "tray-amenities",
-   "name": "Tray Amenities",
-   "order": 5,
-   "description": "Tea, coffee, sugar, sweeteners, condiment sachets, jam, honey, butter, cups, stirrers and toothpicks."
-  },
-  {
-   "slug": "housekeeping-others",
-   "name": "Housekeeping & Others",
-   "order": 6,
-   "description": "Aluminium foil, cling film and fly catcher machines."
-  },
-  {
-   "slug": "hotel-linen",
-   "name": "Hotel Linen & Terry",
-   "order": 7,
-   "description": "Towels, bed sheets, pillows, duvets, napkins, covers, curtains, bath robes, mattresses and more."
-  },
-  {
-   "slug": "hospital-linen",
-   "name": "Hospital Linen",
-   "order": 8,
-   "description": "Foam pillows, blankets, privacy curtains and bed linen for hospitals and healthcare facilities."
-  }
- ],
- "products": [
-  {
-   "slug": "hotel-dental-kit-anchor-toothbrush-with-anchor-paste-1-1",
-   "sku": "HC-001",
-   "name": "Hotel Dental Kit – Anchor Toothbrush with Anchor Paste (1+1)",
-   "category": "guest-amenities",
-   "collection": "Basic Dry & Wet Amenities",
-   "pack": "Paste 8 gms",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p05-1.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": true,
-   "order": 1
-  },
-  {
-   "slug": "hotel-dental-kit-anchor-toothbrush-with-anchor-paste-1-2",
-   "sku": "HC-002",
-   "name": "Hotel Dental Kit – Anchor Toothbrush with Anchor Paste (1+2)",
-   "category": "guest-amenities",
-   "collection": "Basic Dry & Wet Amenities",
-   "pack": "Paste 8 gms",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p05-2.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 2
-  },
-  {
-   "slug": "hotel-dental-kit-anchor-toothbrush-with-meswak-paste-1-1",
-   "sku": "HC-003",
-   "name": "Hotel Dental Kit – Anchor Toothbrush with Meswak Paste (1+1)",
-   "category": "guest-amenities",
-   "collection": "Basic Dry & Wet Amenities",
-   "pack": "Paste 8 gms",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p05-3.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 3
-  },
-  {
-   "slug": "hotel-dental-kit-anchor-toothbrush-with-meswak-paste-1-2",
-   "sku": "HC-004",
-   "name": "Hotel Dental Kit – Anchor Toothbrush with Meswak Paste (1+2)",
-   "category": "guest-amenities",
-   "collection": "Basic Dry & Wet Amenities",
-   "pack": "Paste 8 gms",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p05-4.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 4
-  },
-  {
-   "slug": "hotel-shaving-kit-dorco-razor-with-oxylife-shaving-gel-sachet",
-   "sku": "HC-005",
-   "name": "Hotel Shaving Kit – Dorco Razor with Oxylife Shaving Gel Sachet",
-   "category": "guest-amenities",
-   "collection": "Basic Dry & Wet Amenities",
-   "pack": "",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p05-5.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 5
-  },
-  {
-   "slug": "hotel-comb-with-handle-7",
-   "sku": "HC-006",
-   "name": "Hotel Comb with Handle 7\"",
-   "category": "guest-amenities",
-   "collection": "Basic Dry & Wet Amenities",
-   "pack": "7 inch",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p05-6.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 6
-  },
-  {
-   "slug": "anchor-comfort-clean-toothbrush-with-poly-pack",
-   "sku": "HC-007",
-   "name": "Anchor Comfort Clean Toothbrush with Poly Pack",
-   "category": "guest-amenities",
-   "collection": "Basic Dry & Wet Amenities",
-   "pack": "",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p06-1.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 7
-  },
-  {
-   "slug": "anchor-paste-8-gms",
-   "sku": "HC-008",
-   "name": "Anchor Paste 8 gms",
-   "category": "guest-amenities",
-   "collection": "Basic Dry & Wet Amenities",
-   "pack": "8 gms",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p06-2.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 8
-  },
-  {
-   "slug": "dabur-meswak-tooth-paste-8-gms",
-   "sku": "HC-009",
-   "name": "Dabur Meswak Tooth Paste 8 gms",
-   "category": "guest-amenities",
-   "collection": "Basic Dry & Wet Amenities",
-   "pack": "8 gms",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p06-3.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 9
-  },
-  {
-   "slug": "polar-disposable-slipper-close-toe-white-divine-series",
-   "sku": "HC-010",
-   "name": "Polar Disposable Slipper Close Toe – White Divine Series",
-   "category": "guest-amenities",
-   "collection": "Basic Dry & Wet Amenities",
-   "pack": "",
-   "variants": [],
-   "description": "Breathable and non-slip.",
-   "images": [
-    "/catalog/p06-4.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 10
-  },
-  {
-   "slug": "instant-shoe-shiner-sponge-with-case",
-   "sku": "HC-011",
-   "name": "Instant Shoe Shiner Sponge with Case",
-   "category": "guest-amenities",
-   "collection": "Basic Dry & Wet Amenities",
-   "pack": "",
-   "variants": [],
-   "description": "Quick shine and leather care.",
-   "images": [
-    "/catalog/p06-5.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 11
-  },
-  {
-   "slug": "natural-body-loofah-in-poly-pack",
-   "sku": "HC-012",
-   "name": "Natural Body Loofah in Poly Pack",
-   "category": "guest-amenities",
-   "collection": "Basic Dry & Wet Amenities",
-   "pack": "",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p06-6.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 12
-  },
-  {
-   "slug": "hotel-laundry-bag",
-   "sku": "HC-013",
-   "name": "Hotel Laundry Bag",
-   "category": "guest-amenities",
-   "collection": "Basic Dry & Wet Amenities",
-   "pack": "",
-   "variants": [],
-   "description": "Available with and without branding.",
-   "images": [
-    "/catalog/p07-1.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 13
-  },
-  {
-   "slug": "shower-cap-packed-in-butter-paper",
-   "sku": "HC-014",
-   "name": "Shower Cap Packed in Butter Paper",
-   "category": "guest-amenities",
-   "collection": "Basic Dry & Wet Amenities",
-   "pack": "",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p07-2.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": true,
-   "order": 14
-  },
-  {
-   "slug": "hotel-travel-sewing-kit",
-   "sku": "HC-015",
-   "name": "Hotel / Travel Sewing Kit",
-   "category": "guest-amenities",
-   "collection": "Basic Dry & Wet Amenities",
-   "pack": "",
-   "variants": [],
-   "description": "Needles, threads, button and pin; 6-colour thread repair kit.",
-   "images": [
-    "/catalog/p07-3.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 15
-  },
-  {
-   "slug": "hotel-vanity-kit-in-butter-paper",
-   "sku": "HC-016",
-   "name": "Hotel Vanity Kit in Butter Paper",
-   "category": "guest-amenities",
-   "collection": "Basic Dry & Wet Amenities",
-   "pack": "",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p07-4.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 16
-  },
-  {
-   "slug": "pvc-dnd-cards-please-clean-my-room-please-do-not-disturb",
-   "sku": "HC-017",
-   "name": "PVC DND Cards – Please Clean My Room / Please Do Not Disturb",
-   "category": "guest-amenities",
-   "collection": "Basic Dry & Wet Amenities",
-   "pack": "",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p07-5.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 17
-  },
-  {
-   "slug": "aqua-shui-shampoo-shower-gel-moisturizer",
-   "sku": "HC-018",
-   "name": "Aqua Shui Shampoo / Shower Gel / Moisturizer",
-   "category": "guest-amenities",
-   "collection": "Basic Dry & Wet Amenities",
-   "pack": "20 ml",
-   "variants": [
-    "Shampoo",
-    "Shower Gel",
-    "Moisturizer"
-   ],
-   "description": "",
-   "images": [
-    "/catalog/p07-6.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 18
-  },
-  {
-   "slug": "aloe-vera-soap",
-   "sku": "HC-019",
-   "name": "Aloe Vera Soap",
-   "category": "guest-amenities",
-   "collection": "Basic Dry & Wet Amenities",
-   "pack": "15 gms",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p08-1.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 19
-  },
-  {
-   "slug": "aqua-shui-white-soap",
-   "sku": "HC-020",
-   "name": "Aqua Shui White Soap",
-   "category": "guest-amenities",
-   "collection": "Basic Dry & Wet Amenities",
-   "pack": "20 gms",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p08-2.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 20
-  },
-  {
-   "slug": "aqua-shui-aloe-vera-soap",
-   "sku": "HC-021",
-   "name": "Aqua Shui Aloe Vera Soap",
-   "category": "guest-amenities",
-   "collection": "Basic Dry & Wet Amenities",
-   "pack": "20 gms",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p08-3.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 21
-  },
-  {
-   "slug": "bamboo-toothbrush",
-   "sku": "HC-022",
-   "name": "Bamboo Toothbrush",
-   "category": "eco-friendly",
-   "collection": "Bamboo",
-   "pack": "",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p08-4.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 22
-  },
-  {
-   "slug": "bamboo-comb",
-   "sku": "HC-023",
-   "name": "Bamboo Comb",
-   "category": "eco-friendly",
-   "collection": "Bamboo",
-   "pack": "",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p08-5.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 23
-  },
-  {
-   "slug": "bamboo-shaving-razor",
-   "sku": "HC-024",
-   "name": "Bamboo Shaving Razor",
-   "category": "eco-friendly",
-   "collection": "Bamboo",
-   "pack": "",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p08-6.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 24
-  },
-  {
-   "slug": "wheat-straw-bio-toothbrush",
-   "sku": "HC-025",
-   "name": "Wheat Straw BIO Toothbrush",
-   "category": "eco-friendly",
-   "collection": "Wheat Straw",
-   "pack": "",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p09-2.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 25
-  },
-  {
-   "slug": "wheat-straw-bio-comb",
-   "sku": "HC-026",
-   "name": "Wheat Straw BIO Comb",
-   "category": "eco-friendly",
-   "collection": "Wheat Straw",
-   "pack": "",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p09-1.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 26
-  },
-  {
-   "slug": "wheat-straw-bio-shaving-razor",
-   "sku": "HC-027",
-   "name": "Wheat Straw BIO Shaving Razor",
-   "category": "eco-friendly",
-   "collection": "Wheat Straw",
-   "pack": "",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p09-3.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 27
-  },
-  {
-   "slug": "bio-dental-kit",
-   "sku": "HC-028",
-   "name": "BIO Dental Kit",
-   "category": "biotique-dry-amenities",
-   "collection": "Packed in butter paper",
-   "pack": "1000 per pack",
-   "variants": [],
-   "description": "1 toothpaste 10 g and 1 toothbrush, packed in butter paper.",
-   "images": [
-    "/catalog/p11-1.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 28
-  },
-  {
-   "slug": "bio-dental-kit-double-brush",
-   "sku": "HC-029",
-   "name": "BIO Dental Kit – Double Brush",
-   "category": "biotique-dry-amenities",
-   "collection": "Packed in butter paper",
-   "pack": "500 per pack",
-   "variants": [],
-   "description": "1 toothpaste 10 g and 2 toothbrushes, packed in butter paper.",
-   "images": [
-    "/catalog/p11-2.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 29
-  },
-  {
-   "slug": "bio-shaving-kit-premium",
-   "sku": "HC-030",
-   "name": "BIO Shaving Kit – Premium",
-   "category": "biotique-dry-amenities",
-   "collection": "Packed in butter paper",
-   "pack": "2000 per pack",
-   "variants": [],
-   "description": "1 shaving gel 4 g and 1 razor, packed in butter paper.",
-   "images": [
-    "/catalog/p11-3.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 30
-  },
-  {
-   "slug": "bio-shaving-kit-premium-style-2",
-   "sku": "HC-031",
-   "name": "BIO Shaving Kit – Premium (Style 2)",
-   "category": "biotique-dry-amenities",
-   "collection": "Packed in butter paper",
-   "pack": "2000 per pack",
-   "variants": [],
-   "description": "1 shaving gel 4 g and 1 razor, packed in butter paper.",
-   "images": [
-    "/catalog/p11-4.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 31
-  },
-  {
-   "slug": "bio-comb-kit-plastic-comb-premium",
-   "sku": "HC-032",
-   "name": "BIO Comb Kit – Plastic Comb Premium",
-   "category": "biotique-dry-amenities",
-   "collection": "Packed in butter paper",
-   "pack": "500 per pack",
-   "variants": [],
-   "description": "Packed in butter paper.",
-   "images": [
-    "/catalog/p11-5.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 32
-  },
-  {
-   "slug": "bio-shaving-kit-generic-wooden-razor",
-   "sku": "HC-033",
-   "name": "BIO Shaving Kit – Generic (Wooden Razor)",
-   "category": "biotique-dry-amenities",
-   "collection": "Packed in butter paper",
-   "pack": "2000 per pack",
-   "variants": [],
-   "description": "Shaving gel 4 g and 1 wooden razor, packed in butter paper.",
-   "images": [
-    "/catalog/p11-6.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 33
-  },
-  {
-   "slug": "bio-comb-kit-wooden-comb-generic",
-   "sku": "HC-034",
-   "name": "BIO Comb Kit – Wooden Comb (Generic)",
-   "category": "biotique-dry-amenities",
-   "collection": "Packed in butter paper",
-   "pack": "2000 per pack",
-   "variants": [],
-   "description": "1 wooden comb.",
-   "images": [
-    "/catalog/p12-1.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 34
-  },
-  {
-   "slug": "bio-slipper",
-   "sku": "HC-035",
-   "name": "BIO Slipper",
-   "category": "biotique-dry-amenities",
-   "collection": "Packed in butter paper",
-   "pack": "2000 per pack",
-   "variants": [],
-   "description": "Packed in butter paper.",
-   "images": [
-    "/catalog/p12-2.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 35
-  },
-  {
-   "slug": "bio-loofah",
-   "sku": "HC-036",
-   "name": "BIO Loofah",
-   "category": "biotique-dry-amenities",
-   "collection": "Packed in butter paper",
-   "pack": "2000 per pack",
-   "variants": [],
-   "description": "Packed in butter paper.",
-   "images": [
-    "/catalog/p12-3.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 36
-  },
-  {
-   "slug": "bio-shower-cap",
-   "sku": "HC-037",
-   "name": "BIO Shower Cap",
-   "category": "biotique-dry-amenities",
-   "collection": "Packed in butter paper",
-   "pack": "",
-   "variants": [],
-   "description": "Packed in butter paper.",
-   "images": [
-    "/catalog/p12-4.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 37
-  },
-  {
-   "slug": "bio-vanity-kit",
-   "sku": "HC-038",
-   "name": "BIO Vanity Kit",
-   "category": "biotique-dry-amenities",
-   "collection": "Packed in butter paper",
-   "pack": "",
-   "variants": [],
-   "description": "2 ear buds and 2 makeup remover pads, packed in butter paper.",
-   "images": [
-    "/catalog/p12-5.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 38
-  },
-  {
-   "slug": "bio-sewing-kit",
-   "sku": "HC-039",
-   "name": "BIO Sewing Kit",
-   "category": "biotique-dry-amenities",
-   "collection": "Packed in butter paper",
-   "pack": "",
-   "variants": [],
-   "description": "2 buttons, 4 threads in 4 colours, 1 needle, 1 hook and 1 safety pin, packed in butter paper.",
-   "images": [
-    "/catalog/p12-6.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 39
-  },
-  {
-   "slug": "bio-shoe-shiner",
-   "sku": "HC-040",
-   "name": "BIO Shoe Shiner",
-   "category": "biotique-dry-amenities",
-   "collection": "Packed in butter paper",
-   "pack": "",
-   "variants": [],
-   "description": "Packed in butter paper.",
-   "images": [
-    "/catalog/p13-2.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 40
-  },
-  {
-   "slug": "bio-sanitary-bag",
-   "sku": "HC-041",
-   "name": "BIO Sanitary Bag",
-   "category": "biotique-dry-amenities",
-   "collection": "Packed in butter paper",
-   "pack": "",
-   "variants": [],
-   "description": "Sanitary poly bag, packed in butter paper.",
-   "images": [
-    "/catalog/p13-3.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": true,
-   "order": 41
-  },
-  {
-   "slug": "bio-medical-kit",
-   "sku": "HC-042",
-   "name": "BIO Medical Kit",
-   "category": "biotique-dry-amenities",
-   "collection": "Packed in butter paper",
-   "pack": "",
-   "variants": [],
-   "description": "2 ear buds, 2 handy plasters and a nail filer, packed in butter paper.",
-   "images": [
-    "/catalog/p13-4.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 42
-  },
-  {
-   "slug": "bio-palmyra-expert-shave-gel",
-   "sku": "HC-043",
-   "name": "Bio Palmyra Expert Shave Gel",
-   "category": "biotique-dry-amenities",
-   "collection": "Shave & Care",
-   "pack": "4 g sachet",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p13-5.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 43
-  },
-  {
-   "slug": "bio-clove-tulsi-complete-care-toothpaste",
-   "sku": "HC-044",
-   "name": "BIO Clove & Tulsi Complete Care Toothpaste",
-   "category": "biotique-dry-amenities",
-   "collection": "Shave & Care",
-   "pack": "10 g",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p13-6.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 44
-  },
-  {
-   "slug": "bio-palmyra-expert-shave-gel-2",
-   "sku": "HC-045",
-   "name": "Bio Palmyra Expert Shave Gel",
-   "category": "biotique-dry-amenities",
-   "collection": "Shave & Care",
-   "pack": "6 g tube",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p13-7.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 45
-  },
-  {
-   "slug": "bio-grass-after-shave-gel",
-   "sku": "HC-046",
-   "name": "Bio Grass After Shave Gel",
-   "category": "biotique-dry-amenities",
-   "collection": "Shave & Care",
-   "pack": "35 ml",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p14-1.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 46
-  },
-  {
-   "slug": "bio-shoe-shiner-disposable-slippers",
-   "sku": "HC-047",
-   "name": "BIO Shoe Shiner & Disposable Slippers",
-   "category": "biotique-dry-amenities",
-   "collection": "Packed in butter paper",
-   "pack": "",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p14-2.jpg",
-    "/catalog/p14-3.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 47
-  },
-  {
-   "slug": "farm-fresh-20-ml-hdpe-bottle-white-with-black-cap",
-   "sku": "HC-048",
-   "name": "Farm Fresh 20 ml HDPE Bottle – White with Black Cap",
-   "category": "bath-body",
-   "collection": "Farm Fresh",
-   "pack": "20 ml",
-   "variants": [
-    "Shampoo",
-    "Conditioner",
-    "Shower Gel",
-    "Body Lotion"
-   ],
-   "description": "",
-   "images": [
-    "/catalog/p16-1.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 48
-  },
-  {
-   "slug": "farm-fresh-20-ml-hdpe-bottle-yellow-with-black-cap",
-   "sku": "HC-049",
-   "name": "Farm Fresh 20 ml HDPE Bottle – Yellow with Black Cap",
-   "category": "bath-body",
-   "collection": "Farm Fresh",
-   "pack": "20 ml",
-   "variants": [
-    "Shampoo",
-    "Conditioner",
-    "Shower Gel",
-    "Body Lotion"
-   ],
-   "description": "",
-   "images": [
-    "/catalog/p16-2.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 49
-  },
-  {
-   "slug": "farm-fresh-20-ml-hdpe-bottle-white-with-black-cap-design-2",
-   "sku": "HC-050",
-   "name": "Farm Fresh 20 ml HDPE Bottle – White with Black Cap (Design 2)",
-   "category": "bath-body",
-   "collection": "Farm Fresh",
-   "pack": "20 ml",
-   "variants": [
-    "Shampoo",
-    "Conditioner",
-    "Shower Gel",
-    "Body Lotion"
-   ],
-   "description": "",
-   "images": [
-    "/catalog/p16-3.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 50
-  },
-  {
-   "slug": "farm-fresh-300-ml-hdpe-bottle-with-black-pump",
-   "sku": "HC-051",
-   "name": "Farm Fresh 300 ml HDPE Bottle with Black Pump",
-   "category": "bath-body",
-   "collection": "Farm Fresh",
-   "pack": "300 ml",
-   "variants": [
-    "Shampoo",
-    "Conditioner",
-    "Shower Gel",
-    "Body Lotion"
-   ],
-   "description": "Bracket option available.",
-   "images": [
-    "/catalog/p16-4.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 51
-  },
-  {
-   "slug": "farm-fresh-soap-wrap-yellow",
-   "sku": "HC-052",
-   "name": "Farm Fresh Soap Wrap – Yellow",
-   "category": "bath-body",
-   "collection": "Farm Fresh",
-   "pack": "15 gms",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p16-5.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 52
-  },
-  {
-   "slug": "farm-fresh-soap-wrap-black",
-   "sku": "HC-053",
-   "name": "Farm Fresh Soap Wrap – Black",
-   "category": "bath-body",
-   "collection": "Farm Fresh",
-   "pack": "15 gms",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p16-6.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": true,
-   "order": 53
-  },
-  {
-   "slug": "boutique-green-apple-miniatures",
-   "sku": "HC-054",
-   "name": "Boutique Green Apple Miniatures",
-   "category": "bath-body",
-   "collection": "Miniatures",
-   "pack": "25 ml",
-   "variants": [
-    "Shampoo",
-    "Conditioner",
-    "Shower Gel",
-    "Body Lotion"
-   ],
-   "description": "",
-   "images": [
-    "/catalog/p18-1.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 54
-  },
-  {
-   "slug": "boutique-green-apple-miniatures-hdpe-tall-bottle",
-   "sku": "HC-055",
-   "name": "Boutique Green Apple Miniatures – HDPE Tall Bottle",
-   "category": "bath-body",
-   "collection": "Miniatures",
-   "pack": "35 ml",
-   "variants": [
-    "Shampoo",
-    "Conditioner",
-    "Shower Gel",
-    "Body Lotion"
-   ],
-   "description": "",
-   "images": [
-    "/catalog/p18-2.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 55
-  },
-  {
-   "slug": "boutique-botanical-sketch-series-orange-blossom",
-   "sku": "HC-056",
-   "name": "Boutique Botanical Sketch Series – Orange Blossom",
-   "category": "bath-body",
-   "collection": "Miniatures",
-   "pack": "35 ml",
-   "variants": [
-    "Shampoo",
-    "Conditioner",
-    "Shower Gel",
-    "Body Lotion"
-   ],
-   "description": "",
-   "images": [
-    "/catalog/p18-3.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 56
-  },
-  {
-   "slug": "bio-mandarin-basil",
-   "sku": "HC-057",
-   "name": "Bio Mandarin & Basil",
-   "category": "bath-body",
-   "collection": "Miniatures",
-   "pack": "35 ml",
-   "variants": [
-    "Shampoo",
-    "Conditioner",
-    "Shower Gel",
-    "Body Lotion"
-   ],
-   "description": "",
-   "images": [
-    "/catalog/p18-4.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 57
-  },
-  {
-   "slug": "boutique-sandalwood-marigold-terra-verde-generic",
-   "sku": "HC-058",
-   "name": "Boutique Sandalwood & Marigold (Terra Verde Generic)",
-   "category": "bath-body",
-   "collection": "Miniatures",
-   "pack": "15–18 ml",
-   "variants": [
-    "Shampoo",
-    "Shower Gel",
-    "Body Lotion",
-    "Conditioner"
-   ],
-   "description": "",
-   "images": [
-    "/catalog/p18-5.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 58
-  },
-  {
-   "slug": "boutique-bath-body-travel-kit",
-   "sku": "HC-059",
-   "name": "Boutique Bath & Body Travel Kit",
-   "category": "bath-body",
-   "collection": "Miniatures",
-   "pack": "4 pieces, 25 ml tubes",
-   "variants": [
-    "Shampoo",
-    "Shower Gel",
-    "Body Lotion",
-    "Conditioner"
-   ],
-   "description": "",
-   "images": [
-    "/catalog/p18-6.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 59
-  },
-  {
-   "slug": "boutique-red-grape-fruit-kopou-phul-white-bottle-with-pump",
-   "sku": "HC-060",
-   "name": "Boutique Red Grape Fruit Kopou Phul – White Bottle with Pump",
-   "category": "bath-body",
-   "collection": "Dispensers",
-   "pack": "380 ml",
-   "variants": [
-    "Shampoo",
-    "Conditioner",
-    "Body Wash",
-    "Body Lotion",
-    "Hand Wash"
-   ],
-   "description": "Bracket options available.",
-   "images": [
-    "/catalog/p20-1.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": true,
-   "order": 60
-  },
-  {
-   "slug": "boutique-royal-bergamot-patchouli-black-bottle-with-pump",
-   "sku": "HC-061",
-   "name": "Boutique Royal Bergamot & Patchouli – Black Bottle with Pump",
-   "category": "bath-body",
-   "collection": "Dispensers",
-   "pack": "380 ml",
-   "variants": [
-    "Shampoo",
-    "Conditioner",
-    "Body Wash",
-    "Body Lotion",
-    "Hand Wash"
-   ],
-   "description": "Bracket options available.",
-   "images": [
-    "/catalog/p20-2.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 61
-  },
-  {
-   "slug": "sandalwood-marigold-bottle-with-pump",
-   "sku": "HC-062",
-   "name": "Sandalwood & Marigold – Bottle with Pump",
-   "category": "bath-body",
-   "collection": "Dispensers",
-   "pack": "380 ml",
-   "variants": [
-    "Shampoo",
-    "Conditioner",
-    "Shower Gel",
-    "Body Lotion",
-    "Hand Wash"
-   ],
-   "description": "Bracket options available.",
-   "images": [
-    "/catalog/p20-3.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 62
-  },
-  {
-   "slug": "green-apple-fresh-daily-purifying-bottle-with-pump",
-   "sku": "HC-063",
-   "name": "Green Apple Fresh Daily Purifying – Bottle with Pump",
-   "category": "bath-body",
-   "collection": "Dispensers",
-   "pack": "380 ml",
-   "variants": [
-    "Shampoo",
-    "Conditioner",
-    "Body Wash",
-    "Morning Nectar Body Lotion",
-    "Neem Hand Wash"
-   ],
-   "description": "Bracket options available.",
-   "images": [
-    "/catalog/p20-4.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 63
-  },
-  {
-   "slug": "bio-cypress-citrus-neroli-bottle-with-pump",
-   "sku": "HC-064",
-   "name": "BIO Cypress Citrus & Neroli – Bottle with Pump",
-   "category": "bath-body",
-   "collection": "Dispensers",
-   "pack": "300 ml",
-   "variants": [
-    "Shampoo",
-    "Conditioner",
-    "Body Wash",
-    "Morning Nectar Body Lotion",
-    "Neem Hand Wash"
-   ],
-   "description": "Bracket options available.",
-   "images": [
-    "/catalog/p20-5.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 64
-  },
-  {
-   "slug": "boutique-almond-oil-nourishing-soap",
-   "sku": "HC-065",
-   "name": "Boutique Almond Oil Nourishing Soap",
-   "category": "bath-body",
-   "collection": "Soaps",
-   "pack": "15 gms",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p21-1.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 65
-  },
-  {
-   "slug": "boutique-almond-oil-nourishing-soap-2",
-   "sku": "HC-066",
-   "name": "Boutique Almond Oil Nourishing Soap",
-   "category": "bath-body",
-   "collection": "Soaps",
-   "pack": "25 gms",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p21-2.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 66
-  },
-  {
-   "slug": "boutique-almond-oil-nourishing-soap-2-2",
-   "sku": "HC-067",
-   "name": "Boutique Almond Oil Nourishing Soap",
-   "category": "bath-body",
-   "collection": "Soaps",
-   "pack": "30 gms",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p21-3.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 67
-  },
-  {
-   "slug": "boutique-red-grape-fruit-kopou-phul-5-ltr",
-   "sku": "HC-068",
-   "name": "Boutique Red Grape Fruit Kopou Phul – 5 Ltr",
-   "category": "bath-body",
-   "collection": "Bulk – 5 Ltr",
-   "pack": "5 Ltr",
-   "variants": [
-    "Shampoo",
-    "Conditioner",
-    "Body Wash",
-    "Body Lotion",
-    "Hand Wash"
-   ],
-   "description": "",
-   "images": [
-    "/catalog/p23-1.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 68
-  },
-  {
-   "slug": "boutique-royal-bergamot-patchouli-5-ltr",
-   "sku": "HC-069",
-   "name": "Boutique Royal Bergamot & Patchouli – 5 Ltr",
-   "category": "bath-body",
-   "collection": "Bulk – 5 Ltr",
-   "pack": "5 Ltr",
-   "variants": [
-    "Shampoo",
-    "Conditioner",
-    "Body Wash",
-    "Body Lotion",
-    "Hand Wash"
-   ],
-   "description": "",
-   "images": [
-    "/catalog/p23-2.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 69
-  },
-  {
-   "slug": "sandalwood-marigold-5-ltr",
-   "sku": "HC-070",
-   "name": "Sandalwood & Marigold – 5 Ltr",
-   "category": "bath-body",
-   "collection": "Bulk – 5 Ltr",
-   "pack": "5 Ltr",
-   "variants": [
-    "Shampoo",
-    "Conditioner",
-    "Shower Gel",
-    "Body Lotion",
-    "Hand Wash"
-   ],
-   "description": "",
-   "images": [
-    "/catalog/p23-3.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 70
-  },
-  {
-   "slug": "green-apple-fresh-daily-purifying-5-ltr",
-   "sku": "HC-071",
-   "name": "Green Apple Fresh Daily Purifying – 5 Ltr",
-   "category": "bath-body",
-   "collection": "Bulk – 5 Ltr",
-   "pack": "5 Ltr",
-   "variants": [
-    "Shampoo",
-    "Conditioner",
-    "Body Wash",
-    "Morning Nectar Body Lotion",
-    "Neem Hand Wash"
-   ],
-   "description": "",
-   "images": [
-    "/catalog/p23-4.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 71
-  },
-  {
-   "slug": "green-apple-morning-nectar-5-ltr",
-   "sku": "HC-072",
-   "name": "Green Apple Morning Nectar – 5 Ltr",
-   "category": "bath-body",
-   "collection": "Bulk – 5 Ltr",
-   "pack": "5 Ltr",
-   "variants": [
-    "Shampoo",
-    "Conditioner",
-    "Body Wash",
-    "Morning Nectar Body Lotion",
-    "Neem Hand Wash"
-   ],
-   "description": "",
-   "images": [
-    "/catalog/p23-5.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 72
-  },
-  {
-   "slug": "bio-cypress-citrus-neroli-5-ltr",
-   "sku": "HC-073",
-   "name": "BIO Cypress Citrus & Neroli – 5 Ltr",
-   "category": "bath-body",
-   "collection": "Bulk – 5 Ltr",
-   "pack": "5 Ltr",
-   "variants": [
-    "Shampoo",
-    "Conditioner",
-    "Body Wash",
-    "Morning Nectar Body Lotion",
-    "Neem Hand Wash"
-   ],
-   "description": "",
-   "images": [
-    "/catalog/p23-6.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 73
-  },
-  {
-   "slug": "boutique-botanical-sketch-series-orange-blossom-5-ltr",
-   "sku": "HC-074",
-   "name": "Boutique Botanical Sketch Series – Orange Blossom – 5 Ltr",
-   "category": "bath-body",
-   "collection": "Bulk – 5 Ltr",
-   "pack": "5 Ltr",
-   "variants": [
-    "Shampoo",
-    "Conditioner",
-    "Shower Gel",
-    "Body Lotion"
-   ],
-   "description": "",
-   "images": [
-    "/catalog/p23-7.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 74
-  },
-  {
-   "slug": "farm-fresh-5-ltr",
-   "sku": "HC-075",
-   "name": "Farm Fresh – 5 Ltr",
-   "category": "bath-body",
-   "collection": "Bulk – 5 Ltr",
-   "pack": "5 Ltr",
-   "variants": [
-    "Shampoo",
-    "Conditioner",
-    "Shower Gel",
-    "Body Lotion"
-   ],
-   "description": "",
-   "images": [
-    "/catalog/p23-8.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 75
-  },
-  {
-   "slug": "aqua-shui-shampoo-5-ltr-can",
-   "sku": "HC-076",
-   "name": "Aqua Shui Shampoo – 5 Ltr Can",
-   "category": "bath-body",
-   "collection": "Bulk – 5 Ltr",
-   "pack": "5 Ltr",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p24-1.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 76
-  },
-  {
-   "slug": "aqua-shui-shower-gel-5-ltr-can",
-   "sku": "HC-077",
-   "name": "Aqua Shui Shower Gel – 5 Ltr Can",
-   "category": "bath-body",
-   "collection": "Bulk – 5 Ltr",
-   "pack": "5 Ltr",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p24-2.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 77
-  },
-  {
-   "slug": "aqua-shui-body-lotion-5-ltr-can",
-   "sku": "HC-078",
-   "name": "Aqua Shui Body Lotion – 5 Ltr Can",
-   "category": "bath-body",
-   "collection": "Bulk – 5 Ltr",
-   "pack": "5 Ltr",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p24-3.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 78
-  },
-  {
-   "slug": "fem-safe-hand-wash-blossom-pink-5-ltr",
-   "sku": "HC-079",
-   "name": "Fem Safe Hand Wash – Blossom (Pink) – 5 Ltr",
-   "category": "bath-body",
-   "collection": "Bulk – 5 Ltr",
-   "pack": "5 Ltr",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p24-4.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 79
-  },
-  {
-   "slug": "everyday-dairy-creamer",
-   "sku": "HC-080",
-   "name": "Everyday Dairy Creamer",
-   "category": "tray-amenities",
-   "collection": "Tea, Coffee & Creamer",
-   "pack": "150 sachets per pkt",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p26-1.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 80
-  },
-  {
-   "slug": "nescafe-classic-instant-coffee-sachet",
-   "sku": "HC-081",
-   "name": "Nescafe Classic Instant Coffee Sachet",
-   "category": "tray-amenities",
-   "collection": "Tea, Coffee & Creamer",
-   "pack": "",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p26-2.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 81
-  },
-  {
-   "slug": "tata-tetley-original-tea-bags-assam-tea",
-   "sku": "HC-082",
-   "name": "Tata Tetley Original Tea Bags – Assam Tea",
-   "category": "tray-amenities",
-   "collection": "Tea, Coffee & Creamer",
-   "pack": "100 tea bags",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p26-3.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 82
-  },
-  {
-   "slug": "equal-classic-zero-calorie-sweetener",
-   "sku": "HC-083",
-   "name": "Equal Classic Zero Calorie Sweetener",
-   "category": "tray-amenities",
-   "collection": "Sweeteners",
-   "pack": "Sugar free, calorie control",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p26-4.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": true,
-   "order": 83
-  },
-  {
-   "slug": "ccd-coffee-day-roasted-fresh-coffee-beans",
-   "sku": "HC-084",
-   "name": "CCD Coffee Day Roasted Fresh Coffee Beans",
-   "category": "tray-amenities",
-   "collection": "Tea, Coffee & Creamer",
-   "pack": "1.08 kg bag",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p26-5.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 84
-  },
-  {
-   "slug": "tetley-english-breakfast-dip-tea",
-   "sku": "HC-085",
-   "name": "Tetley English Breakfast Dip Tea",
-   "category": "tray-amenities",
-   "collection": "Tea, Coffee & Creamer",
-   "pack": "50 bags",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p26-6.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 85
-  },
-  {
-   "slug": "coffee-day-roosh-green-tea",
-   "sku": "HC-086",
-   "name": "Coffee Day Roosh Green Tea",
-   "category": "tray-amenities",
-   "collection": "Tea, Coffee & Creamer",
-   "pack": "",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p26-7.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 86
-  },
-  {
-   "slug": "roosh-dip-tea-ginger",
-   "sku": "HC-087",
-   "name": "Roosh Dip Tea – Ginger",
-   "category": "tray-amenities",
-   "collection": "Tea, Coffee & Creamer",
-   "pack": "",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p26-8.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 87
-  },
-  {
-   "slug": "tata-tetley-normal-original-tea",
-   "sku": "HC-088",
-   "name": "Tata Tetley Normal Original Tea",
-   "category": "tray-amenities",
-   "collection": "Tea, Coffee & Creamer",
-   "pack": "100 tea bags",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p26-9.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 88
-  },
-  {
-   "slug": "virgo-white-sugar-sachet",
-   "sku": "HC-089",
-   "name": "Virgo White Sugar Sachet",
-   "category": "tray-amenities",
-   "collection": "Sugar & Condiment Sachets",
-   "pack": "5 gms x 1000 nos.",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p27-1.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 89
-  },
-  {
-   "slug": "coffee-day-sugar-sachets",
-   "sku": "HC-090",
-   "name": "Coffee Day Sugar Sachets",
-   "category": "tray-amenities",
-   "collection": "Sugar & Condiment Sachets",
-   "pack": "5 gms x 200 sachets",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p27-2.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 90
-  },
-  {
-   "slug": "virgo-brown-sugar-sachet",
-   "sku": "HC-091",
-   "name": "Virgo Brown Sugar Sachet",
-   "category": "tray-amenities",
-   "collection": "Sugar & Condiment Sachets",
-   "pack": "5 gms x 200 nos.",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p27-3.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 91
-  },
-  {
-   "slug": "virgo-black-pepper-sachet",
-   "sku": "HC-092",
-   "name": "Virgo Black Pepper Sachet",
-   "category": "tray-amenities",
-   "collection": "Sugar & Condiment Sachets",
-   "pack": "0.25 gms x 1000 nos.",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p27-4.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 92
-  },
-  {
-   "slug": "virgo-oregano-seasoning-sachet",
-   "sku": "HC-093",
-   "name": "Virgo Oregano Seasoning Sachet",
-   "category": "tray-amenities",
-   "collection": "Sugar & Condiment Sachets",
-   "pack": "0.8 gms x 400 nos.",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p27-5.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 93
-  },
-  {
-   "slug": "virgo-chilli-flakes",
-   "sku": "HC-094",
-   "name": "Virgo Chilli Flakes",
-   "category": "tray-amenities",
-   "collection": "Sugar & Condiment Sachets",
-   "pack": "0.8 gms x 400 nos.",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p27-6.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 94
-  },
-  {
-   "slug": "del-monte-tomato-ketchup-sachets",
-   "sku": "HC-095",
-   "name": "Del Monte Tomato Ketchup Sachets",
-   "category": "tray-amenities",
-   "collection": "Sugar & Condiment Sachets",
-   "pack": "0.8 gms x 100 nos.",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p27-7.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 95
-  },
-  {
-   "slug": "caf-coffee-day-sugar-sachets",
-   "sku": "HC-096",
-   "name": "Café Coffee Day Sugar Sachets",
-   "category": "tray-amenities",
-   "collection": "Sugar & Condiment Sachets",
-   "pack": "0.5 gms x 200 nos.",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p27-8.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 96
-  },
-  {
-   "slug": "tata-coffee-grand-sachets",
-   "sku": "HC-097",
-   "name": "Tata Coffee Grand Sachets",
-   "category": "tray-amenities",
-   "collection": "Tea, Coffee & Creamer",
-   "pack": "0.2 gms x 200 nos.",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p27-9.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 97
-  },
-  {
-   "slug": "delicasia-sr-s-mixed-fruit-jam-sachets",
-   "sku": "HC-098",
-   "name": "Delicasia Sr's Mixed Fruit Jam Sachets",
-   "category": "tray-amenities",
-   "collection": "Jam, Honey & Butter",
-   "pack": "15 gms x 48 pkt",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p28-3.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 98
-  },
-  {
-   "slug": "delicasia-sr-s-honey-sachets",
-   "sku": "HC-099",
-   "name": "Delicasia Sr's Honey Sachets",
-   "category": "tray-amenities",
-   "collection": "Jam, Honey & Butter",
-   "pack": "15 gms x 500 pcs",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p28-1.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": true,
-   "order": 99
-  },
-  {
-   "slug": "amul-butter-sachets",
-   "sku": "HC-100",
-   "name": "Amul Butter Sachets",
-   "category": "tray-amenities",
-   "collection": "Jam, Honey & Butter",
-   "pack": "10 gms",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p28-2.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 100
-  },
-  {
-   "slug": "relish-diet-sugar",
-   "sku": "HC-101",
-   "name": "Relish Diet Sugar",
-   "category": "tray-amenities",
-   "collection": "Sweeteners",
-   "pack": "100 gms, 100 sachets",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p28-4.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 101
-  },
-  {
-   "slug": "equal-stevia-natural-sweetener",
-   "sku": "HC-102",
-   "name": "Equal Stevia Natural Sweetener",
-   "category": "tray-amenities",
-   "collection": "Sweeteners",
-   "pack": "75 gms, 100 sachets",
-   "variants": [],
-   "description": "Sugar free, diabetic friendly.",
-   "images": [
-    "/catalog/p28-5.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 102
-  },
-  {
-   "slug": "wooden-stirrers-pack",
-   "sku": "HC-103",
-   "name": "Wooden Stirrers Pack",
-   "category": "tray-amenities",
-   "collection": "Disposables",
-   "pack": "",
-   "variants": [],
-   "description": "Disposable drink stirrers for tea and beverages.",
-   "images": [
-    "/catalog/p28-6.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 103
-  },
-  {
-   "slug": "generic-paper-cup-white",
-   "sku": "HC-104",
-   "name": "Generic Paper Cup – White",
-   "category": "tray-amenities",
-   "collection": "Disposables",
-   "pack": "",
-   "variants": [],
-   "description": "All sizes available.",
-   "images": [
-    "/catalog/p28-7.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": true,
-   "order": 104
-  },
-  {
-   "slug": "fancy-wooden-toothpicks",
-   "sku": "HC-105",
-   "name": "Fancy Wooden Toothpicks",
-   "category": "tray-amenities",
-   "collection": "Disposables",
-   "pack": "",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p28-8.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 105
-  },
-  {
-   "slug": "generic-ripple-cup-white",
-   "sku": "HC-106",
-   "name": "Generic Ripple Cup – White",
-   "category": "tray-amenities",
-   "collection": "Disposables",
-   "pack": "",
-   "variants": [],
-   "description": "All sizes available.",
-   "images": [
-    "/catalog/p28-9.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 106
-  },
-  {
-   "slug": "fresh-wrap-aluminium-plain-foil",
-   "sku": "HC-107",
-   "name": "Fresh Wrap Aluminium Plain Foil",
-   "category": "housekeeping-others",
-   "collection": "Others",
-   "pack": "72 metre",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p29-1.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 107
-  },
-  {
-   "slug": "wrap-on-cling-film",
-   "sku": "HC-108",
-   "name": "Wrap On – Cling Film",
-   "category": "housekeeping-others",
-   "collection": "Others",
-   "pack": "High clarity stretch",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p29-2.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 108
-  },
-  {
-   "slug": "fly-catcher-machine-fibre-body-3-tubes-with-glue-pad",
-   "sku": "HC-109",
-   "name": "Fly Catcher Machine – Fibre Body, 3 Tubes with Glue Pad",
-   "category": "housekeeping-others",
-   "collection": "Fly Catcher Machines",
-   "pack": "29' x 12' x 7', 3 tubes x 15 W",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p29-3.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 109
-  },
-  {
-   "slug": "terminator-fly-catcher-machine-ms-powder-coated-double-tube",
-   "sku": "HC-110",
-   "name": "Terminator Fly Catcher Machine – MS Powder Coated, Double Tube",
-   "category": "housekeeping-others",
-   "collection": "Fly Catcher Machines",
-   "pack": "25' x 18' x 9', 2 tubes x 18 W",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p29-4.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 110
-  },
-  {
-   "slug": "terminator-fly-catcher-machine-ms-powder-coated-double-tube-compact",
-   "sku": "HC-111",
-   "name": "Terminator Fly Catcher Machine – MS Powder Coated, Double Tube (Compact)",
-   "category": "housekeeping-others",
-   "collection": "Fly Catcher Machines",
-   "pack": "25' x 14' x 8', 2 tubes x 18 W",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p29-5.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 111
-  },
-  {
-   "slug": "recycled-cotton-towels",
-   "sku": "HC-112",
-   "name": "Recycled Cotton Towels",
-   "category": "hotel-linen",
-   "collection": "Hotel Towels",
-   "pack": "",
-   "variants": [],
-   "description": "Eco friendly and cost efficient for hotels and spas.",
-   "images": [
-    "/catalog/p31-1.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 112
-  },
-  {
-   "slug": "100-ring-spun-cotton-towels",
-   "sku": "HC-113",
-   "name": "100% Ring Spun Cotton Towels",
-   "category": "hotel-linen",
-   "collection": "Hotel Towels",
-   "pack": "",
-   "variants": [],
-   "description": "Soft and durable for hotels and spas.",
-   "images": [
-    "/catalog/p31-2.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 113
-  },
-  {
-   "slug": "650-gms-hotel-bath-towels",
-   "sku": "HC-114",
-   "name": "650 gms Hotel Bath Towels",
-   "category": "hotel-linen",
-   "collection": "Hotel Towels",
-   "pack": "650 gms",
-   "variants": [],
-   "description": "Ultra plus comfort for luxury rooms and spas.",
-   "images": [
-    "/catalog/p31-3.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 114
-  },
-  {
-   "slug": "face-towels-for-hotels-spas",
-   "sku": "HC-115",
-   "name": "Face Towels for Hotels & Spas",
-   "category": "hotel-linen",
-   "collection": "Hotel Towels",
-   "pack": "",
-   "variants": [],
-   "description": "Soft, compact and hygienic for guest comfort.",
-   "images": [
-    "/catalog/p31-4.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 115
-  },
-  {
-   "slug": "hotel-hand-towels",
-   "sku": "HC-116",
-   "name": "Hotel Hand Towels",
-   "category": "hotel-linen",
-   "collection": "Hotel Towels",
-   "pack": "",
-   "variants": [],
-   "description": "Quick-dry and durable for everyday guest use.",
-   "images": [
-    "/catalog/p31-5.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": true,
-   "order": 116
-  },
-  {
-   "slug": "fitted-bed-sheets-for-hotels",
-   "sku": "HC-117",
-   "name": "Fitted Bed Sheets for Hotels",
-   "category": "hotel-linen",
-   "collection": "Bed Sheets",
-   "pack": "",
-   "variants": [],
-   "description": "Perfect fit for housekeeping efficiency.",
-   "images": [
-    "/catalog/p32-1.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 117
-  },
-  {
-   "slug": "220-tc-white-bed-sheet",
-   "sku": "HC-118",
-   "name": "220 TC White Bed Sheet",
-   "category": "hotel-linen",
-   "collection": "Bed Sheets",
-   "pack": "220 TC",
-   "variants": [],
-   "description": "Budget-friendly option for daily hotel use.",
-   "images": [
-    "/catalog/p32-2.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 118
-  },
-  {
-   "slug": "300-tc-white-cotton-satin-bed-sheet",
-   "sku": "HC-119",
-   "name": "300 TC White Cotton Satin Bed Sheet",
-   "category": "hotel-linen",
-   "collection": "Bed Sheets",
-   "pack": "300 TC",
-   "variants": [],
-   "description": "For boutique and luxury properties.",
-   "images": [
-    "/catalog/p32-4.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 119
-  },
-  {
-   "slug": "400-tc-bed-sheet",
-   "sku": "HC-120",
-   "name": "400 TC Bed Sheet",
-   "category": "hotel-linen",
-   "collection": "Bed Sheets",
-   "pack": "400 TC",
-   "variants": [],
-   "description": "High thread count for the 5-star hotel experience.",
-   "images": [
-    "/catalog/p32-3.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 120
-  },
-  {
-   "slug": "hollow-fiber-pillows",
-   "sku": "HC-121",
-   "name": "Hollow Fiber Pillows",
-   "category": "hotel-linen",
-   "collection": "Pillows & Duvets",
-   "pack": "",
-   "variants": [],
-   "description": "Soft, breathable support for hotel comfort.",
-   "images": [
-    "/catalog/p33-1.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 121
-  },
-  {
-   "slug": "foam-pillows-for-hotels",
-   "sku": "HC-122",
-   "name": "Foam Pillows for Hotels",
-   "category": "hotel-linen",
-   "collection": "Pillows & Duvets",
-   "pack": "",
-   "variants": [],
-   "description": "Firm support with consistent shape.",
-   "images": [
-    "/catalog/p33-2.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 122
-  },
-  {
-   "slug": "microfiber-pillows",
-   "sku": "HC-123",
-   "name": "Microfiber Pillows",
-   "category": "hotel-linen",
-   "collection": "Pillows & Duvets",
-   "pack": "",
-   "variants": [],
-   "description": "Down-like luxury for premium hotel sleep.",
-   "images": [
-    "/catalog/p33-3.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 123
-  },
-  {
-   "slug": "hollow-fiber-duvets-for-hotels",
-   "sku": "HC-124",
-   "name": "Hollow Fiber Duvets for Hotels",
-   "category": "hotel-linen",
-   "collection": "Pillows & Duvets",
-   "pack": "",
-   "variants": [],
-   "description": "Lightweight warmth and easy care.",
-   "images": [
-    "/catalog/p33-4.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 124
-  },
-  {
-   "slug": "table-napkins",
-   "sku": "HC-125",
-   "name": "Table Napkins",
-   "category": "hotel-linen",
-   "collection": "Napkins & Event Covers",
-   "pack": "",
-   "variants": [],
-   "description": "Everyday elegance for hotels and restaurants.",
-   "images": [
-    "/catalog/p34-1.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": true,
-   "order": 125
-  },
-  {
-   "slug": "satin-band-table-napkins",
-   "sku": "HC-126",
-   "name": "Satin Band Table Napkins",
-   "category": "hotel-linen",
-   "collection": "Napkins & Event Covers",
-   "pack": "",
-   "variants": [],
-   "description": "Formal elegance for dining tables.",
-   "images": [
-    "/catalog/p34-2.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 126
-  },
-  {
-   "slug": "jacquard-table-napkins",
-   "sku": "HC-127",
-   "name": "Jacquard Table Napkins",
-   "category": "hotel-linen",
-   "collection": "Napkins & Event Covers",
-   "pack": "",
-   "variants": [],
-   "description": "Textured luxury for upscale dining.",
-   "images": [
-    "/catalog/p34-3.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 127
-  },
-  {
-   "slug": "banquet-chair-covers",
-   "sku": "HC-128",
-   "name": "Banquet Chair Covers",
-   "category": "hotel-linen",
-   "collection": "Napkins & Event Covers",
-   "pack": "",
-   "variants": [],
-   "description": "Reliable, elegant and budget-friendly.",
-   "images": [
-    "/catalog/p34-4.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 128
-  },
-  {
-   "slug": "banquet-table-covers",
-   "sku": "HC-129",
-   "name": "Banquet Table Covers",
-   "category": "hotel-linen",
-   "collection": "Napkins & Event Covers",
-   "pack": "",
-   "variants": [],
-   "description": "Elegant and durable covers for every event.",
-   "images": [
-    "/catalog/p34-5.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 129
-  },
-  {
-   "slug": "spandex-chair-covers",
-   "sku": "HC-130",
-   "name": "Spandex Chair Covers",
-   "category": "hotel-linen",
-   "collection": "Napkins & Event Covers",
-   "pack": "",
-   "variants": [],
-   "description": "Premium stretch-fit for luxury seating.",
-   "images": [
-    "/catalog/p34-6.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 130
-  },
-  {
-   "slug": "printed-curtains-for-hotels",
-   "sku": "HC-131",
-   "name": "Printed Curtains for Hotels",
-   "category": "hotel-linen",
-   "collection": "Curtains",
-   "pack": "",
-   "variants": [],
-   "description": "Custom designs to match your decor.",
-   "images": [
-    "/catalog/p35-1.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 131
-  },
-  {
-   "slug": "sheer-curtains",
-   "sku": "HC-132",
-   "name": "Sheer Curtains",
-   "category": "hotel-linen",
-   "collection": "Curtains",
-   "pack": "",
-   "variants": [],
-   "description": "Soft light diffusion for hotel ambience.",
-   "images": [
-    "/catalog/p35-2.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 132
-  },
-  {
-   "slug": "jacquard-curtains-for-hotels",
-   "sku": "HC-133",
-   "name": "Jacquard Curtains for Hotels",
-   "category": "hotel-linen",
-   "collection": "Curtains",
-   "pack": "",
-   "variants": [],
-   "description": "Elegant patterns with light control.",
-   "images": [
-    "/catalog/p35-3.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 133
-  },
-  {
-   "slug": "hotel-bed-runners-with-cushion-cover",
-   "sku": "HC-134",
-   "name": "Hotel Bed Runners with Cushion Cover",
-   "category": "hotel-linen",
-   "collection": "Bed & Bath Accessories",
-   "pack": "",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p36-1.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 134
-  },
-  {
-   "slug": "cushions-for-hotels",
-   "sku": "HC-135",
-   "name": "Cushions for Hotels",
-   "category": "hotel-linen",
-   "collection": "Bed & Bath Accessories",
-   "pack": "",
-   "variants": [],
-   "description": "Hollow and microfiber fill for plush accent seating.",
-   "images": [
-    "/catalog/p36-2.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 135
-  },
-  {
-   "slug": "mattress-protectors-for-hotels",
-   "sku": "HC-136",
-   "name": "Mattress Protectors for Hotels",
-   "category": "hotel-linen",
-   "collection": "Bed & Bath Accessories",
-   "pack": "",
-   "variants": [],
-   "description": "Waterproof, breathable and durable.",
-   "images": [
-    "/catalog/p36-3.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 136
-  },
-  {
-   "slug": "hotel-bath-mats",
-   "sku": "HC-137",
-   "name": "Hotel Bath Mats",
-   "category": "hotel-linen",
-   "collection": "Bed & Bath Accessories",
-   "pack": "",
-   "variants": [],
-   "description": "Quick-dry, slip-resistant and built for daily use.",
-   "images": [
-    "/catalog/p36-4.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 137
-  },
-  {
-   "slug": "pillow-covers-for-hotels",
-   "sku": "HC-138",
-   "name": "Pillow Covers for Hotels",
-   "category": "hotel-linen",
-   "collection": "Bed & Bath Accessories",
-   "pack": "",
-   "variants": [],
-   "description": "Soft, durable and wash-friendly.",
-   "images": [
-    "/catalog/p37-1.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 138
-  },
-  {
-   "slug": "terry-bath-robes-for-hotels-spas",
-   "sku": "HC-139",
-   "name": "Terry Bath Robes for Hotels & Spas",
-   "category": "hotel-linen",
-   "collection": "Bath Robes",
-   "pack": "",
-   "variants": [],
-   "description": "Plush comfort in 100% ring-spun cotton.",
-   "images": [
-    "/catalog/p37-2.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 139
-  },
-  {
-   "slug": "waffle-weave-bath-robes",
-   "sku": "HC-140",
-   "name": "Waffle Weave Bath Robes",
-   "category": "hotel-linen",
-   "collection": "Bath Robes",
-   "pack": "",
-   "variants": [],
-   "description": "Lightweight, textured comfort for hotels and spas.",
-   "images": [
-    "/catalog/p37-3.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 140
-  },
-  {
-   "slug": "hotel-wall-papers",
-   "sku": "HC-141",
-   "name": "Hotel Wall Papers",
-   "category": "hotel-linen",
-   "collection": "Decor",
-   "pack": "",
-   "variants": [],
-   "description": "",
-   "images": [
-    "/catalog/p37-4.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 141
-  },
-  {
-   "slug": "spring-mattress-for-hotels",
-   "sku": "HC-142",
-   "name": "Spring Mattress for Hotels",
-   "category": "hotel-linen",
-   "collection": "Mattresses",
-   "pack": "",
-   "variants": [],
-   "description": "Long-lasting comfort with bounce and support.",
-   "images": [
-    "/catalog/p37-5.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 142
-  },
-  {
-   "slug": "memory-foam-mattress",
-   "sku": "HC-143",
-   "name": "Memory Foam Mattress",
-   "category": "hotel-linen",
-   "collection": "Mattresses",
-   "pack": "",
-   "variants": [],
-   "description": "Adaptive comfort for the hotel sleep experience.",
-   "images": [
-    "/catalog/p37-6.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 143
-  },
-  {
-   "slug": "hotel-shower-curtains",
-   "sku": "HC-144",
-   "name": "Hotel Shower Curtains",
-   "category": "hotel-linen",
-   "collection": "Bed & Bath Accessories",
-   "pack": "",
-   "variants": [],
-   "description": "Water-resistant and easy to maintain.",
-   "images": [
-    "/catalog/p38-1.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 144
-  },
-  {
-   "slug": "hospital-foam-pillows",
-   "sku": "HC-145",
-   "name": "Hospital Foam Pillows",
-   "category": "hospital-linen",
-   "collection": "Hospital Pillows",
-   "pack": "",
-   "variants": [],
-   "description": "Supportive, hygienic and economical.",
-   "images": [
-    "/catalog/p38-2.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 145
-  },
-  {
-   "slug": "hospital-blankets",
-   "sku": "HC-146",
-   "name": "Hospital Blankets",
-   "category": "hospital-linen",
-   "collection": "Hospital Blankets",
-   "pack": "",
-   "variants": [],
-   "description": "Warmth, hygiene and reusability combined.",
-   "images": [
-    "/catalog/p38-3.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 146
-  },
-  {
-   "slug": "hospital-privacy-curtains",
-   "sku": "HC-147",
-   "name": "Hospital Privacy Curtains",
-   "category": "hospital-linen",
-   "collection": "Hospital Curtains",
-   "pack": "",
-   "variants": [],
-   "description": "Functional design for patient dignity.",
-   "images": [
-    "/catalog/p38-4.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 147
-  },
-  {
-   "slug": "hospital-bed-sheets",
-   "sku": "HC-148",
-   "name": "Hospital Bed Sheets",
-   "category": "hospital-linen",
-   "collection": "Hospital Bed Sheets",
-   "pack": "",
-   "variants": [],
-   "description": "Clinical-grade comfort and durability.",
-   "images": [
-    "/catalog/p39-1.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 148
-  },
-  {
-   "slug": "hospital-bed-linen",
-   "sku": "HC-149",
-   "name": "Hospital Bed Linen",
-   "category": "hospital-linen",
-   "collection": "Hospital Bed Linen",
-   "pack": "",
-   "variants": [],
-   "description": "Complete bedding solutions for healthcare facilities.",
-   "images": [
-    "/catalog/p39-2.jpg"
-   ],
-   "price": null,
-   "priceUnit": "",
-   "minOrder": "",
-   "active": true,
-   "featured": false,
-   "order": 149
-  }
- ]
+  "categories": [
+    {
+      "slug": "guest-amenities",
+      "name": "Guest Amenities",
+      "order": 1,
+      "description": "Dental, shaving, comb, vanity and sewing kits, slippers, loofahs, soaps and room cards for hotel rooms."
+    },
+    {
+      "slug": "eco-friendly",
+      "name": "Eco-Friendly Range",
+      "order": 2,
+      "description": "Bamboo and wheat-straw toothbrushes, combs and razors."
+    },
+    {
+      "slug": "biotique-dry-amenities",
+      "name": "Biotique Dry Amenities",
+      "order": 3,
+      "description": "Premium butter-paper packed Biotique kits: dental, shaving, comb, slipper, loofah, vanity, sewing and more."
+    },
+    {
+      "slug": "bath-body",
+      "name": "Bath & Body",
+      "order": 4,
+      "description": "Shampoo, conditioner, shower gel, body lotion, hand wash and soaps in miniatures, pump dispensers and 5-litre bulk cans."
+    },
+    {
+      "slug": "tray-amenities",
+      "name": "Tray Amenities",
+      "order": 5,
+      "description": "Tea, coffee, sugar, sweeteners, condiment sachets, jam, honey, butter, cups, stirrers and toothpicks."
+    },
+    {
+      "slug": "housekeeping-others",
+      "name": "Housekeeping & Others",
+      "order": 6,
+      "description": "Aluminium foil, cling film and fly catcher machines."
+    },
+    {
+      "slug": "hotel-linen",
+      "name": "Hotel Linen & Terry",
+      "order": 7,
+      "description": "Towels, bed sheets, pillows, duvets, napkins, covers, curtains, bath robes, mattresses and more."
+    },
+    {
+      "slug": "hospital-linen",
+      "name": "Hospital Linen",
+      "order": 8,
+      "description": "Foam pillows, blankets, privacy curtains and bed linen for hospitals and healthcare facilities."
+    }
+  ],
+  "products": [
+    {
+      "slug": "hotel-dental-kit-anchor-toothbrush-with-anchor-paste-1-1",
+      "sku": "HC-001",
+      "name": "Hotel Dental Kit – Anchor Toothbrush with Anchor Paste (1+1)",
+      "category": "guest-amenities",
+      "collection": "Basic Dry & Wet Amenities",
+      "pack": "Paste 8 gms",
+      "variants": [],
+      "description": "Hotel Dental Kit containing soft bristle toothbrush and dental paste in hygienic packaging for guest amenities.",
+      "images": [
+        "/catalog/p05-1.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": true,
+      "order": 1,
+      "hsn": "96050000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "hotel-dental-kit-anchor-toothbrush-with-anchor-paste-1-2",
+      "sku": "HC-002",
+      "name": "Hotel Dental Kit – Anchor Toothbrush with Anchor Paste (1+2)",
+      "category": "guest-amenities",
+      "collection": "Basic Dry & Wet Amenities",
+      "pack": "Paste 8 gms",
+      "variants": [],
+      "description": "Hotel Dental Kit containing soft bristle toothbrush and dental paste in hygienic packaging for guest amenities.",
+      "images": [
+        "/catalog/p05-2.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 2,
+      "hsn": "96050000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "hotel-dental-kit-anchor-toothbrush-with-meswak-paste-1-1",
+      "sku": "HC-003",
+      "name": "Hotel Dental Kit – Anchor Toothbrush with Meswak Paste (1+1)",
+      "category": "guest-amenities",
+      "collection": "Basic Dry & Wet Amenities",
+      "pack": "Paste 8 gms",
+      "variants": [],
+      "description": "Hotel Dental Kit containing soft bristle toothbrush and dental paste in hygienic packaging for guest amenities.",
+      "images": [
+        "/catalog/p05-3.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 3,
+      "hsn": "96050000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "hotel-dental-kit-anchor-toothbrush-with-meswak-paste-1-2",
+      "sku": "HC-004",
+      "name": "Hotel Dental Kit – Anchor Toothbrush with Meswak Paste (1+2)",
+      "category": "guest-amenities",
+      "collection": "Basic Dry & Wet Amenities",
+      "pack": "Paste 8 gms",
+      "variants": [],
+      "description": "Hotel Dental Kit containing soft bristle toothbrush and dental paste in hygienic packaging for guest amenities.",
+      "images": [
+        "/catalog/p05-4.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 4,
+      "hsn": "96050000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "hotel-shaving-kit-dorco-razor-with-oxylife-shaving-gel-sachet",
+      "sku": "HC-005",
+      "name": "Hotel Shaving Kit – Dorco Razor with Oxylife Shaving Gel Sachet",
+      "category": "guest-amenities",
+      "collection": "Basic Dry & Wet Amenities",
+      "pack": "",
+      "variants": [],
+      "description": "Guest Shaving Kit featuring twin-blade razor and moisturizing shaving gel sachet.",
+      "images": [
+        "/catalog/p05-5.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 5,
+      "hsn": "96050000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "hotel-comb-with-handle-7",
+      "sku": "HC-006",
+      "name": "Hotel Comb with Handle 7\"",
+      "category": "guest-amenities",
+      "collection": "Basic Dry & Wet Amenities",
+      "pack": "7 inch",
+      "variants": [],
+      "description": "High quality hygienic hair comb individually packed for hotel guest rooms.",
+      "images": [
+        "/catalog/p05-6.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 6,
+      "hsn": "96151100",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "anchor-comfort-clean-toothbrush-with-poly-pack",
+      "sku": "HC-007",
+      "name": "Anchor Comfort Clean Toothbrush with Poly Pack",
+      "category": "guest-amenities",
+      "collection": "Basic Dry & Wet Amenities",
+      "pack": "",
+      "variants": [],
+      "description": "Hotel amenities toothbrush with ergonomic handle and soft bristles in sealed wrap.",
+      "images": [
+        "/catalog/p06-1.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 7,
+      "hsn": "96032100",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "anchor-paste-8-gms",
+      "sku": "HC-008",
+      "name": "Anchor Paste 8 gms",
+      "category": "guest-amenities",
+      "collection": "Basic Dry & Wet Amenities",
+      "pack": "8 gms",
+      "variants": [],
+      "description": "Branded dental cream in travel sachet/tube for hotel room service.",
+      "images": [
+        "/catalog/p06-2.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 8,
+      "hsn": "33061020",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "dabur-meswak-tooth-paste-8-gms",
+      "sku": "HC-009",
+      "name": "Dabur Meswak Tooth Paste 8 gms",
+      "category": "guest-amenities",
+      "collection": "Basic Dry & Wet Amenities",
+      "pack": "8 gms",
+      "variants": [],
+      "description": "Branded dental cream in travel sachet/tube for hotel room service.",
+      "images": [
+        "/catalog/p06-3.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 9,
+      "hsn": "33061020",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "polar-disposable-slipper-close-toe-white-divine-series",
+      "sku": "HC-010",
+      "name": "Polar Disposable Slipper Close Toe – White Divine Series",
+      "category": "guest-amenities",
+      "collection": "Basic Dry & Wet Amenities",
+      "pack": "",
+      "variants": [],
+      "description": "Breathable and non-slip.",
+      "images": [
+        "/catalog/p06-4.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 10,
+      "hsn": "64052000",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "instant-shoe-shiner-sponge-with-case",
+      "sku": "HC-011",
+      "name": "Instant Shoe Shiner Sponge with Case",
+      "category": "guest-amenities",
+      "collection": "Basic Dry & Wet Amenities",
+      "pack": "",
+      "variants": [],
+      "description": "Quick shine and leather care.",
+      "images": [
+        "/catalog/p06-5.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 11,
+      "hsn": "34051000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "natural-body-loofah-in-poly-pack",
+      "sku": "HC-012",
+      "name": "Natural Body Loofah in Poly Pack",
+      "category": "guest-amenities",
+      "collection": "Basic Dry & Wet Amenities",
+      "pack": "",
+      "variants": [],
+      "description": "Exfoliating bath loofah mesh sponge for rejuvenating shower experience.",
+      "images": [
+        "/catalog/p06-6.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 12,
+      "hsn": "39241090",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "hotel-laundry-bag",
+      "sku": "HC-013",
+      "name": "Hotel Laundry Bag",
+      "category": "guest-amenities",
+      "collection": "Basic Dry & Wet Amenities",
+      "pack": "",
+      "variants": [],
+      "description": "Available with and without branding.",
+      "images": [
+        "/catalog/p07-1.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 13,
+      "hsn": "6307",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "shower-cap-packed-in-butter-paper",
+      "sku": "HC-014",
+      "name": "Shower Cap Packed in Butter Paper",
+      "category": "guest-amenities",
+      "collection": "Basic Dry & Wet Amenities",
+      "pack": "",
+      "variants": [],
+      "description": "Elastic band waterproof disposable shower cap in protective packaging.",
+      "images": [
+        "/catalog/p07-2.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": true,
+      "order": 14,
+      "hsn": "39232100",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "hotel-travel-sewing-kit",
+      "sku": "HC-015",
+      "name": "Hotel / Travel Sewing Kit",
+      "category": "guest-amenities",
+      "collection": "Basic Dry & Wet Amenities",
+      "pack": "",
+      "variants": [],
+      "description": "Needles, threads, button and pin; 6-colour thread repair kit.",
+      "images": [
+        "/catalog/p07-3.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 15,
+      "hsn": "96050000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "hotel-vanity-kit-in-butter-paper",
+      "sku": "HC-016",
+      "name": "Hotel Vanity Kit in Butter Paper",
+      "category": "guest-amenities",
+      "collection": "Basic Dry & Wet Amenities",
+      "pack": "",
+      "variants": [],
+      "description": "Compact personal care vanity kit with cotton pads, cotton buds, and emery board.",
+      "images": [
+        "/catalog/p07-4.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 16,
+      "hsn": "96050000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "pvc-dnd-cards-please-clean-my-room-please-do-not-disturb",
+      "sku": "HC-017",
+      "name": "PVC DND Cards – Please Clean My Room / Please Do Not Disturb",
+      "category": "guest-amenities",
+      "collection": "Basic Dry & Wet Amenities",
+      "pack": "",
+      "variants": [],
+      "description": "Door hanger sign card (Please Do Not Disturb / Please Clean My Room).",
+      "images": [
+        "/catalog/p07-5.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 17,
+      "hsn": "48211020",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "aqua-shui-shampoo-shower-gel-moisturizer",
+      "sku": "HC-018",
+      "name": "Aqua Shui Shampoo / Shower Gel / Moisturizer",
+      "category": "guest-amenities",
+      "collection": "Basic Dry & Wet Amenities",
+      "pack": "20 ml",
+      "variants": [
+        "Shampoo",
+        "Shower Gel",
+        "Moisturizer"
+      ],
+      "description": "Nourishing hair cleanser shampoo with revitalizing natural extracts.",
+      "images": [
+        "/catalog/p07-6.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 18,
+      "hsn": "33073090",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "aloe-vera-soap",
+      "sku": "HC-019",
+      "name": "Aloe Vera Soap",
+      "category": "guest-amenities",
+      "collection": "Basic Dry & Wet Amenities",
+      "pack": "15 gms",
+      "variants": [],
+      "description": "Gentle cleansing toilet soap bar formulated with natural moisturizers for guest bathrooms.",
+      "images": [
+        "/catalog/p08-1.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 19,
+      "hsn": "34011190",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "aqua-shui-white-soap",
+      "sku": "HC-020",
+      "name": "Aqua Shui White Soap",
+      "category": "guest-amenities",
+      "collection": "Basic Dry & Wet Amenities",
+      "pack": "20 gms",
+      "variants": [],
+      "description": "Gentle cleansing toilet soap bar formulated with natural moisturizers for guest bathrooms.",
+      "images": [
+        "/catalog/p08-2.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 20,
+      "hsn": "34011190",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "aqua-shui-aloe-vera-soap",
+      "sku": "HC-021",
+      "name": "Aqua Shui Aloe Vera Soap",
+      "category": "guest-amenities",
+      "collection": "Basic Dry & Wet Amenities",
+      "pack": "20 gms",
+      "variants": [],
+      "description": "Gentle cleansing toilet soap bar formulated with natural moisturizers for guest bathrooms.",
+      "images": [
+        "/catalog/p08-3.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 21,
+      "hsn": "34011190",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "bamboo-toothbrush",
+      "sku": "HC-022",
+      "name": "Bamboo Toothbrush",
+      "category": "eco-friendly",
+      "collection": "Bamboo",
+      "pack": "",
+      "variants": [],
+      "description": "Hotel amenities toothbrush with ergonomic handle and soft bristles in sealed wrap.",
+      "images": [
+        "/catalog/p08-4.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 22,
+      "hsn": "96032100",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "bamboo-comb",
+      "sku": "HC-023",
+      "name": "Bamboo Comb",
+      "category": "eco-friendly",
+      "collection": "Bamboo",
+      "pack": "",
+      "variants": [],
+      "description": "High quality hygienic hair comb individually packed for hotel guest rooms.",
+      "images": [
+        "/catalog/p08-5.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 23,
+      "hsn": "96151900",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "bamboo-shaving-razor",
+      "sku": "HC-024",
+      "name": "Bamboo Shaving Razor",
+      "category": "eco-friendly",
+      "collection": "Bamboo",
+      "pack": "",
+      "variants": [],
+      "description": "Twin blade disposable safety razor for guest bathroom amenity.",
+      "images": [
+        "/catalog/p08-6.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 24,
+      "hsn": "82121010",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "wheat-straw-bio-toothbrush",
+      "sku": "HC-025",
+      "name": "Wheat Straw BIO Toothbrush",
+      "category": "eco-friendly",
+      "collection": "Wheat Straw",
+      "pack": "",
+      "variants": [],
+      "description": "Hotel amenities toothbrush with ergonomic handle and soft bristles in sealed wrap.",
+      "images": [
+        "/catalog/p09-2.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 25,
+      "hsn": "96032100",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "wheat-straw-bio-comb",
+      "sku": "HC-026",
+      "name": "Wheat Straw BIO Comb",
+      "category": "eco-friendly",
+      "collection": "Wheat Straw",
+      "pack": "",
+      "variants": [],
+      "description": "High quality hygienic hair comb individually packed for hotel guest rooms.",
+      "images": [
+        "/catalog/p09-1.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 26,
+      "hsn": "96151100",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "wheat-straw-bio-shaving-razor",
+      "sku": "HC-027",
+      "name": "Wheat Straw BIO Shaving Razor",
+      "category": "eco-friendly",
+      "collection": "Wheat Straw",
+      "pack": "",
+      "variants": [],
+      "description": "Twin blade disposable safety razor for guest bathroom amenity.",
+      "images": [
+        "/catalog/p09-3.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 27,
+      "hsn": "82121010",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "bio-dental-kit",
+      "sku": "HC-028",
+      "name": "BIO Dental Kit",
+      "category": "biotique-dry-amenities",
+      "collection": "Packed in butter paper",
+      "pack": "1000 per pack",
+      "variants": [],
+      "description": "1 toothpaste 10 g and 1 toothbrush, packed in butter paper.",
+      "images": [
+        "/catalog/p11-1.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 28,
+      "hsn": "96050000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "bio-dental-kit-double-brush",
+      "sku": "HC-029",
+      "name": "BIO Dental Kit – Double Brush",
+      "category": "biotique-dry-amenities",
+      "collection": "Packed in butter paper",
+      "pack": "500 per pack",
+      "variants": [],
+      "description": "1 toothpaste 10 g and 2 toothbrushes, packed in butter paper.",
+      "images": [
+        "/catalog/p11-2.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 29,
+      "hsn": "96050000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "bio-shaving-kit-premium",
+      "sku": "HC-030",
+      "name": "BIO Shaving Kit – Premium",
+      "category": "biotique-dry-amenities",
+      "collection": "Packed in butter paper",
+      "pack": "2000 per pack",
+      "variants": [],
+      "description": "1 shaving gel 4 g and 1 razor, packed in butter paper.",
+      "images": [
+        "/catalog/p11-3.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 30,
+      "hsn": "96050000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "bio-shaving-kit-premium-style-2",
+      "sku": "HC-031",
+      "name": "BIO Shaving Kit – Premium (Style 2)",
+      "category": "biotique-dry-amenities",
+      "collection": "Packed in butter paper",
+      "pack": "2000 per pack",
+      "variants": [],
+      "description": "1 shaving gel 4 g and 1 razor, packed in butter paper.",
+      "images": [
+        "/catalog/p11-4.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 31,
+      "hsn": "96050000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "bio-comb-kit-plastic-comb-premium",
+      "sku": "HC-032",
+      "name": "BIO Comb Kit – Plastic Comb Premium",
+      "category": "biotique-dry-amenities",
+      "collection": "Packed in butter paper",
+      "pack": "500 per pack",
+      "variants": [],
+      "description": "Packed in butter paper.",
+      "images": [
+        "/catalog/p11-5.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 32,
+      "hsn": "33049910",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "bio-shaving-kit-generic-wooden-razor",
+      "sku": "HC-033",
+      "name": "BIO Shaving Kit – Generic (Wooden Razor)",
+      "category": "biotique-dry-amenities",
+      "collection": "Packed in butter paper",
+      "pack": "2000 per pack",
+      "variants": [],
+      "description": "Shaving gel 4 g and 1 wooden razor, packed in butter paper.",
+      "images": [
+        "/catalog/p11-6.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 33,
+      "hsn": "96050000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "bio-comb-kit-wooden-comb-generic",
+      "sku": "HC-034",
+      "name": "BIO Comb Kit – Wooden Comb (Generic)",
+      "category": "biotique-dry-amenities",
+      "collection": "Packed in butter paper",
+      "pack": "2000 per pack",
+      "variants": [],
+      "description": "1 wooden comb.",
+      "images": [
+        "/catalog/p12-1.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 34,
+      "hsn": "33049910",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "bio-slipper",
+      "sku": "HC-035",
+      "name": "BIO Slipper",
+      "category": "biotique-dry-amenities",
+      "collection": "Packed in butter paper",
+      "pack": "2000 per pack",
+      "variants": [],
+      "description": "Packed in butter paper.",
+      "images": [
+        "/catalog/p12-2.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 35,
+      "hsn": "64052000",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "bio-loofah",
+      "sku": "HC-036",
+      "name": "BIO Loofah",
+      "category": "biotique-dry-amenities",
+      "collection": "Packed in butter paper",
+      "pack": "2000 per pack",
+      "variants": [],
+      "description": "Packed in butter paper.",
+      "images": [
+        "/catalog/p12-3.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 36,
+      "hsn": "39241090",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "bio-shower-cap",
+      "sku": "HC-037",
+      "name": "BIO Shower Cap",
+      "category": "biotique-dry-amenities",
+      "collection": "Packed in butter paper",
+      "pack": "",
+      "variants": [],
+      "description": "Packed in butter paper.",
+      "images": [
+        "/catalog/p12-4.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 37,
+      "hsn": "39232100",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "bio-vanity-kit",
+      "sku": "HC-038",
+      "name": "BIO Vanity Kit",
+      "category": "biotique-dry-amenities",
+      "collection": "Packed in butter paper",
+      "pack": "",
+      "variants": [],
+      "description": "2 ear buds and 2 makeup remover pads, packed in butter paper.",
+      "images": [
+        "/catalog/p12-5.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 38,
+      "hsn": "96050000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "bio-sewing-kit",
+      "sku": "HC-039",
+      "name": "BIO Sewing Kit",
+      "category": "biotique-dry-amenities",
+      "collection": "Packed in butter paper",
+      "pack": "",
+      "variants": [],
+      "description": "2 buttons, 4 threads in 4 colours, 1 needle, 1 hook and 1 safety pin, packed in butter paper.",
+      "images": [
+        "/catalog/p12-6.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 39,
+      "hsn": "96050000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "bio-shoe-shiner",
+      "sku": "HC-040",
+      "name": "BIO Shoe Shiner",
+      "category": "biotique-dry-amenities",
+      "collection": "Packed in butter paper",
+      "pack": "",
+      "variants": [],
+      "description": "Packed in butter paper.",
+      "images": [
+        "/catalog/p13-2.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 40,
+      "hsn": "34051000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "bio-sanitary-bag",
+      "sku": "HC-041",
+      "name": "BIO Sanitary Bag",
+      "category": "biotique-dry-amenities",
+      "collection": "Packed in butter paper",
+      "pack": "",
+      "variants": [],
+      "description": "Sanitary poly bag, packed in butter paper.",
+      "images": [
+        "/catalog/p13-3.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": true,
+      "order": 41,
+      "hsn": "96050000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "bio-medical-kit",
+      "sku": "HC-042",
+      "name": "BIO Medical Kit",
+      "category": "biotique-dry-amenities",
+      "collection": "Packed in butter paper",
+      "pack": "",
+      "variants": [],
+      "description": "2 ear buds, 2 handy plasters and a nail filer, packed in butter paper.",
+      "images": [
+        "/catalog/p13-4.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 42,
+      "hsn": "96050000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "bio-palmyra-expert-shave-gel",
+      "sku": "HC-043",
+      "name": "Bio Palmyra Expert Shave Gel",
+      "category": "biotique-dry-amenities",
+      "collection": "Shave & Care",
+      "pack": "4 g sachet",
+      "variants": [],
+      "description": "Hotel guest room amenity supply.",
+      "images": [
+        "/catalog/p13-5.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 43,
+      "hsn": "96050000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "bio-clove-tulsi-complete-care-toothpaste",
+      "sku": "HC-044",
+      "name": "BIO Clove & Tulsi Complete Care Toothpaste",
+      "category": "biotique-dry-amenities",
+      "collection": "Shave & Care",
+      "pack": "10 g",
+      "variants": [],
+      "description": "Branded dental cream in travel sachet/tube for hotel room service.",
+      "images": [
+        "/catalog/p13-6.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 44,
+      "hsn": "33061020",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "bio-palmyra-expert-shave-gel-2",
+      "sku": "HC-045",
+      "name": "Bio Palmyra Expert Shave Gel",
+      "category": "biotique-dry-amenities",
+      "collection": "Shave & Care",
+      "pack": "6 g tube",
+      "variants": [],
+      "description": "Hotel guest room amenity supply.",
+      "images": [
+        "/catalog/p13-7.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 45,
+      "hsn": "96050000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "bio-grass-after-shave-gel",
+      "sku": "HC-046",
+      "name": "Bio Grass After Shave Gel",
+      "category": "biotique-dry-amenities",
+      "collection": "Shave & Care",
+      "pack": "35 ml",
+      "variants": [],
+      "description": "Hotel guest room amenity supply.",
+      "images": [
+        "/catalog/p14-1.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 46,
+      "hsn": "96050000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "bio-shoe-shiner-disposable-slippers",
+      "sku": "HC-047",
+      "name": "BIO Shoe Shiner & Disposable Slippers",
+      "category": "biotique-dry-amenities",
+      "collection": "Packed in butter paper",
+      "pack": "",
+      "variants": [],
+      "description": "Comfortable disposable indoor guest slippers with non-slip sole.",
+      "images": [
+        "/catalog/p14-2.jpg",
+        "/catalog/p14-3.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 47,
+      "hsn": "64052000",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "farm-fresh-20-ml-hdpe-bottle-white-with-black-cap",
+      "sku": "HC-048",
+      "name": "Farm Fresh 20 ml HDPE Bottle – White with Black Cap",
+      "category": "bath-body",
+      "collection": "Farm Fresh",
+      "pack": "20 ml",
+      "variants": [
+        "Shampoo",
+        "Conditioner",
+        "Shower Gel",
+        "Body Lotion"
+      ],
+      "description": "Personal care guest amenity.",
+      "images": [
+        "/catalog/p16-1.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 48,
+      "hsn": "34011190",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "farm-fresh-20-ml-hdpe-bottle-yellow-with-black-cap",
+      "sku": "HC-049",
+      "name": "Farm Fresh 20 ml HDPE Bottle – Yellow with Black Cap",
+      "category": "bath-body",
+      "collection": "Farm Fresh",
+      "pack": "20 ml",
+      "variants": [
+        "Shampoo",
+        "Conditioner",
+        "Shower Gel",
+        "Body Lotion"
+      ],
+      "description": "Personal care guest amenity.",
+      "images": [
+        "/catalog/p16-2.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 49,
+      "hsn": "34011190",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "farm-fresh-20-ml-hdpe-bottle-white-with-black-cap-design-2",
+      "sku": "HC-050",
+      "name": "Farm Fresh 20 ml HDPE Bottle – White with Black Cap (Design 2)",
+      "category": "bath-body",
+      "collection": "Farm Fresh",
+      "pack": "20 ml",
+      "variants": [
+        "Shampoo",
+        "Conditioner",
+        "Shower Gel",
+        "Body Lotion"
+      ],
+      "description": "Personal care guest amenity.",
+      "images": [
+        "/catalog/p16-3.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 50,
+      "hsn": "34011190",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "farm-fresh-300-ml-hdpe-bottle-with-black-pump",
+      "sku": "HC-051",
+      "name": "Farm Fresh 300 ml HDPE Bottle with Black Pump",
+      "category": "bath-body",
+      "collection": "Farm Fresh",
+      "pack": "300 ml",
+      "variants": [
+        "Shampoo",
+        "Conditioner",
+        "Shower Gel",
+        "Body Lotion"
+      ],
+      "description": "Bracket option available.",
+      "images": [
+        "/catalog/p16-4.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 51,
+      "hsn": "34011190",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "farm-fresh-soap-wrap-yellow",
+      "sku": "HC-052",
+      "name": "Farm Fresh Soap Wrap – Yellow",
+      "category": "bath-body",
+      "collection": "Farm Fresh",
+      "pack": "15 gms",
+      "variants": [],
+      "description": "Gentle cleansing toilet soap bar formulated with natural moisturizers for guest bathrooms.",
+      "images": [
+        "/catalog/p16-5.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 52,
+      "hsn": "3401",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "farm-fresh-soap-wrap-black",
+      "sku": "HC-053",
+      "name": "Farm Fresh Soap Wrap – Black",
+      "category": "bath-body",
+      "collection": "Farm Fresh",
+      "pack": "15 gms",
+      "variants": [],
+      "description": "Gentle cleansing toilet soap bar formulated with natural moisturizers for guest bathrooms.",
+      "images": [
+        "/catalog/p16-6.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": true,
+      "order": 53,
+      "hsn": "3401",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "boutique-green-apple-miniatures",
+      "sku": "HC-054",
+      "name": "Boutique Green Apple Miniatures",
+      "category": "bath-body",
+      "collection": "Miniatures",
+      "pack": "25 ml",
+      "variants": [
+        "Shampoo",
+        "Conditioner",
+        "Shower Gel",
+        "Body Lotion"
+      ],
+      "description": "Personal care guest amenity.",
+      "images": [
+        "/catalog/p18-1.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 54,
+      "hsn": "30039011",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "boutique-green-apple-miniatures-hdpe-tall-bottle",
+      "sku": "HC-055",
+      "name": "Boutique Green Apple Miniatures – HDPE Tall Bottle",
+      "category": "bath-body",
+      "collection": "Miniatures",
+      "pack": "35 ml",
+      "variants": [
+        "Shampoo",
+        "Conditioner",
+        "Shower Gel",
+        "Body Lotion"
+      ],
+      "description": "Personal care guest amenity.",
+      "images": [
+        "/catalog/p18-2.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 55,
+      "hsn": "34011190",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "boutique-botanical-sketch-series-orange-blossom",
+      "sku": "HC-056",
+      "name": "Boutique Botanical Sketch Series – Orange Blossom",
+      "category": "bath-body",
+      "collection": "Miniatures",
+      "pack": "35 ml",
+      "variants": [
+        "Shampoo",
+        "Conditioner",
+        "Shower Gel",
+        "Body Lotion"
+      ],
+      "description": "Personal care guest amenity.",
+      "images": [
+        "/catalog/p18-3.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 56,
+      "hsn": "34011190",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "bio-mandarin-basil",
+      "sku": "HC-057",
+      "name": "Bio Mandarin & Basil",
+      "category": "bath-body",
+      "collection": "Miniatures",
+      "pack": "35 ml",
+      "variants": [
+        "Shampoo",
+        "Conditioner",
+        "Shower Gel",
+        "Body Lotion"
+      ],
+      "description": "Personal care guest amenity.",
+      "images": [
+        "/catalog/p18-4.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 57,
+      "hsn": "34011190",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "boutique-sandalwood-marigold-terra-verde-generic",
+      "sku": "HC-058",
+      "name": "Boutique Sandalwood & Marigold (Terra Verde Generic)",
+      "category": "bath-body",
+      "collection": "Miniatures",
+      "pack": "15–18 ml",
+      "variants": [
+        "Shampoo",
+        "Shower Gel",
+        "Body Lotion",
+        "Conditioner"
+      ],
+      "description": "Personal care guest amenity.",
+      "images": [
+        "/catalog/p18-5.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 58,
+      "hsn": "34011190",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "boutique-bath-body-travel-kit",
+      "sku": "HC-059",
+      "name": "Boutique Bath & Body Travel Kit",
+      "category": "bath-body",
+      "collection": "Miniatures",
+      "pack": "4 pieces, 25 ml tubes",
+      "variants": [
+        "Shampoo",
+        "Shower Gel",
+        "Body Lotion",
+        "Conditioner"
+      ],
+      "description": "Personal care guest amenity.",
+      "images": [
+        "/catalog/p18-6.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 59,
+      "hsn": "34011190",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "boutique-red-grape-fruit-kopou-phul-white-bottle-with-pump",
+      "sku": "HC-060",
+      "name": "Boutique Red Grape Fruit Kopou Phul – White Bottle with Pump",
+      "category": "bath-body",
+      "collection": "Dispensers",
+      "pack": "380 ml",
+      "variants": [
+        "Shampoo",
+        "Conditioner",
+        "Body Wash",
+        "Body Lotion",
+        "Hand Wash"
+      ],
+      "description": "Bracket options available.",
+      "images": [
+        "/catalog/p20-1.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": true,
+      "order": 60,
+      "hsn": "34011190",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "boutique-royal-bergamot-patchouli-black-bottle-with-pump",
+      "sku": "HC-061",
+      "name": "Boutique Royal Bergamot & Patchouli – Black Bottle with Pump",
+      "category": "bath-body",
+      "collection": "Dispensers",
+      "pack": "380 ml",
+      "variants": [
+        "Shampoo",
+        "Conditioner",
+        "Body Wash",
+        "Body Lotion",
+        "Hand Wash"
+      ],
+      "description": "Bracket options available.",
+      "images": [
+        "/catalog/p20-2.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 61,
+      "hsn": "34013000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "sandalwood-marigold-bottle-with-pump",
+      "sku": "HC-062",
+      "name": "Sandalwood & Marigold – Bottle with Pump",
+      "category": "bath-body",
+      "collection": "Dispensers",
+      "pack": "380 ml",
+      "variants": [
+        "Shampoo",
+        "Conditioner",
+        "Shower Gel",
+        "Body Lotion",
+        "Hand Wash"
+      ],
+      "description": "Bracket options available.",
+      "images": [
+        "/catalog/p20-3.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 62,
+      "hsn": "34011190",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "green-apple-fresh-daily-purifying-bottle-with-pump",
+      "sku": "HC-063",
+      "name": "Green Apple Fresh Daily Purifying – Bottle with Pump",
+      "category": "bath-body",
+      "collection": "Dispensers",
+      "pack": "380 ml",
+      "variants": [
+        "Shampoo",
+        "Conditioner",
+        "Body Wash",
+        "Morning Nectar Body Lotion",
+        "Neem Hand Wash"
+      ],
+      "description": "Bracket options available.",
+      "images": [
+        "/catalog/p20-4.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 63,
+      "hsn": "34011190",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "bio-cypress-citrus-neroli-bottle-with-pump",
+      "sku": "HC-064",
+      "name": "BIO Cypress Citrus & Neroli – Bottle with Pump",
+      "category": "bath-body",
+      "collection": "Dispensers",
+      "pack": "300 ml",
+      "variants": [
+        "Shampoo",
+        "Conditioner",
+        "Body Wash",
+        "Morning Nectar Body Lotion",
+        "Neem Hand Wash"
+      ],
+      "description": "Bracket options available.",
+      "images": [
+        "/catalog/p20-5.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 64,
+      "hsn": "33051090",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "boutique-almond-oil-nourishing-soap",
+      "sku": "HC-065",
+      "name": "Boutique Almond Oil Nourishing Soap",
+      "category": "bath-body",
+      "collection": "Soaps",
+      "pack": "15 gms",
+      "variants": [],
+      "description": "Gentle cleansing toilet soap bar formulated with natural moisturizers for guest bathrooms.",
+      "images": [
+        "/catalog/p21-1.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 65,
+      "hsn": "30039011",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "boutique-almond-oil-nourishing-soap-2",
+      "sku": "HC-066",
+      "name": "Boutique Almond Oil Nourishing Soap",
+      "category": "bath-body",
+      "collection": "Soaps",
+      "pack": "25 gms",
+      "variants": [],
+      "description": "Gentle cleansing toilet soap bar formulated with natural moisturizers for guest bathrooms.",
+      "images": [
+        "/catalog/p21-2.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 66,
+      "hsn": "30039011",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "boutique-almond-oil-nourishing-soap-2-2",
+      "sku": "HC-067",
+      "name": "Boutique Almond Oil Nourishing Soap",
+      "category": "bath-body",
+      "collection": "Soaps",
+      "pack": "30 gms",
+      "variants": [],
+      "description": "Gentle cleansing toilet soap bar formulated with natural moisturizers for guest bathrooms.",
+      "images": [
+        "/catalog/p21-3.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 67,
+      "hsn": "30039011",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "boutique-red-grape-fruit-kopou-phul-5-ltr",
+      "sku": "HC-068",
+      "name": "Boutique Red Grape Fruit Kopou Phul – 5 Ltr",
+      "category": "bath-body",
+      "collection": "Bulk – 5 Ltr",
+      "pack": "5 Ltr",
+      "variants": [
+        "Shampoo",
+        "Conditioner",
+        "Body Wash",
+        "Body Lotion",
+        "Hand Wash"
+      ],
+      "description": "Personal care guest amenity.",
+      "images": [
+        "/catalog/p23-1.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 68,
+      "hsn": "34011190",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "boutique-royal-bergamot-patchouli-5-ltr",
+      "sku": "HC-069",
+      "name": "Boutique Royal Bergamot & Patchouli – 5 Ltr",
+      "category": "bath-body",
+      "collection": "Bulk – 5 Ltr",
+      "pack": "5 Ltr",
+      "variants": [
+        "Shampoo",
+        "Conditioner",
+        "Body Wash",
+        "Body Lotion",
+        "Hand Wash"
+      ],
+      "description": "Personal care guest amenity.",
+      "images": [
+        "/catalog/p23-2.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 69,
+      "hsn": "34013000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "sandalwood-marigold-5-ltr",
+      "sku": "HC-070",
+      "name": "Sandalwood & Marigold – 5 Ltr",
+      "category": "bath-body",
+      "collection": "Bulk – 5 Ltr",
+      "pack": "5 Ltr",
+      "variants": [
+        "Shampoo",
+        "Conditioner",
+        "Shower Gel",
+        "Body Lotion",
+        "Hand Wash"
+      ],
+      "description": "Personal care guest amenity.",
+      "images": [
+        "/catalog/p23-3.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 70,
+      "hsn": "34011190",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "green-apple-fresh-daily-purifying-5-ltr",
+      "sku": "HC-071",
+      "name": "Green Apple Fresh Daily Purifying – 5 Ltr",
+      "category": "bath-body",
+      "collection": "Bulk – 5 Ltr",
+      "pack": "5 Ltr",
+      "variants": [
+        "Shampoo",
+        "Conditioner",
+        "Body Wash",
+        "Morning Nectar Body Lotion",
+        "Neem Hand Wash"
+      ],
+      "description": "Personal care guest amenity.",
+      "images": [
+        "/catalog/p23-4.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 71,
+      "hsn": "34011110",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "green-apple-morning-nectar-5-ltr",
+      "sku": "HC-072",
+      "name": "Green Apple Morning Nectar – 5 Ltr",
+      "category": "bath-body",
+      "collection": "Bulk – 5 Ltr",
+      "pack": "5 Ltr",
+      "variants": [
+        "Shampoo",
+        "Conditioner",
+        "Body Wash",
+        "Morning Nectar Body Lotion",
+        "Neem Hand Wash"
+      ],
+      "description": "Personal care guest amenity.",
+      "images": [
+        "/catalog/p23-5.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 72,
+      "hsn": "34011110",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "bio-cypress-citrus-neroli-5-ltr",
+      "sku": "HC-073",
+      "name": "BIO Cypress Citrus & Neroli – 5 Ltr",
+      "category": "bath-body",
+      "collection": "Bulk – 5 Ltr",
+      "pack": "5 Ltr",
+      "variants": [
+        "Shampoo",
+        "Conditioner",
+        "Body Wash",
+        "Morning Nectar Body Lotion",
+        "Neem Hand Wash"
+      ],
+      "description": "Personal care guest amenity.",
+      "images": [
+        "/catalog/p23-6.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 73,
+      "hsn": "33051090",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "boutique-botanical-sketch-series-orange-blossom-5-ltr",
+      "sku": "HC-074",
+      "name": "Boutique Botanical Sketch Series – Orange Blossom – 5 Ltr",
+      "category": "bath-body",
+      "collection": "Bulk – 5 Ltr",
+      "pack": "5 Ltr",
+      "variants": [
+        "Shampoo",
+        "Conditioner",
+        "Shower Gel",
+        "Body Lotion"
+      ],
+      "description": "Personal care guest amenity.",
+      "images": [
+        "/catalog/p23-7.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 74,
+      "hsn": "33051090",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "farm-fresh-5-ltr",
+      "sku": "HC-075",
+      "name": "Farm Fresh – 5 Ltr",
+      "category": "bath-body",
+      "collection": "Bulk – 5 Ltr",
+      "pack": "5 Ltr",
+      "variants": [
+        "Shampoo",
+        "Conditioner",
+        "Shower Gel",
+        "Body Lotion"
+      ],
+      "description": "Personal care guest amenity.",
+      "images": [
+        "/catalog/p23-8.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 75,
+      "hsn": "3401",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "aqua-shui-shampoo-5-ltr-can",
+      "sku": "HC-076",
+      "name": "Aqua Shui Shampoo – 5 Ltr Can",
+      "category": "bath-body",
+      "collection": "Bulk – 5 Ltr",
+      "pack": "5 Ltr",
+      "variants": [],
+      "description": "Nourishing hair cleanser shampoo with revitalizing natural extracts.",
+      "images": [
+        "/catalog/p24-1.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 76,
+      "hsn": "33051090",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "aqua-shui-shower-gel-5-ltr-can",
+      "sku": "HC-077",
+      "name": "Aqua Shui Shower Gel – 5 Ltr Can",
+      "category": "bath-body",
+      "collection": "Bulk – 5 Ltr",
+      "pack": "5 Ltr",
+      "variants": [],
+      "description": "Refreshing and invigorating shower gel and bath wash for hospitality suites.",
+      "images": [
+        "/catalog/p24-2.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 77,
+      "hsn": "33073090",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "aqua-shui-body-lotion-5-ltr-can",
+      "sku": "HC-078",
+      "name": "Aqua Shui Body Lotion – 5 Ltr Can",
+      "category": "bath-body",
+      "collection": "Bulk – 5 Ltr",
+      "pack": "5 Ltr",
+      "variants": [],
+      "description": "Hydrating body lotion with essential moisturizers for skin protection.",
+      "images": [
+        "/catalog/p24-3.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 78,
+      "hsn": "33059090",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "fem-safe-hand-wash-blossom-pink-5-ltr",
+      "sku": "HC-079",
+      "name": "Fem Safe Hand Wash – Blossom (Pink) – 5 Ltr",
+      "category": "bath-body",
+      "collection": "Bulk – 5 Ltr",
+      "pack": "5 Ltr",
+      "variants": [],
+      "description": "Anti-bacterial liquid hand cleanser for commercial and guest washrooms.",
+      "images": [
+        "/catalog/p24-4.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 79,
+      "hsn": "33051090",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "everyday-dairy-creamer",
+      "sku": "HC-080",
+      "name": "Everyday Dairy Creamer",
+      "category": "tray-amenities",
+      "collection": "Tea, Coffee & Creamer",
+      "pack": "150 sachets per pkt",
+      "variants": [],
+      "description": "Hydrating body lotion with essential moisturizers for skin protection.",
+      "images": [
+        "/catalog/p26-1.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 80,
+      "hsn": "33049190",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "nescafe-classic-instant-coffee-sachet",
+      "sku": "HC-081",
+      "name": "Nescafe Classic Instant Coffee Sachet",
+      "category": "tray-amenities",
+      "collection": "Tea, Coffee & Creamer",
+      "pack": "",
+      "variants": [],
+      "description": "Instant coffee sachet portion for hospitality welcome tray.",
+      "images": [
+        "/catalog/p26-2.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 81,
+      "hsn": "21011120",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "tata-tetley-original-tea-bags-assam-tea",
+      "sku": "HC-082",
+      "name": "Tata Tetley Original Tea Bags – Assam Tea",
+      "category": "tray-amenities",
+      "collection": "Tea, Coffee & Creamer",
+      "pack": "100 tea bags",
+      "variants": [],
+      "description": "Individually envelope-wrapped premium tea bags for in-room beverage tray.",
+      "images": [
+        "/catalog/p26-3.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 82,
+      "hsn": "09024040",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "equal-classic-zero-calorie-sweetener",
+      "sku": "HC-083",
+      "name": "Equal Classic Zero Calorie Sweetener",
+      "category": "tray-amenities",
+      "collection": "Sweeteners",
+      "pack": "Sugar free, calorie control",
+      "variants": [],
+      "description": "Hotel guest room amenity supply.",
+      "images": [
+        "/catalog/p26-4.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": true,
+      "order": 83,
+      "hsn": "96050000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "ccd-coffee-day-roasted-fresh-coffee-beans",
+      "sku": "HC-084",
+      "name": "CCD Coffee Day Roasted Fresh Coffee Beans",
+      "category": "tray-amenities",
+      "collection": "Tea, Coffee & Creamer",
+      "pack": "1.08 kg bag",
+      "variants": [],
+      "description": "Instant coffee sachet portion for hospitality welcome tray.",
+      "images": [
+        "/catalog/p26-5.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 84,
+      "hsn": "090121",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "tetley-english-breakfast-dip-tea",
+      "sku": "HC-085",
+      "name": "Tetley English Breakfast Dip Tea",
+      "category": "tray-amenities",
+      "collection": "Tea, Coffee & Creamer",
+      "pack": "50 bags",
+      "variants": [],
+      "description": "Individually envelope-wrapped premium tea bags for in-room beverage tray.",
+      "images": [
+        "/catalog/p26-6.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 85,
+      "hsn": "0902",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "coffee-day-roosh-green-tea",
+      "sku": "HC-086",
+      "name": "Coffee Day Roosh Green Tea",
+      "category": "tray-amenities",
+      "collection": "Tea, Coffee & Creamer",
+      "pack": "",
+      "variants": [],
+      "description": "Instant coffee sachet portion for hospitality welcome tray.",
+      "images": [
+        "/catalog/p26-7.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 86,
+      "hsn": "09024040",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "roosh-dip-tea-ginger",
+      "sku": "HC-087",
+      "name": "Roosh Dip Tea – Ginger",
+      "category": "tray-amenities",
+      "collection": "Tea, Coffee & Creamer",
+      "pack": "",
+      "variants": [],
+      "description": "Hotel guest room amenity supply.",
+      "images": [
+        "/catalog/p26-8.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 87,
+      "hsn": "0902",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "tata-tetley-normal-original-tea",
+      "sku": "HC-088",
+      "name": "Tata Tetley Normal Original Tea",
+      "category": "tray-amenities",
+      "collection": "Tea, Coffee & Creamer",
+      "pack": "100 tea bags",
+      "variants": [],
+      "description": "Individually envelope-wrapped premium tea bags for in-room beverage tray.",
+      "images": [
+        "/catalog/p26-9.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 88,
+      "hsn": "90172090",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "virgo-white-sugar-sachet",
+      "sku": "HC-089",
+      "name": "Virgo White Sugar Sachet",
+      "category": "tray-amenities",
+      "collection": "Sugar & Condiment Sachets",
+      "pack": "5 gms x 1000 nos.",
+      "variants": [],
+      "description": "Portion controlled hygienic sugar sachet for hot beverages.",
+      "images": [
+        "/catalog/p27-1.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 89,
+      "hsn": "17019100",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "coffee-day-sugar-sachets",
+      "sku": "HC-090",
+      "name": "Coffee Day Sugar Sachets",
+      "category": "tray-amenities",
+      "collection": "Sugar & Condiment Sachets",
+      "pack": "5 gms x 200 sachets",
+      "variants": [],
+      "description": "Instant coffee sachet portion for hospitality welcome tray.",
+      "images": [
+        "/catalog/p27-2.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 90,
+      "hsn": "3304",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "virgo-brown-sugar-sachet",
+      "sku": "HC-091",
+      "name": "Virgo Brown Sugar Sachet",
+      "category": "tray-amenities",
+      "collection": "Sugar & Condiment Sachets",
+      "pack": "5 gms x 200 nos.",
+      "variants": [],
+      "description": "Portion controlled hygienic sugar sachet for hot beverages.",
+      "images": [
+        "/catalog/p27-3.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 91,
+      "hsn": "17019100",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "virgo-black-pepper-sachet",
+      "sku": "HC-092",
+      "name": "Virgo Black Pepper Sachet",
+      "category": "tray-amenities",
+      "collection": "Sugar & Condiment Sachets",
+      "pack": "0.25 gms x 1000 nos.",
+      "variants": [],
+      "description": "Hotel guest room amenity supply.",
+      "images": [
+        "/catalog/p27-4.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 92,
+      "hsn": "96050000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "virgo-oregano-seasoning-sachet",
+      "sku": "HC-093",
+      "name": "Virgo Oregano Seasoning Sachet",
+      "category": "tray-amenities",
+      "collection": "Sugar & Condiment Sachets",
+      "pack": "0.8 gms x 400 nos.",
+      "variants": [],
+      "description": "Hotel guest room amenity supply.",
+      "images": [
+        "/catalog/p27-5.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 93,
+      "hsn": "96050000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "virgo-chilli-flakes",
+      "sku": "HC-094",
+      "name": "Virgo Chilli Flakes",
+      "category": "tray-amenities",
+      "collection": "Sugar & Condiment Sachets",
+      "pack": "0.8 gms x 400 nos.",
+      "variants": [],
+      "description": "Hotel guest room amenity supply.",
+      "images": [
+        "/catalog/p27-6.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 94,
+      "hsn": "96050000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "del-monte-tomato-ketchup-sachets",
+      "sku": "HC-095",
+      "name": "Del Monte Tomato Ketchup Sachets",
+      "category": "tray-amenities",
+      "collection": "Sugar & Condiment Sachets",
+      "pack": "0.8 gms x 100 nos.",
+      "variants": [],
+      "description": "Hotel guest room amenity supply.",
+      "images": [
+        "/catalog/p27-7.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 95,
+      "hsn": "2103",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "caf-coffee-day-sugar-sachets",
+      "sku": "HC-096",
+      "name": "Café Coffee Day Sugar Sachets",
+      "category": "tray-amenities",
+      "collection": "Sugar & Condiment Sachets",
+      "pack": "0.5 gms x 200 nos.",
+      "variants": [],
+      "description": "Instant coffee sachet portion for hospitality welcome tray.",
+      "images": [
+        "/catalog/p27-8.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 96,
+      "hsn": "3304",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "tata-coffee-grand-sachets",
+      "sku": "HC-097",
+      "name": "Tata Coffee Grand Sachets",
+      "category": "tray-amenities",
+      "collection": "Tea, Coffee & Creamer",
+      "pack": "0.2 gms x 200 nos.",
+      "variants": [],
+      "description": "Instant coffee sachet portion for hospitality welcome tray.",
+      "images": [
+        "/catalog/p27-9.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 97,
+      "hsn": "3304",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "delicasia-sr-s-mixed-fruit-jam-sachets",
+      "sku": "HC-098",
+      "name": "Delicasia Sr's Mixed Fruit Jam Sachets",
+      "category": "tray-amenities",
+      "collection": "Jam, Honey & Butter",
+      "pack": "15 gms x 48 pkt",
+      "variants": [],
+      "description": "Hotel guest room amenity supply.",
+      "images": [
+        "/catalog/p28-3.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 98,
+      "hsn": "96050000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "delicasia-sr-s-honey-sachets",
+      "sku": "HC-099",
+      "name": "Delicasia Sr's Honey Sachets",
+      "category": "tray-amenities",
+      "collection": "Jam, Honey & Butter",
+      "pack": "15 gms x 500 pcs",
+      "variants": [],
+      "description": "Hotel guest room amenity supply.",
+      "images": [
+        "/catalog/p28-1.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": true,
+      "order": 99,
+      "hsn": "0902",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "amul-butter-sachets",
+      "sku": "HC-100",
+      "name": "Amul Butter Sachets",
+      "category": "tray-amenities",
+      "collection": "Jam, Honey & Butter",
+      "pack": "10 gms",
+      "variants": [],
+      "description": "Hotel guest room amenity supply.",
+      "images": [
+        "/catalog/p28-2.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 100,
+      "hsn": "96050000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "relish-diet-sugar",
+      "sku": "HC-101",
+      "name": "Relish Diet Sugar",
+      "category": "tray-amenities",
+      "collection": "Sweeteners",
+      "pack": "100 gms, 100 sachets",
+      "variants": [],
+      "description": "Hotel guest room amenity supply.",
+      "images": [
+        "/catalog/p28-4.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 101,
+      "hsn": "96050000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "equal-stevia-natural-sweetener",
+      "sku": "HC-102",
+      "name": "Equal Stevia Natural Sweetener",
+      "category": "tray-amenities",
+      "collection": "Sweeteners",
+      "pack": "75 gms, 100 sachets",
+      "variants": [],
+      "description": "Sugar free, diabetic friendly.",
+      "images": [
+        "/catalog/p28-5.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 102,
+      "hsn": "96050000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "wooden-stirrers-pack",
+      "sku": "HC-103",
+      "name": "Wooden Stirrers Pack",
+      "category": "tray-amenities",
+      "collection": "Disposables",
+      "pack": "",
+      "variants": [],
+      "description": "Disposable drink stirrers for tea and beverages.",
+      "images": [
+        "/catalog/p28-6.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 103,
+      "hsn": "96050000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "generic-paper-cup-white",
+      "sku": "HC-104",
+      "name": "Generic Paper Cup – White",
+      "category": "tray-amenities",
+      "collection": "Disposables",
+      "pack": "",
+      "variants": [],
+      "description": "All sizes available.",
+      "images": [
+        "/catalog/p28-7.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": true,
+      "order": 104,
+      "hsn": "96050000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "fancy-wooden-toothpicks",
+      "sku": "HC-105",
+      "name": "Fancy Wooden Toothpicks",
+      "category": "tray-amenities",
+      "collection": "Disposables",
+      "pack": "",
+      "variants": [],
+      "description": "Hotel guest room amenity supply.",
+      "images": [
+        "/catalog/p28-8.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 105,
+      "hsn": "96050000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "generic-ripple-cup-white",
+      "sku": "HC-106",
+      "name": "Generic Ripple Cup – White",
+      "category": "tray-amenities",
+      "collection": "Disposables",
+      "pack": "",
+      "variants": [],
+      "description": "All sizes available.",
+      "images": [
+        "/catalog/p28-9.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 106,
+      "hsn": "96050000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "fresh-wrap-aluminium-plain-foil",
+      "sku": "HC-107",
+      "name": "Fresh Wrap Aluminium Plain Foil",
+      "category": "housekeeping-others",
+      "collection": "Others",
+      "pack": "72 metre",
+      "variants": [],
+      "description": "Hotel and hospitality supply product.",
+      "images": [
+        "/catalog/p29-1.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 107,
+      "hsn": "96050000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "wrap-on-cling-film",
+      "sku": "HC-108",
+      "name": "Wrap On – Cling Film",
+      "category": "housekeeping-others",
+      "collection": "Others",
+      "pack": "High clarity stretch",
+      "variants": [],
+      "description": "Hotel and hospitality supply product.",
+      "images": [
+        "/catalog/p29-2.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 108,
+      "hsn": "4900",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "fly-catcher-machine-fibre-body-3-tubes-with-glue-pad",
+      "sku": "HC-109",
+      "name": "Fly Catcher Machine – Fibre Body, 3 Tubes with Glue Pad",
+      "category": "housekeeping-others",
+      "collection": "Fly Catcher Machines",
+      "pack": "29' x 12' x 7', 3 tubes x 15 W",
+      "variants": [],
+      "description": "Hotel and hospitality supply product.",
+      "images": [
+        "/catalog/p29-3.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 109,
+      "hsn": "96050000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "terminator-fly-catcher-machine-ms-powder-coated-double-tube",
+      "sku": "HC-110",
+      "name": "Terminator Fly Catcher Machine – MS Powder Coated, Double Tube",
+      "category": "housekeeping-others",
+      "collection": "Fly Catcher Machines",
+      "pack": "25' x 18' x 9', 2 tubes x 18 W",
+      "variants": [],
+      "description": "Hotel and hospitality supply product.",
+      "images": [
+        "/catalog/p29-4.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 110,
+      "hsn": "96050000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "terminator-fly-catcher-machine-ms-powder-coated-double-tube-compact",
+      "sku": "HC-111",
+      "name": "Terminator Fly Catcher Machine – MS Powder Coated, Double Tube (Compact)",
+      "category": "housekeeping-others",
+      "collection": "Fly Catcher Machines",
+      "pack": "25' x 14' x 8', 2 tubes x 18 W",
+      "variants": [],
+      "description": "Hotel and hospitality supply product.",
+      "images": [
+        "/catalog/p29-5.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 111,
+      "hsn": "96050000",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "recycled-cotton-towels",
+      "sku": "HC-112",
+      "name": "Recycled Cotton Towels",
+      "category": "hotel-linen",
+      "collection": "Hotel Towels",
+      "pack": "",
+      "variants": [],
+      "description": "Eco friendly and cost efficient for hotels and spas.",
+      "images": [
+        "/catalog/p31-1.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 112,
+      "hsn": "63026090",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "100-ring-spun-cotton-towels",
+      "sku": "HC-113",
+      "name": "100% Ring Spun Cotton Towels",
+      "category": "hotel-linen",
+      "collection": "Hotel Towels",
+      "pack": "",
+      "variants": [],
+      "description": "Soft and durable for hotels and spas.",
+      "images": [
+        "/catalog/p31-2.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 113,
+      "hsn": "63026090",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "650-gms-hotel-bath-towels",
+      "sku": "HC-114",
+      "name": "650 gms Hotel Bath Towels",
+      "category": "hotel-linen",
+      "collection": "Hotel Towels",
+      "pack": "650 gms",
+      "variants": [],
+      "description": "Ultra plus comfort for luxury rooms and spas.",
+      "images": [
+        "/catalog/p31-3.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 114,
+      "hsn": "63026090",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "face-towels-for-hotels-spas",
+      "sku": "HC-115",
+      "name": "Face Towels for Hotels & Spas",
+      "category": "hotel-linen",
+      "collection": "Hotel Towels",
+      "pack": "",
+      "variants": [],
+      "description": "Soft, compact and hygienic for guest comfort.",
+      "images": [
+        "/catalog/p31-4.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 115,
+      "hsn": "63026090",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "hotel-hand-towels",
+      "sku": "HC-116",
+      "name": "Hotel Hand Towels",
+      "category": "hotel-linen",
+      "collection": "Hotel Towels",
+      "pack": "",
+      "variants": [],
+      "description": "Quick-dry and durable for everyday guest use.",
+      "images": [
+        "/catalog/p31-5.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": true,
+      "order": 116,
+      "hsn": "63026090",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "fitted-bed-sheets-for-hotels",
+      "sku": "HC-117",
+      "name": "Fitted Bed Sheets for Hotels",
+      "category": "hotel-linen",
+      "collection": "Bed Sheets",
+      "pack": "",
+      "variants": [],
+      "description": "Perfect fit for housekeeping efficiency.",
+      "images": [
+        "/catalog/p32-1.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 117,
+      "hsn": "63022190",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "220-tc-white-bed-sheet",
+      "sku": "HC-118",
+      "name": "220 TC White Bed Sheet",
+      "category": "hotel-linen",
+      "collection": "Bed Sheets",
+      "pack": "220 TC",
+      "variants": [],
+      "description": "Budget-friendly option for daily hotel use.",
+      "images": [
+        "/catalog/p32-2.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 118,
+      "hsn": "63022190",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "300-tc-white-cotton-satin-bed-sheet",
+      "sku": "HC-119",
+      "name": "300 TC White Cotton Satin Bed Sheet",
+      "category": "hotel-linen",
+      "collection": "Bed Sheets",
+      "pack": "300 TC",
+      "variants": [],
+      "description": "For boutique and luxury properties.",
+      "images": [
+        "/catalog/p32-4.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 119,
+      "hsn": "63022190",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "400-tc-bed-sheet",
+      "sku": "HC-120",
+      "name": "400 TC Bed Sheet",
+      "category": "hotel-linen",
+      "collection": "Bed Sheets",
+      "pack": "400 TC",
+      "variants": [],
+      "description": "High thread count for the 5-star hotel experience.",
+      "images": [
+        "/catalog/p32-3.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 120,
+      "hsn": "63022190",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "hollow-fiber-pillows",
+      "sku": "HC-121",
+      "name": "Hollow Fiber Pillows",
+      "category": "hotel-linen",
+      "collection": "Pillows & Duvets",
+      "pack": "",
+      "variants": [],
+      "description": "Soft, breathable support for hotel comfort.",
+      "images": [
+        "/catalog/p33-1.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 121,
+      "hsn": "63026090",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "foam-pillows-for-hotels",
+      "sku": "HC-122",
+      "name": "Foam Pillows for Hotels",
+      "category": "hotel-linen",
+      "collection": "Pillows & Duvets",
+      "pack": "",
+      "variants": [],
+      "description": "Firm support with consistent shape.",
+      "images": [
+        "/catalog/p33-2.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 122,
+      "hsn": "63026090",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "microfiber-pillows",
+      "sku": "HC-123",
+      "name": "Microfiber Pillows",
+      "category": "hotel-linen",
+      "collection": "Pillows & Duvets",
+      "pack": "",
+      "variants": [],
+      "description": "Down-like luxury for premium hotel sleep.",
+      "images": [
+        "/catalog/p33-3.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 123,
+      "hsn": "63026090",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "hollow-fiber-duvets-for-hotels",
+      "sku": "HC-124",
+      "name": "Hollow Fiber Duvets for Hotels",
+      "category": "hotel-linen",
+      "collection": "Pillows & Duvets",
+      "pack": "",
+      "variants": [],
+      "description": "Lightweight warmth and easy care.",
+      "images": [
+        "/catalog/p33-4.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 124,
+      "hsn": "63022190",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "table-napkins",
+      "sku": "HC-125",
+      "name": "Table Napkins",
+      "category": "hotel-linen",
+      "collection": "Napkins & Event Covers",
+      "pack": "",
+      "variants": [],
+      "description": "Everyday elegance for hotels and restaurants.",
+      "images": [
+        "/catalog/p34-1.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": true,
+      "order": 125,
+      "hsn": "63049229",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "satin-band-table-napkins",
+      "sku": "HC-126",
+      "name": "Satin Band Table Napkins",
+      "category": "hotel-linen",
+      "collection": "Napkins & Event Covers",
+      "pack": "",
+      "variants": [],
+      "description": "Formal elegance for dining tables.",
+      "images": [
+        "/catalog/p34-2.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 126,
+      "hsn": "63049229",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "jacquard-table-napkins",
+      "sku": "HC-127",
+      "name": "Jacquard Table Napkins",
+      "category": "hotel-linen",
+      "collection": "Napkins & Event Covers",
+      "pack": "",
+      "variants": [],
+      "description": "Textured luxury for upscale dining.",
+      "images": [
+        "/catalog/p34-3.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 127,
+      "hsn": "63049229",
+      "gstRate": 18,
+      "unit": "pcs"
+    },
+    {
+      "slug": "banquet-chair-covers",
+      "sku": "HC-128",
+      "name": "Banquet Chair Covers",
+      "category": "hotel-linen",
+      "collection": "Napkins & Event Covers",
+      "pack": "",
+      "variants": [],
+      "description": "Reliable, elegant and budget-friendly.",
+      "images": [
+        "/catalog/p34-4.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 128,
+      "hsn": "63026090",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "banquet-table-covers",
+      "sku": "HC-129",
+      "name": "Banquet Table Covers",
+      "category": "hotel-linen",
+      "collection": "Napkins & Event Covers",
+      "pack": "",
+      "variants": [],
+      "description": "Elegant and durable covers for every event.",
+      "images": [
+        "/catalog/p34-5.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 129,
+      "hsn": "63026090",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "spandex-chair-covers",
+      "sku": "HC-130",
+      "name": "Spandex Chair Covers",
+      "category": "hotel-linen",
+      "collection": "Napkins & Event Covers",
+      "pack": "",
+      "variants": [],
+      "description": "Premium stretch-fit for luxury seating.",
+      "images": [
+        "/catalog/p34-6.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 130,
+      "hsn": "63026090",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "printed-curtains-for-hotels",
+      "sku": "HC-131",
+      "name": "Printed Curtains for Hotels",
+      "category": "hotel-linen",
+      "collection": "Curtains",
+      "pack": "",
+      "variants": [],
+      "description": "Custom designs to match your decor.",
+      "images": [
+        "/catalog/p35-1.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 131,
+      "hsn": "63026090",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "sheer-curtains",
+      "sku": "HC-132",
+      "name": "Sheer Curtains",
+      "category": "hotel-linen",
+      "collection": "Curtains",
+      "pack": "",
+      "variants": [],
+      "description": "Soft light diffusion for hotel ambience.",
+      "images": [
+        "/catalog/p35-2.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 132,
+      "hsn": "63026090",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "jacquard-curtains-for-hotels",
+      "sku": "HC-133",
+      "name": "Jacquard Curtains for Hotels",
+      "category": "hotel-linen",
+      "collection": "Curtains",
+      "pack": "",
+      "variants": [],
+      "description": "Elegant patterns with light control.",
+      "images": [
+        "/catalog/p35-3.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 133,
+      "hsn": "63026090",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "hotel-bed-runners-with-cushion-cover",
+      "sku": "HC-134",
+      "name": "Hotel Bed Runners with Cushion Cover",
+      "category": "hotel-linen",
+      "collection": "Bed & Bath Accessories",
+      "pack": "",
+      "variants": [],
+      "description": "Institutional hospitality linen product.",
+      "images": [
+        "/catalog/p36-1.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 134,
+      "hsn": "63026090",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "cushions-for-hotels",
+      "sku": "HC-135",
+      "name": "Cushions for Hotels",
+      "category": "hotel-linen",
+      "collection": "Bed & Bath Accessories",
+      "pack": "",
+      "variants": [],
+      "description": "Hollow and microfiber fill for plush accent seating.",
+      "images": [
+        "/catalog/p36-2.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 135,
+      "hsn": "63026090",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "mattress-protectors-for-hotels",
+      "sku": "HC-136",
+      "name": "Mattress Protectors for Hotels",
+      "category": "hotel-linen",
+      "collection": "Bed & Bath Accessories",
+      "pack": "",
+      "variants": [],
+      "description": "Waterproof, breathable and durable.",
+      "images": [
+        "/catalog/p36-3.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 136,
+      "hsn": "63026090",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "hotel-bath-mats",
+      "sku": "HC-137",
+      "name": "Hotel Bath Mats",
+      "category": "hotel-linen",
+      "collection": "Bed & Bath Accessories",
+      "pack": "",
+      "variants": [],
+      "description": "Quick-dry, slip-resistant and built for daily use.",
+      "images": [
+        "/catalog/p36-4.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 137,
+      "hsn": "63026090",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "pillow-covers-for-hotels",
+      "sku": "HC-138",
+      "name": "Pillow Covers for Hotels",
+      "category": "hotel-linen",
+      "collection": "Bed & Bath Accessories",
+      "pack": "",
+      "variants": [],
+      "description": "Soft, durable and wash-friendly.",
+      "images": [
+        "/catalog/p37-1.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 138,
+      "hsn": "6302",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "terry-bath-robes-for-hotels-spas",
+      "sku": "HC-139",
+      "name": "Terry Bath Robes for Hotels & Spas",
+      "category": "hotel-linen",
+      "collection": "Bath Robes",
+      "pack": "",
+      "variants": [],
+      "description": "Plush comfort in 100% ring-spun cotton.",
+      "images": [
+        "/catalog/p37-2.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 139,
+      "hsn": "63026090",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "waffle-weave-bath-robes",
+      "sku": "HC-140",
+      "name": "Waffle Weave Bath Robes",
+      "category": "hotel-linen",
+      "collection": "Bath Robes",
+      "pack": "",
+      "variants": [],
+      "description": "Lightweight, textured comfort for hotels and spas.",
+      "images": [
+        "/catalog/p37-3.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 140,
+      "hsn": "63026090",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "hotel-wall-papers",
+      "sku": "HC-141",
+      "name": "Hotel Wall Papers",
+      "category": "hotel-linen",
+      "collection": "Decor",
+      "pack": "",
+      "variants": [],
+      "description": "Institutional hospitality linen product.",
+      "images": [
+        "/catalog/p37-4.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 141,
+      "hsn": "63026090",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "spring-mattress-for-hotels",
+      "sku": "HC-142",
+      "name": "Spring Mattress for Hotels",
+      "category": "hotel-linen",
+      "collection": "Mattresses",
+      "pack": "",
+      "variants": [],
+      "description": "Long-lasting comfort with bounce and support.",
+      "images": [
+        "/catalog/p37-5.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 142,
+      "hsn": "63026090",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "memory-foam-mattress",
+      "sku": "HC-143",
+      "name": "Memory Foam Mattress",
+      "category": "hotel-linen",
+      "collection": "Mattresses",
+      "pack": "",
+      "variants": [],
+      "description": "Adaptive comfort for the hotel sleep experience.",
+      "images": [
+        "/catalog/p37-6.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 143,
+      "hsn": "63026090",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "hotel-shower-curtains",
+      "sku": "HC-144",
+      "name": "Hotel Shower Curtains",
+      "category": "hotel-linen",
+      "collection": "Bed & Bath Accessories",
+      "pack": "",
+      "variants": [],
+      "description": "Water-resistant and easy to maintain.",
+      "images": [
+        "/catalog/p38-1.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 144,
+      "hsn": "63026090",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "hospital-foam-pillows",
+      "sku": "HC-145",
+      "name": "Hospital Foam Pillows",
+      "category": "hospital-linen",
+      "collection": "Hospital Pillows",
+      "pack": "",
+      "variants": [],
+      "description": "Supportive, hygienic and economical.",
+      "images": [
+        "/catalog/p38-2.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 145,
+      "hsn": "63026090",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "hospital-blankets",
+      "sku": "HC-146",
+      "name": "Hospital Blankets",
+      "category": "hospital-linen",
+      "collection": "Hospital Blankets",
+      "pack": "",
+      "variants": [],
+      "description": "Warmth, hygiene and reusability combined.",
+      "images": [
+        "/catalog/p38-3.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 146,
+      "hsn": "63026090",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "hospital-privacy-curtains",
+      "sku": "HC-147",
+      "name": "Hospital Privacy Curtains",
+      "category": "hospital-linen",
+      "collection": "Hospital Curtains",
+      "pack": "",
+      "variants": [],
+      "description": "Functional design for patient dignity.",
+      "images": [
+        "/catalog/p38-4.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 147,
+      "hsn": "63026090",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "hospital-bed-sheets",
+      "sku": "HC-148",
+      "name": "Hospital Bed Sheets",
+      "category": "hospital-linen",
+      "collection": "Hospital Bed Sheets",
+      "pack": "",
+      "variants": [],
+      "description": "Clinical-grade comfort and durability.",
+      "images": [
+        "/catalog/p39-1.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 148,
+      "hsn": "63022190",
+      "gstRate": 5,
+      "unit": "pcs"
+    },
+    {
+      "slug": "hospital-bed-linen",
+      "sku": "HC-149",
+      "name": "Hospital Bed Linen",
+      "category": "hospital-linen",
+      "collection": "Hospital Bed Linen",
+      "pack": "",
+      "variants": [],
+      "description": "Complete bedding solutions for healthcare facilities.",
+      "images": [
+        "/catalog/p39-2.jpg"
+      ],
+      "price": null,
+      "priceUnit": "",
+      "minOrder": "",
+      "active": true,
+      "featured": false,
+      "order": 149,
+      "hsn": "63026090",
+      "gstRate": 5,
+      "unit": "pcs"
+    }
+  ]
 }

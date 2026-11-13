@@ -211,8 +211,8 @@ export default function Product() {
                 <span className="p-price">{money(rate || p.pricePaise || 750)}</span>
                 <span className="p-unit-tag"> /{unit}</span>
               </div>
-              <div className="p-incl">
-                {money(withGst(rate || p.pricePaise || 750, p.gstRate || 18))} Incl. GST
+              <div className="p-incl" style={{ color: "#b45309", background: "#fef3c7", padding: "2px 8px", borderRadius: "4px", fontSize: "12px", fontWeight: "600", width: "fit-content", marginTop: "4px" }}>
+                + {p.gstRate || 18}% GST extra (Tax added at Quote / Cart)
               </div>
             </div>
             <span className="stock-pill in-stock">IN STOCK</span>

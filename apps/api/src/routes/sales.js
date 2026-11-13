@@ -6,13 +6,14 @@ import { channels } from "../lib/notify.js";
 import { requirePerm } from "../lib/permissions.js";
 import { refreshPayLink } from "../lib/payments.js";
 import { createPaymentLink } from "../lib/razorpay.js";
-import { balance, bucketOf, stockBuckets, createCreditNote, createInvoice, createOrderFromQuote, dispatchOrder, customerSnapshot, deductForInvoice, logActivity, moveStock, now, priced, rateFor, recordPayment, refreshInvoice, refundDue, resolveCustomer, removePaymentLedger, postLedger, assertStockAvailable, consumeStock, token } from "../lib/sales.js";
+import { balance, bucketOf, stockBuckets, createCreditNote, createInvoice, saveDraftInvoice, issueDraftInvoice, createOrderFromQuote, dispatchOrder, customerSnapshot, deductForInvoice, logActivity, moveStock, now, priced, rateFor, recordPayment, refreshInvoice, refundDue, resolveCustomer, removePaymentLedger, postLedger, assertStockAvailable, consumeStock, token } from "../lib/sales.js";
 import { measureLabel, pieces, uomOptions } from "../lib/units.js";
 import { nextNumber } from "../lib/gst.js";
 import { getSettings } from "../model.js";
 import { shadowfaxOn } from "../services/delivery_shadowfax.js";
 import { bookShipment } from "./logistics.js";
-import { creditNoteInput, dispatchInput, invoiceInput, orderInput, paymentInput, quoteInput } from "../schemas.js";
+import { buildEwbGovtJson, generateSandboxEwb } from "../services/ewaybill.js";
+import { creditNoteInput, dispatchInput, invoiceInput, invoiceDraftInput, orderInput, paymentInput, quoteInput } from "../schemas.js";
 import { wrap } from "./public.js";
 import { bad, notFound, parse } from "./shared.js";
 
@@ -287,6 +288,33 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
     const inv = await createInvoice(store, { customer: c, ...d, by: by(req) });
     res.status(201).json(await afterInvoice(req, inv));
   }));
+  r.post("/invoices/draft", requirePerm("invoices"), wrap(async (req, res) => {
+    const d = parse(invoiceDraftInput, req.body, res); if (!d) return;
+    const c = await customerOr404(d.customerId, res); if (!c) return;
+    const inv = await saveDraftInvoice(store, { customer: c, ...d, by: by(req) });
+    await audit(req, "invoice.draft", inv.number, { total: inv.totals.total });
+    res.status(201).json({ ...inv, balance: balance(inv) });
+  }));
+  r.put("/invoices/draft/:id", requirePerm("invoices"), wrap(async (req, res) => {
+    const d = parse(invoiceDraftInput, req.body, res); if (!d) return;
+    const c = await customerOr404(d.customerId, res); if (!c) return;
+    const inv = await saveDraftInvoice(store, { draftId: req.params.id, customer: c, ...d, by: by(req) });
+    await audit(req, "invoice.draft.update", inv.number, { total: inv.totals.total });
+    res.json({ ...inv, balance: balance(inv) });
+  }));
+  r.post("/invoices/:id/issue", requirePerm("invoices"), wrap(async (req, res) => {
+    const inv = await issueDraftInvoice(store, req.params.id, { by: by(req), date: req.body?.date, dueDate: req.body?.dueDate });
+    const issued = await afterInvoice(req, inv);
+    res.json({ ...issued, balance: balance(issued) });
+  }));
+  r.delete("/invoices/:id", requirePerm("invoices"), wrap(async (req, res) => {
+    const inv = await store.invoices.get(req.params.id); if (!inv) return notFound(res, "Invoice");
+    if (inv.status !== "draft") return bad(res, "Only draft invoices can be discarded. Void an issued invoice instead.", 409);
+    await store.invoices.remove(inv.id);
+    await logActivity(store, { entity: "invoice", entityId: inv.id, text: `Draft ${inv.number} discarded`, by: by(req) });
+    await audit(req, "invoice.draft.delete", inv.number);
+    res.status(204).end();
+  }));
   r.post("/invoices/:id/void", requirePerm("invoices"), atomicWrap(store, async (req, res) => {
     const i = await store.invoices.get(req.params.id); if (!i) return notFound(res, "Invoice");
     if (i.status === "void") return bad(res, "Already void", 409);
@@ -340,6 +368,71 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
     await automation.on.paymentReceived(out.invoice, out.payment); await audit(req, "payment.create", i.number, { amount: d.amount, mode: d.mode });
     res.status(201).json(out);
   }));
+
+  // ---------- E-Way Bill Integration
+  r.post("/invoices/:id/ewaybill/generate", requirePerm("invoices"), wrap(async (req, res) => {
+    const inv = await store.invoices.get(req.params.id);
+    if (!inv) return notFound(res, "Invoice");
+    if (inv.status === "void") return bad(res, "Cannot generate E-Way Bill for a void invoice", 409);
+
+    const settings = await getSettings(store);
+    const transport = req.body || {};
+    const result = await generateSandboxEwb({ invoice: inv, settings, transport, cfg, fetchImpl });
+
+    if (result.ewbNo) {
+      const ewaybill = {
+        ewbNo: result.ewbNo,
+        ewbDate: result.ewbDate,
+        validUpto: result.validUpto,
+        vehicleNo: transport.vehicleNo,
+        distance: transport.transDistance,
+      };
+      await store.invoices.update(inv.id, { ewaybill, updatedAt: now() });
+      await logActivity(store, { entity: "invoice", entityId: inv.id, text: `E-Way Bill ${result.ewbNo} generated`, by: by(req) });
+      await audit(req, "invoice.ewaybill.generate", inv.number, { ewbNo: result.ewbNo });
+      return res.json({ ok: true, ewbNo: result.ewbNo, ewaybill, alert: result.alert });
+    }
+
+    if (result.error) {
+      return bad(res, `E-Way Bill: ${result.error}`, 400);
+    }
+
+    // Return the Govt JSON payload for 100% free direct bulk upload
+    res.json(result);
+  }));
+
+  r.get("/invoices/:id/ewaybill/json", requirePerm("invoices"), wrap(async (req, res) => {
+    const inv = await store.invoices.get(req.params.id);
+    if (!inv) return notFound(res, "Invoice");
+
+    const settings = await getSettings(store);
+    const transport = {
+      vehicleNo: req.query.vehicleNo || inv.ewaybill?.vehicleNo || "",
+      transDistance: req.query.distance || inv.ewaybill?.distance || "20",
+      transporterName: req.query.transporter || "",
+    };
+    const govtJson = buildEwbGovtJson({ invoice: inv, settings, transport });
+    res.setHeader("Content-Disposition", `attachment; filename="EWB_${inv.number.replace(/\//g, "-")}.json"`);
+    res.json(govtJson);
+  }));
+
+  r.post("/invoices/:id/ewaybill/save", requirePerm("invoices"), wrap(async (req, res) => {
+    const inv = await store.invoices.get(req.params.id);
+    if (!inv) return notFound(res, "Invoice");
+
+    const { ewbNo = "", ewbDate = "", validUpto = "", vehicleNo = "" } = req.body || {};
+    const ewaybill = {
+      ewbNo: String(ewbNo).trim(),
+      ewbDate: ewbDate || new Date().toISOString(),
+      validUpto: validUpto || "",
+      vehicleNo: String(vehicleNo).trim().toUpperCase(),
+    };
+    await store.invoices.update(inv.id, { ewaybill, updatedAt: now() });
+    await logActivity(store, { entity: "invoice", entityId: inv.id, text: `E-Way Bill ${ewaybill.ewbNo} recorded`, by: by(req) });
+    await audit(req, "invoice.ewaybill.save", inv.number, { ewbNo: ewaybill.ewbNo });
+    res.json({ ok: true, ewaybill });
+  }));
+
   // ---------- credit notes (GST sales returns / price adjustments against an invoice)
   r.get("/credit-notes", requirePerm("invoices"), wrap(async (req, res) => {
     let rows = await store.creditNotes.all({ sort: { createdAt: -1 } });

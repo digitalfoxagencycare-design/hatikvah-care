@@ -20,13 +20,13 @@ export function docRoutes({ cfg, store, automation }) {
   const find = async (kind, t) => {
     if (!/^[\w-]{20,40}$/.test(t)) return null;
     // packing slip, gate pass and shipping label are print views of the delivery challan
-    const col = { quote: store.quotes, invoice: store.invoices, challan: store.orders, packing: store.orders, gatepass: store.orders, label: store.orders, creditnote: store.creditNotes }[kind];
+    const col = { quote: store.quotes, invoice: store.invoices, challan: store.orders, packing: store.orders, gatepass: store.orders, label: store.orders, creditnote: store.creditNotes, ewaybill: store.invoices }[kind];
     return col ? col.findBy("token", t) : null;
   };
 
   r.get("/api/public/doc/:kind/:token", limiter, wrap(async (req, res) => {
     let d = await find(req.params.kind, req.params.token);
-    if (!d || (["challan", "packing", "gatepass", "label"].includes(req.params.kind) && !d.challanNumber)) return res.status(404).json({ error: "NOT_FOUND", message: "This document link is not valid" });
+    if (!d || (req.params.kind === "invoice" && d.status === "draft") || (["challan", "packing", "gatepass", "label"].includes(req.params.kind) && !d.challanNumber)) return res.status(404).json({ error: "NOT_FOUND", message: "This document link is not valid" });
     if (req.params.kind === "invoice" && !d.payLink?.url && balance(d) > 0 && cfg.razorpayKeyId && cfg.razorpaySecret) {
       try {
         const link = await createPaymentLink(cfg, d, { notes: { invoiceId: d.id, source: "doc_view" } });
@@ -40,7 +40,7 @@ export function docRoutes({ cfg, store, automation }) {
   }));
   r.get(["/api/public/doc/:kind/:token/pdf", "/doc/:kind/:token/pdf"], limiter, wrap(async (req, res) => {
     let d = await find(req.params.kind, req.params.token);
-    if (!d || (["challan", "packing", "gatepass", "label"].includes(req.params.kind) && !d.challanNumber)) return res.status(404).json({ error: "NOT_FOUND", message: "This document link is not valid" });
+    if (!d || (req.params.kind === "invoice" && d.status === "draft") || (["challan", "packing", "gatepass", "label"].includes(req.params.kind) && !d.challanNumber)) return res.status(404).json({ error: "NOT_FOUND", message: "This document link is not valid" });
     if (req.params.kind === "invoice" && !d.payLink?.url && balance(d) > 0 && cfg.razorpayKeyId && cfg.razorpaySecret) {
       try {
         const link = await createPaymentLink(cfg, d, { notes: { invoiceId: d.id, source: "doc_pdf" } });

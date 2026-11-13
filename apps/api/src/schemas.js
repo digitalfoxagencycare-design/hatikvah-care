@@ -37,6 +37,7 @@ export const lineInput = z.object({
   gstRate: z.number().refine((v) => GST_RATES.includes(v), "GST rate must be 0, 5, 12, 18 or 28").default(18),
   // Ordered by the piece, box or carton; perUnit (pieces per ordered unit) is fixed from the product on the server.
   uom: z.enum(["piece", "box", "carton"]).default("piece"), perUnit: z.number().int().min(1).max(10_000_000).default(1),
+  image: z.string().max(2000).optional(),
 }).strict();
 const lines = z.array(lineInput).min(1, "Add at least one item").max(150);
 
@@ -71,6 +72,10 @@ export const dispatchInput = z.object({
 
 export const invoiceInput = z.object({
   customerId: id.min(1, "Choose a customer"), items: lines, date: optDate, dueDate: optDate, notes: text(2000).default(""), placeOfSupply: stateCode, poNumber: text(60).default(""),
+}).strict();
+
+export const invoiceDraftInput = z.object({
+  draftId: text(60).optional(), customerId: id.min(1, "Choose a customer"), items: lines, date: optDate, dueDate: optDate, notes: text(2000).default(""), placeOfSupply: stateCode, poNumber: text(60).default(""),
 }).strict();
 
 export const paymentInput = z.object({

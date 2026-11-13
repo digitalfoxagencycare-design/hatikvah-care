@@ -6,7 +6,7 @@ const DispatchSlip = lazy(() => import("./DispatchSlip.jsx")); // the QR library
 const ShippingLabel = lazy(() => import("./ShippingLabel.jsx")); // same for the barcode library
 import "./doc.css";
 
-const TITLES = { quote: "QUOTATION", invoice: "TAX INVOICE", challan: "DELIVERY CHALLAN", packing: "PACKING SLIP", gatepass: "GATE PASS", label: "SHIPPING LABEL", creditnote: "CREDIT NOTE" };
+const TITLES = { quote: "QUOTATION", invoice: "TAX INVOICE", challan: "DELIVERY CHALLAN", packing: "PACKING SLIP", gatepass: "GATE PASS", label: "SHIPPING LABEL", creditnote: "CREDIT NOTE", ewaybill: "e-Way Bill" };
 
 function fmtDate(s) {
   if (!s) return "—";
@@ -58,6 +58,7 @@ export default function DocPage() {
   const { doc: d, company: c } = s.data;
   if (kind === "packing" || kind === "gatepass") return <Suspense fallback={<p className="doc-note">Loading…</p>}><DispatchSlip kind={kind} token={token} d={d} c={c} /></Suspense>;
   if (kind === "label") return <Suspense fallback={<p className="doc-note">Loading…</p>}><ShippingLabel d={d} c={c} /></Suspense>;
+  if (kind === "ewaybill") return <EwbPrintSlip d={d} c={c} />;
   const challan = kind === "challan";
   const quote = kind === "quote";
   const invoice = kind === "invoice";
@@ -180,6 +181,12 @@ export default function DocPage() {
             <span className="meta-label">{quote ? "Validity:" : credit ? "Against Invoice:" : "Due Date:"}</span>
             <strong>{credit ? `${d.invoiceNumber} dt. ${fmtDate(d.invoiceDate)}` : fmtDate(quote ? d.validUntil : d.dueDate)}</strong>
           </div>
+          {d.ewaybill?.ewbNo && (
+            <div className="bill-meta-cell" style={{ background: "#f0fdf4" }}>
+              <span className="meta-label">E-Way Bill #:</span>
+              <strong style={{ color: "#166534" }}>{d.ewaybill.ewbNo}</strong>
+            </div>
+          )}
         </div>
 
         {/* Customer Details & Billing Address */}
@@ -205,6 +212,7 @@ export default function DocPage() {
           {quote && <span>Delivery: <strong>{d.shippingType === "shadowfax" ? `Shadowfax Courier${d.shippingCharge ? ` (+₹${(d.shippingCharge/100).toFixed(2)})` : ""}` : d.shippingType === "custom" ? `Custom Courier${d.shippingCharge ? ` (+₹${(d.shippingCharge/100).toFixed(2)})` : ""}` : "Free Delivery"}</strong></span>}
           {d.poNumber && <span>Customer PO #: <strong>{d.poNumber}</strong></span>}
           {d.orderNumber && <span>Order #: <strong>{d.orderNumber}</strong></span>}
+          {d.ewaybill?.ewbNo && <span style={{ color: "#166534" }}>E-Way Bill: <strong>#{d.ewaybill.ewbNo}</strong> {d.ewaybill.vehicleNo ? `(Veh: ${d.ewaybill.vehicleNo})` : ""}</span>}
           {credit && <span>Reason: <strong>{String(d.reason || "").replace(/_/g, " ")}</strong>{d.restock ? " (goods returned)" : ""}</span>}
         </div>
 
@@ -518,6 +526,144 @@ export default function DocPage() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function EwbPrintSlip({ d, c }) {
+  const [qrSrc, setQrSrc] = useState("");
+  const ewb = d.ewaybill || {};
+  const formattedEwb = ewb.ewbNo ? String(ewb.ewbNo).replace(/(\d{4})(\d{4})(\d{4})/, "$1 $2 $3") : "N/A";
+
+  useEffect(() => {
+    if (ewb.ewbNo) {
+      const qrPayload = `${ewb.ewbNo}/${c.gstin || "36ADDPC0083H1Z0"}/${d.number}/${ewb.ewbDate || d.date}`;
+      QRCode.toDataURL(qrPayload, { margin: 1, width: 160 })
+        .then(setQrSrc)
+        .catch(() => {});
+    }
+  }, [ewb.ewbNo, c.gstin, d.number, ewb.ewbDate, d.date]);
+
+  return (
+    <div className="doc-page" style={{ maxWidth: 820, margin: "20px auto", padding: 24, fontFamily: "system-ui, -apple-system, sans-serif" }}>
+      <div className="no-print" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+        <button className="btn" onClick={() => window.print()} style={{ fontSize: "1rem", padding: "8px 18px" }}>
+          🖨️ Print / Save as PDF
+        </button>
+        <button className="btn ghost" onClick={() => window.close() || window.history.back()}>
+          ← Close
+        </button>
+      </div>
+
+      <div style={{ border: "2px solid #2563eb", borderRadius: 6, overflow: "hidden", background: "#fff", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
+        {/* Header Title & QR */}
+        <div style={{ textAlign: "center", padding: "20px 0 10px", background: "#fff" }}>
+          <h1 style={{ fontSize: "2rem", margin: 0, fontWeight: 800, color: "#1e293b", letterSpacing: "1px" }}>e-Way Bill</h1>
+          {qrSrc && (
+            <div style={{ display: "inline-block", padding: 8, marginTop: 10, border: "1px solid #e2e8f0", borderRadius: 4 }}>
+              <img src={qrSrc} alt="E-Way Bill QR Code" style={{ width: 150, height: 150, display: "block" }} />
+            </div>
+          )}
+        </div>
+
+        {/* EWB Header Table */}
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.92rem", marginTop: 10 }}>
+          <tbody>
+            <tr style={{ borderTop: "1px solid #cbd5e1" }}>
+              <td style={{ padding: "8px 16px", width: "32%", color: "#64748b", fontWeight: 600 }}>E-Way Bill No.:</td>
+              <td style={{ padding: "8px 16px", fontWeight: 800, fontSize: "1.2rem", color: "#0f172a", letterSpacing: "1px" }}>{formattedEwb}</td>
+            </tr>
+            <tr style={{ borderTop: "1px solid #f1f5f9" }}>
+              <td style={{ padding: "8px 16px", color: "#64748b", fontWeight: 600 }}>E-Way Bill Date:</td>
+              <td style={{ padding: "8px 16px", fontWeight: 700 }}>{ewb.ewbDate || d.date}</td>
+            </tr>
+            <tr style={{ borderTop: "1px solid #f1f5f9" }}>
+              <td style={{ padding: "8px 16px", color: "#64748b", fontWeight: 600 }}>Generated By:</td>
+              <td style={{ padding: "8px 16px", fontWeight: 600 }}>{c.gstin || "36ADDPC0083H1Z0"} - {c.legalName || c.name || "M/s. EXL MARKETING"}</td>
+            </tr>
+            <tr style={{ borderTop: "1px solid #f1f5f9" }}>
+              <td style={{ padding: "8px 16px", color: "#64748b", fontWeight: 600 }}>Valid From:</td>
+              <td style={{ padding: "8px 16px" }}>{ewb.ewbDate || d.date} [{ewb.distance || "18"} Kms]</td>
+            </tr>
+            <tr style={{ borderTop: "1px solid #f1f5f9" }}>
+              <td style={{ padding: "8px 16px", color: "#64748b", fontWeight: 600 }}>Valid Until:</td>
+              <td style={{ padding: "8px 16px", fontWeight: 700, color: "#16a34a" }}>{ewb.validUpto || "N/A"}</td>
+            </tr>
+            <tr style={{ borderTop: "1px solid #f1f5f9" }}>
+              <td style={{ padding: "8px 16px", color: "#64748b", fontWeight: 600 }}>Portal:</td>
+              <td style={{ padding: "8px 16px" }}>1 (NIC Official)</td>
+            </tr>
+          </tbody>
+        </table>
+
+        {/* Part A Header */}
+        <div style={{ background: "#4338ca", color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: "1rem", letterSpacing: "0.5px" }}>
+          Part - A
+        </div>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.88rem" }}>
+          <tbody>
+            <tr style={{ borderBottom: "1px solid #f1f5f9" }}>
+              <td style={{ padding: "8px 16px", width: "35%", color: "#64748b" }}>GSTIN of Supplier</td>
+              <td style={{ padding: "8px 16px", fontWeight: 700 }}>{c.gstin || "36ADDPC0083H1Z0"}, {c.name}</td>
+            </tr>
+            <tr style={{ borderBottom: "1px solid #f1f5f9" }}>
+              <td style={{ padding: "8px 16px", color: "#64748b" }}>Place of Dispatch</td>
+              <td style={{ padding: "8px 16px" }}>{c.address || "Hyderabad, TELANGANA-500084"}</td>
+            </tr>
+            <tr style={{ borderBottom: "1px solid #f1f5f9" }}>
+              <td style={{ padding: "8px 16px", color: "#64748b" }}>GSTIN of Recipient</td>
+              <td style={{ padding: "8px 16px", fontWeight: 700 }}>{d.customer?.gstin || "URP (Unregistered Person)"}</td>
+            </tr>
+            <tr style={{ borderBottom: "1px solid #f1f5f9" }}>
+              <td style={{ padding: "8px 16px", color: "#64748b" }}>Place of Delivery</td>
+              <td style={{ padding: "8px 16px" }}>{d.customer?.shippingAddress || d.customer?.billingAddress || "Hyderabad, TELANGANA"}</td>
+            </tr>
+            <tr style={{ borderBottom: "1px solid #f1f5f9" }}>
+              <td style={{ padding: "8px 16px", color: "#64748b" }}>Document No. & Date</td>
+              <td style={{ padding: "8px 16px" }}><strong>{d.number}</strong> · {d.date}</td>
+            </tr>
+            <tr style={{ borderBottom: "1px solid #f1f5f9" }}>
+              <td style={{ padding: "8px 16px", color: "#64748b" }}>Value of Goods</td>
+              <td style={{ padding: "8px 16px", fontWeight: 800 }}>₹{((d.totals?.total || 0) / 100).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+            </tr>
+            <tr style={{ borderBottom: "1px solid #f1f5f9" }}>
+              <td style={{ padding: "8px 16px", color: "#64748b" }}>HSN Code</td>
+              <td style={{ padding: "8px 16px", fontWeight: 600 }}>{d.items?.[0]?.hsn || "9605"}</td>
+            </tr>
+            <tr style={{ borderBottom: "1px solid #f1f5f9" }}>
+              <td style={{ padding: "8px 16px", color: "#64748b" }}>Reason for Transportation</td>
+              <td style={{ padding: "8px 16px" }}>Outward - Supply</td>
+            </tr>
+          </tbody>
+        </table>
+
+        {/* Part B Header */}
+        <div style={{ background: "#4338ca", color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: "1rem", letterSpacing: "0.5px" }}>
+          Part - B
+        </div>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.88rem" }}>
+          <thead>
+            <tr style={{ background: "#f8fafc", borderBottom: "1px solid #cbd5e1" }}>
+              <th style={{ padding: "8px 12px", textAlign: "left", color: "#475569" }}>Mode</th>
+              <th style={{ padding: "8px 12px", textAlign: "left", color: "#475569" }}>Vehicle / Trans Doc No & Dt</th>
+              <th style={{ padding: "8px 12px", textAlign: "left", color: "#475569" }}>From</th>
+              <th style={{ padding: "8px 12px", textAlign: "left", color: "#475569" }}>Entered Date</th>
+              <th style={{ padding: "8px 12px", textAlign: "left", color: "#475569" }}>Entered By</th>
+              <th style={{ padding: "8px 12px", textAlign: "left", color: "#475569" }}>Multi Veh.Info</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style={{ padding: "10px 12px" }}>Road</td>
+              <td style={{ padding: "10px 12px", fontWeight: 700, color: "#0f172a" }}>{ewb.vehicleNo || "N/A"}</td>
+              <td style={{ padding: "10px 12px" }}>{c.city || "Hyderabad"}</td>
+              <td style={{ padding: "10px 12px" }}>{ewb.ewbDate || d.date}</td>
+              <td style={{ padding: "10px 12px", fontWeight: 600 }}>{c.gstin || "36ADDPC0083H1Z0"}</td>
+              <td style={{ padding: "10px 12px" }}>-</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

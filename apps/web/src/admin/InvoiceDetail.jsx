@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api.js";
+import { CreateInvoiceModal } from "./CreateInvoiceModal.jsx";
 import { DocView } from "./DocParts.jsx";
 import { Loader, useLoad } from "./hooks.jsx";
 import { ask, askText } from "./toast.jsx";
 import { InvoiceDispatch } from "./Logistics.jsx";
 import { PayLinkActions } from "./PayLink.jsx";
+import { EwbModal } from "./EwbModal.jsx";
 import { DocEditor, fmtDate, Modal, Msg, rs, Timeline, today, toPaise, useAction } from "./ui.jsx";
 
 function getWhatsAppInvoice(inv) {
@@ -28,6 +30,8 @@ export default function InvoiceDetail() {
   const s = useLoad(isNew ? "/api/admin/me" : `/api/admin/invoices/${id}`);
   const [pay, setPay] = useState(null);
   const [credit, setCredit] = useState(null);
+  const [editingDraft, setEditingDraft] = useState(false);
+  const [showEwb, setShowEwb] = useState(false);
   const [st, run] = useAction();
   const inv = isNew ? null : s.data;
   const wa = getWhatsAppInvoice(inv);
@@ -42,40 +46,132 @@ export default function InvoiceDetail() {
       window.open(`https://wa.me/${p}?text=${encodeURIComponent(wa.text)}`, "_blank", "noopener,noreferrer");
     }
   };
-  const extra = (f, set) => <>
-    <label className="field"><span>Invoice date</span><input type="date" value={f.date || ""} onChange={(e) => set("date", e.target.value)} /></label>
-    <label className="field"><span>Due date (blank = customer terms)</span><input type="date" value={f.dueDate || ""} onChange={(e) => set("dueDate", e.target.value)} /></label>
-    <label className="field"><span>Customer PO number</span><input maxLength={60} value={f.poNumber || ""} onChange={(e) => set("poNumber", e.target.value)} /></label>
-  </>;
-  if (isNew) return (
-    <>
-      <p><Link to="/admin/invoices">← Invoices</Link></p>
-      <h1>New GST invoice</h1>
-      <p className="notice">Most invoices are created from a sales order (Order → Create GST invoice). Use this for direct sales. Invoices cannot be edited after saving (GST rule); void and re-issue instead.</p>
-      <DocEditor kind="invoice" busy={st.busy} error={st.error} extra={extra} initial={{ customerId: sp.get("customer") || "", items: [], notes: "", date: today(), dueDate: "", poNumber: "", placeOfSupply: "" }}
-        onSave={async (body) => { if (await ask("Issue this invoice?", { body: "It gets the next invoice number and cannot be edited afterwards.", confirmLabel: "Issue invoice" })) run(async () => { const out = await api("/api/admin/invoices", { method: "POST", body }); nav(`/admin/invoices/${out.id}`, { replace: true }); }); }} />
-    </>
-  );
+
+  if (isNew) {
+    return (
+      <>
+        <p><Link to="/admin/invoices">← Invoices</Link></p>
+        <CreateInvoiceModal
+          onClose={() => nav("/admin/invoices")}
+          onCreated={(created) => nav(`/admin/invoices/${created.id}`, { replace: true })}
+        />
+      </>
+    );
+  }
+
+  if (inv && inv.status === "draft" && editingDraft) {
+    return (
+      <>
+        <p><button type="button" className="link" onClick={() => setEditingDraft(false)}>← Back to Draft view</button></p>
+        <CreateInvoiceModal
+          draft={inv}
+          onClose={() => setEditingDraft(false)}
+          onCreated={() => {
+            setEditingDraft(false);
+            s.reload();
+          }}
+        />
+      </>
+    );
+  }
+
   return (
     <>
       <p><Link to="/admin/invoices">← Invoices</Link></p>
       <Loader s={s}>{inv && (
         <>
-          <div className="row-between"><h1>Invoice {inv.number}</h1>
+          {inv.status === "draft" && (
+            <div className="notice" style={{ background: "#fffbeb", borderColor: "#fde68a", marginBottom: 16 }}>
+              <strong>Draft Invoice</strong> — This document has not been issued yet. It has no legal GST invoice number, stock has not been deducted, and no accounts receivable ledger entry has been posted.
+            </div>
+          )}
+          <div className="row-between">
+            <h1>{inv.status === "draft" ? `Draft ${inv.number}` : `Invoice ${inv.number}`}</h1>
             <div className="btn-row">
-              <a className="btn ghost" href={`/doc/invoice/${inv.token}`} target="_blank" rel="noopener noreferrer">View / print PDF</a>
-              {inv.status !== "void" && <InvoiceDispatch inv={inv} onClose={() => s.reload()} />}
-              {inv.status !== "void" && <button type="button" className="btn btn-whatsapp" onClick={openWhatsApp}>📱 Send via WhatsApp</button>}
-              {inv.status !== "void" && <button className="btn ghost" onClick={() => run(async () => { await api(`/api/admin/invoices/${id}/send`, { method: "POST" }); s.reload(); }, "Sent to the customer again ✓")}>Send to customer</button>}
-              {inv.status !== "void" && <button className="btn ghost" onClick={() => setCredit({ reason: "return", restock: true, notes: "", lines: inv.items.map(() => ({ qty: "", rate: "", batch: "" })) })}>Issue credit note</button>}
-              {inv.balance > 0 && <button className="btn" onClick={() => setPay({ amount: String(inv.balance / 100), date: today(), mode: "bank", reference: "", notes: "" })}>Record payment</button>}
-            </div></div>
+              {inv.status === "draft" ? (
+                <>
+                  <button type="button" className="btn ghost" onClick={() => setEditingDraft(true)}>Edit Draft</button>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={async () => {
+                      if (await ask("Issue this tax invoice now?", { body: "An official GST invoice number will be assigned, stock will be deducted, and accounts receivable posted.", confirmLabel: "Issue Invoice" })) {
+                        run(async () => {
+                          await api(`/api/admin/invoices/${inv.id}/issue`, { method: "POST", body: {} });
+                          s.reload();
+                        }, "Invoice issued successfully ✓");
+                      }
+                    }}
+                  >
+                    Issue Tax Invoice
+                  </button>
+                  <button
+                    type="button"
+                    className="btn ghost danger"
+                    onClick={async () => {
+                      if (await ask("Discard this draft invoice?", { danger: true, confirmLabel: "Discard Draft" })) {
+                        run(async () => {
+                          await api(`/api/admin/invoices/${inv.id}`, { method: "DELETE" });
+                          nav("/admin/invoices", { replace: true });
+                        }, "Draft discarded");
+                      }
+                    }}
+                  >
+                    Discard Draft
+                  </button>
+                </>
+              ) : (
+                <>
+                  <a className="btn ghost" href={`/doc/invoice/${inv.token}`} target="_blank" rel="noopener noreferrer">View / print PDF</a>
+                  {inv.status !== "void" && (
+                    <button type="button" className="btn ghost" onClick={() => setShowEwb(true)} style={{ borderColor: inv.ewaybill?.ewbNo ? "#16a34a" : undefined }}>
+                      🚚 E-Way Bill {inv.ewaybill?.ewbNo ? "✓" : ""}
+                    </button>
+                  )}
+                  {inv.ewaybill?.ewbNo && (
+                    <a
+                      className="btn ghost"
+                      href={`/doc/ewaybill/${inv.token}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: "#16a34a", borderColor: "#16a34a", textDecoration: "none", fontWeight: 600 }}
+                    >
+                      🖨️ Print E-Way Bill
+                    </a>
+                  )}
+                  {inv.status !== "void" && <InvoiceDispatch inv={inv} onClose={() => s.reload()} />}
+                  {inv.status !== "void" && <button type="button" className="btn btn-whatsapp" onClick={openWhatsApp}>📱 Send via WhatsApp</button>}
+                  {inv.status !== "void" && <button className="btn ghost" onClick={() => run(async () => { await api(`/api/admin/invoices/${id}/send`, { method: "POST" }); s.reload(); }, "Sent to the customer again ✓")}>Send to customer</button>}
+                  {inv.status !== "void" && <button className="btn ghost" onClick={() => setCredit({ reason: "return", restock: true, notes: "", lines: inv.items.map(() => ({ qty: "", rate: "", batch: "" })) })}>Issue credit note</button>}
+                  {inv.balance > 0 && <button className="btn" onClick={() => setPay({ amount: String(inv.balance / 100), date: today(), mode: "bank", reference: "", notes: "" })}>Record payment</button>}
+                </>
+              )}
+            </div>
+          </div>
           <Msg st={st} />
           <div className="tiles">
             <div className="tile"><strong>{rs(inv.totals.total)}</strong><span>Invoice total</span><small>{fmtDate(inv.date)}</small></div>
             <div className="tile"><strong>{rs(inv.amountPaid)}</strong><span>Received</span></div>
             <div className={"tile" + (inv.overdue ? " warn" : "")}><strong>{rs(inv.balance)}</strong><span>Balance</span><small>{inv.overdue ? "Overdue since " : "Due "}{fmtDate(inv.dueDate)}</small></div>
             {inv.creditedAmount > 0 && <div className={"tile" + (inv.refundDue ? " warn" : "")}><strong>{rs(inv.creditedAmount)}</strong><span>Credited</span><small>{inv.refundDue ? `Refund due ${rs(inv.refundDue)}` : `${inv.creditNotesList.length} credit note(s)`}</small></div>}
+            {inv.ewaybill?.ewbNo && (
+              <div className="tile" style={{ borderLeft: "4px solid #16a34a", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                <div>
+                  <strong style={{ color: "#16a34a" }}>#{inv.ewaybill.ewbNo}</strong>
+                  <span>E-Way Bill Active</span>
+                  <small>Vehicle: {inv.ewaybill.vehicleNo || "N/A"}</small>
+                </div>
+                <a
+                  href={`/doc/ewaybill/${inv.token}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn ghost sm"
+                  style={{ marginTop: 8, textAlign: "center", textDecoration: "none", color: "#16a34a", borderColor: "#16a34a", padding: "4px 8px", fontSize: "0.8rem", fontWeight: 600 }}
+                >
+                  🖨️ Print / Download Slip ↗
+                </a>
+              </div>
+            )}
           </div>
           <DocView d={inv} extraInfo={<p className="muted small-print">{inv.orderNumber && <>Order <Link to={`/admin/orders/${inv.orderId}`}>{inv.orderNumber}</Link><br /></>}{inv.poNumber && <>Customer PO {inv.poNumber}<br /></>}{inv.voidReason && <>Void: {inv.voidReason}</>}</p>}>
             {inv.balance > 0 && <PayLinkActions base={`/api/admin/invoices/${id}`} doc={inv} due={inv.balance} onChange={() => s.reload()} />}
@@ -94,9 +190,10 @@ export default function InvoiceDetail() {
               {inv.payments.length === 0 && <tr><td className="muted">No payments yet.</td></tr>}
             </tbody></table>
           </div>
-          {inv.status !== "void" && inv.amountPaid === 0 && <button className="link danger" onClick={async () => { const reason = await askText("Reason for voiding this invoice?", { confirmLabel: "Void invoice", danger: true }); if (reason !== null) run(async () => { await api(`/api/admin/invoices/${id}/void`, { method: "POST", body: { reason } }); s.reload(); }); }}>Void invoice</button>}
+          {inv.status !== "void" && inv.amountPaid === 0 && inv.status !== "draft" && <button className="link danger" onClick={async () => { const reason = await askText("Reason for voiding this invoice?", { confirmLabel: "Void invoice", danger: true }); if (reason !== null) run(async () => { await api(`/api/admin/invoices/${id}/void`, { method: "POST", body: { reason } }); s.reload(); }); }}>Void invoice</button>}
           <div className="panel"><h2>History</h2><Timeline entity="invoice" entityId={inv.id} items={inv.activities} onAdded={s.reload} /></div>
           {credit && <CreditNoteModal inv={inv} c={credit} setC={setCredit} st={st} onSave={(body) => run(async () => { const r = await api("/api/admin/credit-notes", { method: "POST", body }); setCredit(null); s.reload(); return r; }, "Credit note issued ✓")} />}
+          {showEwb && <EwbModal invoice={inv} onClose={() => setShowEwb(false)} onUpdated={() => { setShowEwb(false); s.reload(); }} />}
           {pay && (
             <Modal title={`Payment for ${inv.number}`} onClose={() => setPay(null)}>
               <form className="form" onSubmit={(e) => { e.preventDefault(); const amount = toPaise(pay.amount); if (!amount || Number.isNaN(amount)) return; run(async () => { await api(`/api/admin/invoices/${id}/payments`, { method: "POST", body: { ...pay, amount } }); setPay(null); s.reload(); }, "Payment recorded ✓ Receipt sent to the customer."); }}>

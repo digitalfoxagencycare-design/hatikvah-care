@@ -1,14 +1,16 @@
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import ProductCard from "../components/ProductCard.jsx";
 import Seo from "../components/Seo.jsx";
 import { useSite } from "../data.jsx";
 
 const categoriesList = [
-  { name: "Hotel Guest Amenities", slug: "bio-wet-amenities", img: "/brand/cat-1.png" },
-  { name: "Coffee and Beverages", slug: "coffee-beverages", img: "/brand/cat-2.png" },
-  { name: "Kits", slug: "kits-baskets", img: "/brand/cat-3.png" },
-  { name: "House Keeping & Paper Products", slug: "housekeeping", img: "/brand/cat-4.png" },
-  { name: "Eco-Friendly Range", slug: "eco-friendly-range", img: "/brand/cat-1.png" },
+  { name: "Hotel Guest Amenities", slug: "guest-amenities", img: "/brand/cat-1.png" },
+  { name: "Bath & Body Care", slug: "bath-body", img: "/brand/cat-3.png" },
+  { name: "Hotel Linen & Towels", slug: "hotel-linen", img: "/brand/cat-4.png" },
+  { name: "Tray Amenities & Tea/Coffee", slug: "tray-amenities", img: "/brand/cat-2.png" },
+  { name: "Eco-Friendly Amenities", slug: "eco-friendly", img: "/brand/cat-1.png" },
+  { name: "Biotique Amenities", slug: "biotique-dry-amenities", img: "/brand/cat-3.png" },
 ];
 
 const keyBenefits = [
@@ -78,68 +80,41 @@ const keyBenefits = [
   },
 ];
 
-const sampleBestsellers = [
-  {
-    id: "sample-1",
-    name: "Farm Fresh Bay Leaf & Lemongrass Shampoo 20ml (WB)",
-    slug: "farm-fresh-day-leaf-lemongrass-shampoo-20ml-wb",
-    category: "bio-wet-amenities",
-    collection: "BIO WET AMENITIES",
-    shortDescription: "A premium, Ayurvedic-inspired hair cleanser meticulously crafted for the hospitality and...",
-    pricePaise: 600,
-    unit: "Nos",
-    variants: ["20ml"],
-    images: ["/brand/farm-fresh-single-bottle.png", "/brand/farm-fresh-tea-tree-bottles.png"],
-    stock: "in",
-  },
-  {
-    id: "sample-2",
-    name: "Farm Fresh Tea Tree Conditioner 20ml",
-    slug: "farm-fresh-tea-tree-conditioner-20ml",
-    category: "bio-wet-amenities",
-    collection: "BIO WET AMENITIES",
-    shortDescription: "Provide your guests with an ultra-refreshing hair care experience with our Farm Fresh Tea Tree...",
-    pricePaise: 750,
-    unit: "Nos",
-    variants: ["20ml"],
-    images: ["/brand/farm-fresh-tea-tree-bottles.png"],
-    stock: "in",
-  },
-  {
-    id: "sample-3",
-    name: "Farm Fresh Ylang Ylang Shower Gel 20ml",
-    slug: "farm-fresh-ylang-ylang-shower-gel-20ml",
-    category: "bio-wet-amenities",
-    collection: "BIO WET AMENITIES",
-    shortDescription: "Transform the daily shower into a sensory natural ritual with our Farm Fresh Ylang Ylang shower...",
-    pricePaise: 700,
-    unit: "Nos",
-    variants: ["20ml"],
-    images: ["/brand/farm-fresh-tea-tree-bottles.png"],
-    stock: "in",
-  },
-  {
-    id: "sample-4",
-    name: "Farm Fresh Peppermint Body Lotion 20ml",
-    slug: "farm-fresh-peppermint-body-lotion-20ml",
-    category: "bio-wet-amenities",
-    collection: "BIO WET AMENITIES",
-    shortDescription: "Pamper your guests with an instantly reviving skincare experience with our Farm Fresh...",
-    pricePaise: 700,
-    unit: "Nos",
-    variants: ["20ml"],
-    images: ["/brand/farm-fresh-tea-tree-bottles.png"],
-    stock: "in",
-  },
-];
-
 export default function Home() {
   const { catalog, settings } = useSite();
-  // Showcase the client's exact 4 Best Sellers from Screenshot 4 with guaranteed prices
-  const featured = sampleBestsellers.map((s) => {
-    const live = catalog.products.find((p) => p.slug === s.slug || p.name === s.name);
-    return live ? { ...s, ...live, pricePaise: live.pricePaise ?? s.pricePaise } : s;
-  });
+
+  // Dynamically showcase top verified products across categories with 100% unique original photos
+  const featured = useMemo(() => {
+    const prods = catalog.products || [];
+    // Prioritize products that have verified original photography
+    const withPhotos = prods.filter((p) => p.images && p.images.length > 0 && p.images[0].startsWith("/catalog/"));
+    if (withPhotos.length === 0) return prods.slice(0, 8);
+
+    // Pick top items across diverse categories so each card has its own unique photo
+    const chosen = [];
+    const usedImages = new Set();
+    const categories = ["guest-amenities", "bath-body", "hotel-linen", "tray-amenities", "eco-friendly", "biotique-dry-amenities"];
+
+    // First, pick one prominent item per category
+    for (const cat of categories) {
+      const match = withPhotos.find((p) => p.category === cat && !usedImages.has(p.images[0]));
+      if (match) {
+        chosen.push(match);
+        usedImages.add(match.images[0]);
+      }
+    }
+
+    // Fill remaining slots up to 8 with other photo-verified products
+    for (const p of withPhotos) {
+      if (chosen.length >= 8) break;
+      if (!usedImages.has(p.images[0])) {
+        chosen.push(p);
+        usedImages.add(p.images[0]);
+      }
+    }
+
+    return chosen;
+  }, [catalog.products]);
 
   const ld = {
     "@context": "https://schema.org",

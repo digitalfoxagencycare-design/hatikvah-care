@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api } from "../api.js";
+import { GstinInput } from "./GstinInput.jsx";
 import { Msg, PersonSelect, StateSelect, useAction, useAsync } from "./ui.jsx";
 
 const EMPTY = { name: "", contactName: "", phone: "", email: "", gstin: "", stateCode: "", city: "", billingAddress: "", shippingAddress: "", plusCode: "", deliveryPincode: "", priceListId: "", paymentTermsDays: 30, reorderDays: 0, tags: [], notes: "", assignedTo: "", followUpAt: "", source: "" };
@@ -24,7 +25,21 @@ export default function CustomerForm({ customer, onSaved }) {
         <label className="field"><span>Contact person</span><input maxLength={100} value={f.contactName} onChange={set("contactName")} /></label>
         <label className="field"><span>Phone</span><input type="tel" maxLength={20} value={f.phone} onChange={set("phone")} /></label>
         <label className="field"><span>Email</span><input type="email" maxLength={160} value={f.email} onChange={set("email")} /></label>
-        <label className="field"><span>GSTIN</span><input maxLength={15} value={f.gstin} onChange={(e) => setF({ ...f, gstin: e.target.value.toUpperCase(), stateCode: f.stateCode || (/^\d{2}/.test(e.target.value) ? e.target.value.slice(0, 2) : "") })} placeholder="36ABCDE1234F1Z5" /></label>
+        <GstinInput
+          value={f.gstin}
+          onChange={(v) => setF({ ...f, gstin: v, stateCode: f.stateCode || (/^\d{2}/.test(v) ? v.slice(0, 2) : "") })}
+          onFetched={(data) => {
+            setF((prev) => ({
+              ...prev,
+              name: prev.name && prev.name.length > 3 ? prev.name : (data.tradeName || data.legalName),
+              stateCode: data.stateCode || prev.stateCode,
+              city: prev.city || data.city,
+              billingAddress: prev.billingAddress || data.address,
+              shippingAddress: prev.shippingAddress || data.address,
+              deliveryPincode: prev.deliveryPincode || data.pincode,
+            }));
+          }}
+        />
         <StateSelect value={f.stateCode} onChange={set("stateCode")} label="State (decides CGST+SGST or IGST)" />
         <label className="field"><span>Applied Offer / Discount</span><select value={f.priceListId} onChange={set("priceListId")}><option value="">Standard prices (no offer)</option>{lists.data?.map((l) => <option key={l.id} value={l.id}>{l.name} ({l.discountPct}% off)</option>)}</select></label>
       </div>

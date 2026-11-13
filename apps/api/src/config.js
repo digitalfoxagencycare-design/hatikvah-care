@@ -43,6 +43,13 @@ export function loadConfig(env = process.env) {
     // Nova (central engine): login codes go out on Nova's WhatsApp number through its client API. Key issued in the Nova console.
     novaUrl: (env.NOVA_URL || "").replace(/\/$/, ""), novaKey: env.NOVA_CLIENT_KEY || "", novaSlug: env.NOVA_TENANT_SLUG || "",
     razorpayKeyId: env.RAZORPAY_KEY_ID || "", razorpaySecret: env.RAZORPAY_KEY_SECRET || "", razorpayWebhookSecret: env.RAZORPAY_WEBHOOK_SECRET || "",
+    // Sandbox.co.in GST APIs
+    sandboxApiKey: env.SANDBOX_API_KEY || "",
+    sandboxApiSecret: env.SANDBOX_API_SECRET || "",
+    // Quicko / Govt E-Way Bill GSP Credentials
+    ewbGstin: env.EWB_GSTIN || "",
+    ewbUsername: env.EWB_USERNAME || "",
+    ewbPassword: env.EWB_PASSWORD || "",
   };
   if (!cfg.jwtSecret && !prod) cfg.jwtSecret = "dev-only-secret-change-me-dev-only-secret-change-me";
   const problems = [];
