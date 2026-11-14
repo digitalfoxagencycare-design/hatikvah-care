@@ -8,6 +8,11 @@ const NIC_ERROR_MESSAGES = {
   "238": "Distance between PIN codes not found in Govt database",
   "301": "Invalid Document Number",
   "302": "Duplicate E-Way Bill: an E-Way Bill already exists for this invoice number",
+  "385": "State code mismatch with delivery location",
+  "436": "Consignee State & Pincode mismatch (Consignee state is set to Andhra Pradesh (37), but PIN code belongs to Telangana (50xxxx) or vice versa. Please enter matching PIN or update Place of Supply)",
+  "437": "Consignor State & Pincode mismatch (Consignor state code does not match dispatch pincode)",
+  "438": "Invalid Bill-to State Code for given Pincode",
+  "439": "Invalid Dispatch-from State Code for given Pincode",
   "702": "Distance mismatch (leave distance blank to let Government calculate exact PIN-to-PIN distance)",
 };
 
@@ -173,7 +178,7 @@ export function buildEwbGovtJson({ invoice, settings = {}, transport = {}, cfg =
     toTrdName: String(invoice.customer?.name || "Customer").slice(0, 100),
     toAddr1: buyerAddr.slice(0, 120),
     toPlace: String(invoice.customer?.city || "Hyderabad").slice(0, 50),
-    toPincode: Number(invoice.customer?.deliveryPincode || invoice.customer?.pincode || "500001"),
+    toPincode: Number(transport.toPincode || invoice.customer?.deliveryPincode || invoice.customer?.pincode || (buyerStateCode === 37 ? "520001" : "500001")),
     toStateCode: buyerStateCode,
     actToStateCode: buyerStateCode,
 

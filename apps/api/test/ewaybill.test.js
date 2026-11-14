@@ -125,5 +125,61 @@ describe("E-Way Bill Generation & NIC Govt JSON Schema", () => {
     assert.ok(res.error);
     assert.ok(res.govtJson);
   });
+
+  it("handles Andhra Pradesh (37) PIN defaults and translates Code 436 error", async () => {
+    const apInvoice = {
+      number: "INV2627/026",
+      date: "2026-11-14",
+      placeOfSupply: "37", // Andhra Pradesh
+      customer: { name: "novasaas", phone: "9381993241" },
+      totals: { taxable: 10000000, igst: 1800000, total: 11800000 },
+      items: [{ name: "Kit", hsn: "96032100", qty: 1000, rate: 10000 }],
+    };
+
+    // Case 1: Default fallback for state 37 is 520001 (AP)
+    const ewb1 = buildEwbGovtJson({ invoice: apInvoice, settings: { stateCode: "36" } });
+    assert.equal(ewb1.billLists[0].toStateCode, 37);
+    assert.equal(ewb1.billLists[0].toPincode, 520001);
+
+    // Case 2: Explicit toPincode provided in transport
+    const ewb2 = buildEwbGovtJson({
+      invoice: apInvoice,
+      settings: { stateCode: "36" },
+      transport: { toPincode: "530001" },
+    });
+    assert.equal(ewb2.billLists[0].toPincode, 530001);
+
+    // Case 3: Error 436 is translated into human-readable guidance
+    const mockFetch436 = async (url) => {
+      if (url.includes("/authenticate") && !url.includes("tax-payer")) {
+        return { ok: true, json: async () => ({ data: { access_token: "mock-sbox-token" } }) };
+      }
+      if (url.includes("/tax-payer/authenticate")) {
+        return { ok: true, json: async () => ({ data: { Status: 1, access_token: "mock-tax-token" } }) };
+      }
+      if (url.includes("/consignor/bill")) {
+        return {
+          ok: true,
+          json: async () => ({
+            code: 200,
+            data: { error: { errorCodes: "436" } },
+          }),
+        };
+      }
+      return { ok: false, status: 404, text: async () => "Not Found" };
+    };
+
+    const res = await generateSandboxEwb({
+      invoice: apInvoice,
+      settings: { gstin: "36ADDPC0083H1Z0" },
+      transport: { vehicleNo: "AP39SG9657" },
+      cfg: { sandboxApiKey: "test-key" },
+      fetchImpl: mockFetch436,
+    });
+
+    assert.equal(res.ok, false);
+    assert.match(res.error, /Consignee State & Pincode mismatch/i);
+    assert.match(res.error, /Andhra Pradesh \(37\)/i);
+  });
 });
 

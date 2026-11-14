@@ -410,6 +410,7 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
       vehicleNo: req.query.vehicleNo || inv.ewaybill?.vehicleNo || "",
       transDistance: req.query.distance || inv.ewaybill?.distance || "20",
       transporterName: req.query.transporter || "",
+      toPincode: req.query.pincode || "",
     };
     const govtJson = buildEwbGovtJson({ invoice: inv, settings, transport });
     res.setHeader("Content-Disposition", `attachment; filename="EWB_${inv.number.replace(/\//g, "-")}.json"`);
