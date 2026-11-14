@@ -35,7 +35,7 @@ const P = {
   Purchases: page(() => import("./Purchases.jsx")), PurchaseDetail: page(() => import("./PurchaseDetail.jsx")), Suppliers: page(() => import("./Suppliers.jsx")),
   Reports: page(() => import("./Reports.jsx")), Content: page(() => import("./Content.jsx")), Automation: page(() => import("./Automation.jsx")),
   Settings: page(() => import("./Settings.jsx")), Team: page(() => import("./Team.jsx")), Audit: page(() => import("./Audit.jsx")), Account: page(() => import("./Account.jsx")),
-  CreditNotes: page(() => import("./CreditNotes.jsx")), POS: page(() => import("./POS.jsx")), WhatsApp: page(() => import("./WhatsApp.jsx")), Ledger: page(() => import("./Ledger.jsx")),
+  CreditNotes: page(() => import("./CreditNotes.jsx")), POS: page(() => import("./POS.jsx")), WhatsApp: page(() => import("./WhatsApp.jsx")), Ledger: page(() => import("./Ledger.jsx")), Expenses: page(() => import("./Expenses.jsx")),
   PaymentsHub: page(() => import("./PaymentsHub.jsx")), LogisticsHub: page(() => import("./LogisticsHub.jsx")), More: page(() => import("./More.jsx")),
 };
 // [path, label, permission, component, icon]
@@ -49,7 +49,7 @@ const NAV = [
   ]],
   ["Purchases & Expenses", [
     ["purchase-orders", "Purchases", "stock", "Purchases", "purchase"],
-    ["ledger", "Expenses+ & Cash Book", "ledger", "Ledger", "card"],
+    ["expenses", "Expenses+ & Cash Book", "ledger", "Expenses", "card"],
     ["vendors", "Vendors / Suppliers", "stock", "Suppliers", "vendor"],
   ]],
   ["Catalog & Inventory", [
@@ -66,7 +66,7 @@ const NAV = [
 // Off the sidebar, on the More page: [path, label, permission, component, hint]
 export const MORE = [["enquiries", "Enquiries", "enquiries", "Enquiries", "Quote requests from the website"], ["customers", "Customers", "customers", "Customers", "Hotel accounts and credit terms"], ["orders", "Sales orders", "orders", "Orders", "Packing and dispatch"],
   ["stock", "Stock levels", "stock", "Stock", "Adjustments, batches and transfers"], ["price-lists", "Offers & discounts", "customers", "PriceLists", "Special price lists"], ["credit-notes", "Credit notes", "invoices", "CreditNotes", "Returns, needed for GST filing"],
-  ["ledger", "Cash & bank book", "ledger", "Ledger", "Money in and out"], ["reports", "Reports", "reports", "Reports", "GST, sales and stock reports"], ["automation", "Automation & messages", "automation", "Automation", "Message rules and the outbox"],
+  ["expenses", "Expenses+", "ledger", "Expenses", "Operating expenses and ITC"], ["ledger", "Cash & bank book", "ledger", "Ledger", "Money in and out"], ["reports", "Reports", "reports", "Reports", "GST, sales and stock reports"], ["automation", "Automation & messages", "automation", "Automation", "Message rules and the outbox"],
   ["content", "Website content", "content", "Content", "Pages, banners and testimonials"], ["settings", "Company & GST", "settings", "Settings", "Business details on every invoice"], ["team", "Team", "team", "Team", "Staff sign-ins and roles"], ["audit", "Activity log", "audit", "Audit", "Who changed what"]];
 const DETAIL = [["products/new", "catalog", "ProductForm"], ["products/:id", "catalog", "ProductForm"], ["customers/:id", "customers", "CustomerDetail"], ["quotes/:id", "quotes", "QuoteDetail"],
   ["orders/:id", "orders", "OrderDetail"], ["invoices/:id", "invoices", "InvoiceDetail"], ["purchase-orders/:id", "stock", "PurchaseDetail"]];

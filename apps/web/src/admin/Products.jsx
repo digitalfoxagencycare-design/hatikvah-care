@@ -20,56 +20,260 @@ function PriceCell({ p, onSaved, onError }) {
   return <label className="price-in"><span>₹</span><input inputMode="decimal" value={v} placeholder="—" disabled={busy} onChange={(e) => setV(e.target.value)} onBlur={commit} onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()} aria-label={`Price for ${p.name}`} /></label>;
 }
 
+const PROD_TABS = [
+  { key: "items", label: "Items" },
+  { key: "categories", label: "Categories" },
+  { key: "groups", label: "Groups" },
+  { key: "pricelists", label: "Price Lists" },
+  { key: "deleted", label: "Deleted" },
+];
+
 export default function Products() {
   const s = useLoad("/api/admin/products");
   const cats = useLoad("/api/admin/categories");
   const [sp, setSp] = useSearchParams();
   const [msg, setMsg] = useState(null);
   const [imp, setImp] = useState(false);
+  const [viewMode, setViewMode] = useState("table"); // "table" or "grid"
+  const currentTab = sp.get("tab") || "items";
+
   const q = sp.get("q") || "", cat = sp.get("category") || "", filter = sp.get("filter") || "";
   const set = (k, v) => { const n = new URLSearchParams(sp); v ? n.set(k, v) : n.delete(k); setSp(n, { replace: true }); };
-  const rows = useMemo(() => (s.data || []).filter((p) =>
+
+  const allItems = s.data || [];
+  const rows = useMemo(() => allItems.filter((p) =>
     (!cat || p.category === cat) && (!q || `${p.name} ${p.sku} ${p.collection}`.toLowerCase().includes(q.toLowerCase())) &&
-    (!filter || (filter === "noprice" && p.price == null) || (filter === "hidden" && !p.active) || (filter === "nophoto" && !p.images.length))), [s.data, q, cat, filter]);
+    (!filter || (filter === "noprice" && p.price == null) || (filter === "hidden" && !p.active) || (filter === "nophoto" && !p.images.length))), [allItems, q, cat, filter]);
+
   const replace = (np) => s.setData((d) => d.map((x) => (x.id === np.id ? np : x)));
   const patch = async (p, body) => { try { replace(await api(`/api/admin/products/${p.id}`, { method: "PATCH", body })); setMsg(null); } catch (e) { setMsg(e.message); } };
   const catName = (slug) => cats.data?.find((c) => c.slug === slug)?.name || slug;
 
+  const shareWhatsAppProduct = (p) => {
+    const priceText = p.price != null ? `₹${(p.price / 100).toFixed(2)}` : "Price on Request";
+    const text = `Check out *${p.name}* from HaTikvah Care!\nPrice: ${priceText} (${p.unit || "pcs"})\nSKU: ${p.sku || "N/A"}\nOrder online: ${window.location.origin}/products/${p.slug || p.id}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+  };
+
   return (
     <>
-      <div className="row-between"><h1>Products & Inventory</h1>
-        <div className="btn-row">
-          <Link className="btn ghost" to="/admin/price-lists">Offers & Discounts</Link>
-          <a className="btn ghost" href="/api/admin/products/export.csv">Export CSV</a>
-          <button className="btn ghost" onClick={() => setImp(true)}>Import CSV</button>
-          <Link className="btn" to="/admin/products/new">+ Add product</Link>
+      <div className="swipe-page-header">
+        <h1 className="swipe-title">
+          <span>Products & Services</span>
+          <span className="swipe-play-badge" title="Products & Catalog">▶</span>
+        </h1>
+        <div className="swipe-header-actions">
+          <Link className="swipe-btn-ghost" to="/admin/price-lists">Offers & Discounts</Link>
+          <a className="swipe-btn-ghost" href="/api/admin/products/export.csv">Export CSV</a>
+          <button type="button" className="swipe-btn-ghost" onClick={() => setImp(true)}>Import CSV</button>
+          <Link className="swipe-btn-primary" to="/admin/products/new">+ Add Product</Link>
         </div>
       </div>
-      <div className="toolbar">
-        <input type="search" placeholder="Search name, SKU…" value={q} onChange={(e) => set("q", e.target.value)} aria-label="Search" />
-        <select value={cat} onChange={(e) => set("category", e.target.value)} aria-label="Category"><option value="">All categories</option>{cats.data?.map((c) => <option key={c.id} value={c.slug}>{c.name}</option>)}</select>
-        <select value={filter} onChange={(e) => set("filter", e.target.value)} aria-label="Filter"><option value="">All</option><option value="noprice">No price yet</option><option value="hidden">Hidden</option><option value="nophoto">No photo</option></select>
+
+      {/* Top Horizontal Tabs */}
+      <div className="swipe-tabs-bar" role="tablist">
+        {PROD_TABS.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            role="tab"
+            aria-selected={currentTab === tab.key}
+            className={`swipe-tab-item ${currentTab === tab.key ? "active" : ""}`}
+            onClick={() => {
+              const n = new URLSearchParams(sp);
+              if (tab.key === "items") n.delete("tab");
+              else n.set("tab", tab.key);
+              setSp(n);
+            }}
+          >
+            <span>{tab.label}</span>
+            {tab.key === "items" && <span className="swipe-tab-count">{allItems.length}</span>}
+          </button>
+        ))}
       </div>
+
+      <div className="swipe-filter-bar">
+        <div className="swipe-search-wrapper">
+          <span className="swipe-search-icon">🔍</span>
+          <input
+            type="text"
+            className="swipe-search-input"
+            placeholder="Search name, SKU, HSN…"
+            value={q}
+            onChange={(e) => set("q", e.target.value)}
+            aria-label="Search"
+          />
+        </div>
+
+        <select className="swipe-select" value={cat} onChange={(e) => set("category", e.target.value)} aria-label="Category">
+          <option value="">All categories</option>
+          {cats.data?.map((c) => <option key={c.id} value={c.slug}>{c.name}</option>)}
+        </select>
+
+        <select className="swipe-select" value={filter} onChange={(e) => set("filter", e.target.value)} aria-label="Filter">
+          <option value="">All Products</option>
+          <option value="noprice">No price yet</option>
+          <option value="hidden">Hidden from website</option>
+          <option value="nophoto">No photo</option>
+        </select>
+
+        <div style={{ display: "flex", gap: 4, marginLeft: "auto" }}>
+          <button
+            type="button"
+            className={`swipe-btn-ghost ${viewMode === "table" ? "active" : ""}`}
+            style={{ fontWeight: viewMode === "table" ? 700 : 400, background: viewMode === "table" ? "#e2e8f0" : undefined }}
+            onClick={() => setViewMode("table")}
+            title="Table View"
+          >
+            📋 Table
+          </button>
+          <button
+            type="button"
+            className={`swipe-btn-ghost ${viewMode === "grid" ? "active" : ""}`}
+            style={{ fontWeight: viewMode === "grid" ? 700 : 400, background: viewMode === "grid" ? "#e2e8f0" : undefined }}
+            onClick={() => setViewMode("grid")}
+            title="Grid View"
+          >
+            🖼️ Cards
+          </button>
+        </div>
+      </div>
+
       <Msg st={{ error: msg }} />
+
       <Loader s={s}>
-        <p className="muted" role="status">{rows.length} of {s.data?.length} products. Type a price and press Enter to save.</p>
-        <div className="prod-grid">
-          {rows.map((p) => (
-            <article key={p.id} className={"prod" + (p.active ? "" : " off")}>
-              <Link className="prod-img" to={`/admin/products/${p.id}`} aria-label={`Edit ${p.name}`}><Photo src={p.images[0]} />{p.featured && <span className="prod-flag">Featured</span>}</Link>
-              <div className="prod-body">
-                <Link to={`/admin/products/${p.id}`}>{p.name}</Link>
-                <small>{p.sku}{p.pack && ` · ${p.pack}`} · {catName(p.category)}</small>
-                {p.stockTracked ? <StockMeter available={p.available} reorderLevel={p.reorderLevel || 0} /> : <small>Stock not tracked</small>}
-                <div className="prod-foot">
-                  <PriceCell key={p.id + ":" + p.price} p={p} onSaved={replace} onError={setMsg} />
-                  <label className="toggle"><input type="checkbox" checked={p.active} onChange={(e) => patch(p, { active: e.target.checked })} aria-label={`${p.name} is live on the website`} />Live</label>
+        <p className="muted" role="status" style={{ marginBottom: 12, fontSize: "0.85rem" }}>
+          Showing {rows.length} of {allItems.length} products. Type a price in the selling price box and press Enter to save.
+        </p>
+
+        {viewMode === "table" ? (
+          <div className="swipe-table-card">
+            <div className="swipe-table-wrap">
+              <table className="swipe-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: 60 }}>Item</th>
+                    <th>Product Name & Details</th>
+                    <th style={{ width: 120 }}>Qty</th>
+                    <th style={{ width: 180 }}>Selling Price</th>
+                    <th style={{ width: 140 }}>Purchase Price</th>
+                    <th style={{ width: 100 }}>Status</th>
+                    <th style={{ width: 140, textAlign: "right" }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((p) => {
+                    const initials = (p.name || "PR").slice(0, 2).toUpperCase();
+                    const available = p.available ?? p.qty ?? 0;
+                    const isLow = available <= (p.reorderLevel || 0);
+
+                    return (
+                      <tr key={p.id}>
+                        {/* Thumbnail */}
+                        <td style={{ verticalAlign: "middle" }}>
+                          <Link to={`/admin/products/${p.id}`} style={{ textDecoration: "none" }}>
+                            {p.images?.[0] ? (
+                              <div style={{ width: 40, height: 40, borderRadius: 6, overflow: "hidden", border: "1px solid #e2e8f0", background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                <img src={p.images[0]} alt={p.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                              </div>
+                            ) : (
+                              <div style={{ width: 40, height: 40, borderRadius: 6, background: "#dbeafe", color: "#1e40af", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: "0.85rem" }}>
+                                {initials}
+                              </div>
+                            )}
+                          </Link>
+                        </td>
+
+                        {/* Name & HSN */}
+                        <td>
+                          <div className="swipe-cell-stacked">
+                            <Link to={`/admin/products/${p.id}`} className="swipe-cell-title" style={{ textDecoration: "none", color: "#0f172a", fontWeight: 600 }}>
+                              {p.name}
+                            </Link>
+                            <span className="swipe-cell-sub">
+                              Product: {p.hsn ? `HSN ${p.hsn}` : (p.sku || "N/A")} · {catName(p.category)}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* Qty */}
+                        <td>
+                          <strong style={{ color: isLow ? "#dc2626" : "#0f172a" }}>
+                            {available} {p.unit || "pcs"}
+                          </strong>
+                          {isLow && <span style={{ display: "block", fontSize: "0.72rem", color: "#dc2626", fontWeight: 600 }}>Low stock</span>}
+                        </td>
+
+                        {/* Selling Price */}
+                        <td>
+                          <PriceCell key={p.id + ":" + p.price} p={p} onSaved={replace} onError={setMsg} />
+                          <span className="swipe-cell-sub" style={{ marginTop: 2, display: "block" }}>
+                            {p.gstRate || 18}% GST incl.
+                          </span>
+                        </td>
+
+                        {/* Purchase Price */}
+                        <td>
+                          <span style={{ fontWeight: 600, color: "#334155" }}>
+                            ₹ {p.costPrice != null ? (p.costPrice / 100).toFixed(2) : "0.00"}
+                          </span>
+                          <span className="swipe-cell-sub" style={{ display: "block" }}>
+                            {p.gstRate || 18}% excl.
+                          </span>
+                        </td>
+
+                        {/* Live Status */}
+                        <td>
+                          <label className="toggle" style={{ fontSize: "0.8rem" }}>
+                            <input type="checkbox" checked={p.active} onChange={(e) => patch(p, { active: e.target.checked })} aria-label={`${p.name} live status`} />
+                            {p.active ? "Live" : "Hidden"}
+                          </label>
+                        </td>
+
+                        {/* Actions */}
+                        <td>
+                          <div className="swipe-row-actions" style={{ justifyContent: "flex-end" }}>
+                            <Link className="swipe-btn-ghost" to={`/admin/products/${p.id}`} title="Edit Product">
+                              ✏ Edit
+                            </Link>
+                            <button
+                              type="button"
+                              className="swipe-btn-ghost"
+                              style={{ color: "#16a34a", borderColor: "#bbf7d0" }}
+                              onClick={() => shareWhatsAppProduct(p)}
+                              title="Share on WhatsApp"
+                            >
+                              💬
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <div className="prod-grid">
+            {rows.map((p) => (
+              <article key={p.id} className={"prod" + (p.active ? "" : " off")}>
+                <Link className="prod-img" to={`/admin/products/${p.id}`} aria-label={`Edit ${p.name}`}><Photo src={p.images[0]} />{p.featured && <span className="prod-flag">Featured</span>}</Link>
+                <div className="prod-body">
+                  <Link to={`/admin/products/${p.id}`}>{p.name}</Link>
+                  <small>{p.sku}{p.pack && ` · ${p.pack}`} · {catName(p.category)}</small>
+                  {p.stockTracked ? <StockMeter available={p.available} reorderLevel={p.reorderLevel || 0} /> : <small>Stock not tracked</small>}
+                  <div className="prod-foot">
+                    <PriceCell key={p.id + ":" + p.price} p={p} onSaved={replace} onError={setMsg} />
+                    <label className="toggle"><input type="checkbox" checked={p.active} onChange={(e) => patch(p, { active: e.target.checked })} aria-label={`${p.name} is live on the website`} />Live</label>
+                  </div>
                 </div>
-              </div>
-            </article>
-          ))}
-          {rows.length === 0 && <p className="muted">No products match.</p>}
-        </div>
+              </article>
+            ))}
+          </div>
+        )}
+
+        {rows.length === 0 && <p className="muted" style={{ marginTop: 20 }}>No products match your search or filter.</p>}
       </Loader>
       {imp && <ImportDialog onClose={(changed) => { setImp(false); if (changed) s.reload(); }} />}
     </>

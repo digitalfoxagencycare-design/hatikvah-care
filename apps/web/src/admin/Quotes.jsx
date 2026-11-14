@@ -7,6 +7,13 @@ import { Msg, useAction } from "./ui.jsx";
 import { EmptyState } from "./visual.jsx";
 import { openWhatsAppQuote } from "./whatsappQuote.js";
 
+const DOC_SUBTYPES = [
+  { key: "quotes", label: "Quotations" },
+  { key: "proforma", label: "Pro Forma Invoices" },
+  { key: "challans", label: "Delivery Challans" },
+  { key: "packing", label: "Packing Lists" },
+];
+
 const TABS = [
   { key: "all", label: "All" },
   { key: "sent", label: "Sent" },
@@ -52,9 +59,11 @@ export default function Quotes() {
   const me = useMe();
   const nav = useNavigate();
   const [sp, setSp] = useSearchParams();
+  const currentDocType = sp.get("type") || "quotes";
   const currentTab = sp.get("tab") || "all";
 
   const [search, setSearch] = useState("");
+  const [activeConvertId, setActiveConvertId] = useState(null);
   const [sortField, setSortField] = useState("createdAt");
   const [sortAsc, setSortAsc] = useState(false);
   const [page, setPage] = useState(1);
@@ -128,7 +137,7 @@ export default function Quotes() {
     for (const q of filtered) {
       const amt = q.totals?.total ?? q.total ?? 0;
       totalVal += amt;
-      if (q.status === "accepted" || q.invoiceId) acceptedVal += amt;
+      if (q.status === "accepted" || q.invoiceId || q.status === "converted") acceptedVal += amt;
       else if (q.status !== "rejected" && q.status !== "expired") pendingVal += amt;
     }
 
@@ -156,18 +165,52 @@ export default function Quotes() {
     }, `Quotation converted to Tax Invoice ${q.number}`);
   };
 
+  const convertToOrder = (q) => {
+    run(async () => {
+      const ord = await api(`/api/admin/quotes/${q.id}/order`, { method: "POST" });
+      nav(`/admin/orders/${ord.id}`);
+    }, `Quotation converted to Sales Order ${q.number}`);
+  };
+
   return (
     <>
       <div className="swipe-page-header">
         <h1 className="swipe-title">
-          <span>Quotations</span>
-          <span className="swipe-play-badge" title="Quotations / Estimates">▶</span>
+          <span>Quotations+</span>
+          <span className="swipe-play-badge" title="Quotations / Estimates / Proforma">▶</span>
         </h1>
         <div className="swipe-header-actions">
           <Link className="swipe-btn-primary" to="/admin/quotes/new">
             + New Quotation
           </Link>
         </div>
+      </div>
+
+      {/* Quotations+ Sub-Type Pills */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 12, overflowX: "auto", paddingBottom: 4 }}>
+        {DOC_SUBTYPES.map((sub) => (
+          <button
+            key={sub.key}
+            type="button"
+            className="swipe-btn-ghost"
+            style={{
+              background: currentDocType === sub.key ? "#0B57D0" : "#F8FAFC",
+              color: currentDocType === sub.key ? "#FFFFFF" : "#334155",
+              borderColor: currentDocType === sub.key ? "#0B57D0" : "#E2E8F0",
+              fontWeight: currentDocType === sub.key ? 700 : 500,
+              fontSize: "0.85rem",
+              padding: "6px 14px",
+              borderRadius: "20px",
+            }}
+            onClick={() => {
+              const n = new URLSearchParams(sp);
+              n.set("type", sub.key);
+              setSp(n, { replace: true });
+            }}
+          >
+            {sub.label}
+          </button>
+        ))}
       </div>
 
       {/* Tabs matching Swipe */}
@@ -181,7 +224,10 @@ export default function Quotes() {
             className={`swipe-tab-item ${currentTab === tab.key ? "active" : ""}`}
             onClick={() => {
               setPage(1);
-              setSp(tab.key === "all" ? {} : { tab: tab.key });
+              const n = new URLSearchParams(sp);
+              if (tab.key === "all") n.delete("tab");
+              else n.set("tab", tab.key);
+              setSp(n);
             }}
           >
             <span>{tab.label}</span>
@@ -331,16 +377,61 @@ export default function Quotes() {
                             </button>
 
                             {canConvert && (
-                              <button
-                                type="button"
-                                className="swipe-btn-ghost"
-                                style={{ color: "#2563eb", borderColor: "#bfdbfe" }}
-                                disabled={st.busy}
-                                onClick={() => convertToInvoice(q)}
-                                title="Convert to Tax Invoice"
-                              >
-                                ⚡ Invoice
-                              </button>
+                              <div style={{ position: "relative", display: "inline-block" }}>
+                                <button
+                                  type="button"
+                                  className="swipe-btn-ghost"
+                                  style={{ color: "#2563eb", borderColor: "#bfdbfe", fontWeight: 700 }}
+                                  disabled={st.busy}
+                                  onClick={() => setActiveConvertId(activeConvertId === q.id ? null : q.id)}
+                                  title="Convert to Invoice or Sales Order"
+                                >
+                                  + Convert ▾
+                                </button>
+                                {activeConvertId === q.id && (
+                                  <div
+                                    style={{
+                                      position: "absolute",
+                                      right: 0,
+                                      top: "100%",
+                                      marginTop: 4,
+                                      background: "#fff",
+                                      border: "1px solid #cbd5e1",
+                                      borderRadius: 6,
+                                      boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)",
+                                      zIndex: 50,
+                                      minWidth: 180,
+                                      display: "flex",
+                                      flexDirection: "column",
+                                      padding: "4px 0",
+                                    }}
+                                  >
+                                    <button
+                                      type="button"
+                                      style={{ padding: "8px 12px", textAlign: "left", background: "none", border: "none", cursor: "pointer", fontSize: "0.85rem", color: "#1e293b", fontWeight: 600 }}
+                                      onClick={() => { setActiveConvertId(null); convertToInvoice(q); }}
+                                    >
+                                      ⚡ Convert to Tax Invoice
+                                    </button>
+                                    <button
+                                      type="button"
+                                      style={{ padding: "8px 12px", textAlign: "left", background: "none", border: "none", cursor: "pointer", fontSize: "0.85rem", color: "#1e293b" }}
+                                      onClick={() => { setActiveConvertId(null); convertToOrder(q); }}
+                                    >
+                                      📦 Convert to Sales Order
+                                    </button>
+                                    <a
+                                      href={`/doc/quote/${q.token}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      style={{ padding: "8px 12px", textAlign: "left", textDecoration: "none", fontSize: "0.85rem", color: "#1e293b" }}
+                                      onClick={() => setActiveConvertId(null)}
+                                    >
+                                      📄 Pro Forma / Challan Doc
+                                    </a>
+                                  </div>
+                                )}
+                              </div>
                             )}
 
                             {q.token && (
