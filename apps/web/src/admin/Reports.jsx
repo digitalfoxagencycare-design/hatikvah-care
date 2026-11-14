@@ -17,63 +17,89 @@ export const REPORT_DIVISIONS = [
     icon: "🏛️",
     views: [
       { key: "gstr1", label: "GSTR-1 Tax Hub" },
-      { key: "gstr2b", label: "GSTR-2B (Input Credit)" },
+      { key: "gstr2b", label: "GSTR-2B Input Tax Credit" },
+      { key: "gstr3b", label: "GSTR-3B Monthly Return" },
       { key: "tax_summary", label: "Rate-wise Tax Summary" },
       { key: "hsn_summary", label: "HSN Summary" },
+      { key: "hsn_sales", label: "HSN Sales Breakdown" },
+      { key: "hsn_purchase", label: "HSN Purchase Breakdown" },
+      { key: "tcs_tds", label: "TCS / TDS Ledger" },
     ],
   },
   {
     key: "transactions",
-    label: "Transactions",
+    label: "Transaction Reports",
     icon: "📜",
     views: [
       { key: "sales_summary", label: "Sales Register" },
       { key: "purchase_summary", label: "Purchase Register" },
       { key: "credit_notes", label: "Credit Notes Register" },
+      { key: "debit_notes", label: "Debit Notes Register" },
+      { key: "quotations", label: "Quotations Summary" },
+      { key: "challans", label: "Delivery Challans" },
       { key: "expenses", label: "Operating Expenses" },
       { key: "indirect_income", label: "Indirect Income" },
+      { key: "day_book", label: "Day Book (Chronological)" },
     ],
   },
   {
     key: "bill_items",
-    label: "Bill-wise Items",
+    label: "Bill-wise Item Reports",
     icon: "📦",
     views: [
-      { key: "bill_profit_loss", label: "Bill Profit & Loss" },
-      { key: "sales_by_item", label: "Sales by Product" },
-      { key: "velocity_report", label: "Fast & Slow Moving" },
-      { key: "expiry_report", label: "Batches & Expiry" },
+      { key: "bill_profit_loss", label: "Bill-wise Profit & Margin" },
+      { key: "sales_by_item", label: "Sales by Product / Item" },
+      { key: "purchase_by_item", label: "Purchases by Product / Item" },
+      { key: "item_discount", label: "Item Discounts Given" },
+      { key: "expiry_report", label: "Batches & Expiry Analysis" },
+      { key: "velocity_report", label: "Fast & Slow Moving Items" },
     ],
   },
   {
     key: "items",
-    label: "Stock & Valuation",
+    label: "Item & Stock Reports",
     icon: "🏷️",
     views: [
-      { key: "stock_summary", label: "Stock Summary" },
-      { key: "low_stock", label: "Low Stock Alert" },
+      { key: "stock_summary", label: "Current Stock Summary" },
+      { key: "low_stock", label: "Low Stock & Reorder Alert" },
+      { key: "stock_valuation", label: "Stock Valuation (Sale vs Cost)" },
+      { key: "negative_stock", label: "Negative Stock Check" },
     ],
   },
   {
     key: "party",
-    label: "Party & Ageing",
+    label: "Party & Customer Reports",
     icon: "👥",
     views: [
       { key: "receivables_ageing", label: "Receivables Ageing (0-90+d)" },
+      { key: "payables_ageing", label: "Payables Ageing (Vendors)" },
       { key: "customer_summary", label: "Customer-wise Sales" },
+      { key: "supplier_summary", label: "Supplier-wise Purchases" },
+    ],
+  },
+  {
+    key: "warehouse",
+    label: "Warehouse / Multi-Hub",
+    icon: "🏭",
+    views: [
+      { key: "hub_stock", label: "Hub-wise Stock Distribution" },
+      { key: "hub_moves", label: "Stock Movements Register" },
     ],
   },
   {
     key: "pl",
-    label: "Profit & Loss",
+    label: "Profit & Loss (P&L)",
     icon: "📊",
     views: [
-      { key: "gross_profit", label: "Gross Profit & Margins" },
+      { key: "gross_profit", label: "Gross Profit Summary" },
+      { key: "net_profit", label: "Net Profit (After Expenses)" },
+      { key: "category_profit", label: "Category-wise Margins" },
+      { key: "customer_profit", label: "Customer-wise Profitability" },
     ],
   },
   {
     key: "payments",
-    label: "Payments Hub",
+    label: "Payments Hub Reports",
     icon: "💳",
     views: [
       { key: "payments_in", label: "Payments In (Collections)" },
@@ -82,20 +108,23 @@ export const REPORT_DIVISIONS = [
   },
   {
     key: "summary",
-    label: "Financial Overview",
+    label: "Summary & Financials",
     icon: "📑",
     views: [
       { key: "overview", label: "Sales & Funnel Analytics" },
       { key: "daily_sales", label: "Daily Sales Register" },
-      { key: "trial_balance", label: "Trial Balance" },
+      { key: "monthly_overview", label: "Monthly Revenue Overview" },
+      { key: "trial_balance", label: "Trial Balance (Ledger)" },
+      { key: "audit_trail", label: "Audit Trail Register" },
     ],
   },
   {
     key: "eway",
-    label: "E-Way Bills",
+    label: "E-Way & E-Invoice",
     icon: "🚚",
     views: [
-      { key: "eway_bills", label: "E-Way Bills Issued" },
+      { key: "eway_bills", label: "Government E-Way Bills Issued" },
+      { key: "shipments", label: "Courier Shipments & Tracking" },
     ],
   },
 ];
@@ -111,6 +140,14 @@ export default function Reports() {
   const q = `from=${rg.from}&to=${rg.to}`;
   const s = useLoad(`/api/admin/reports?${q}`);
   const gstr = useLoad(`/api/admin/reports/gstr-1/preview?fy=${encodeURIComponent(selectedFy)}`);
+  const divLoad = useLoad("/api/admin/reports/divisions");
+
+  const divisions = useMemo(() => {
+    if (divLoad.data && Array.isArray(divLoad.data) && divLoad.data.length > 0) {
+      return divLoad.data;
+    }
+    return REPORT_DIVISIONS;
+  }, [divLoad.data]);
 
   // Query engine for active dynamic report view
   const queryUrl = `/api/admin/reports/query?division=${activeDivision}&view=${activeView}&from=${rg.from}&to=${rg.to}`;
@@ -120,15 +157,19 @@ export default function Reports() {
   const gd = gstr.data;
   const pct = (a, b) => (b ? Math.round((100 * a) / b) + "%" : "—");
 
-  const currentDivObj = REPORT_DIVISIONS.find((div) => div.key === activeDivision) || REPORT_DIVISIONS[0];
+  const currentDivObj = divisions.find((div) => div.key === activeDivision) || divisions[0];
 
   const handleDivisionChange = (divKey) => {
     setActiveDivision(divKey);
-    const div = REPORT_DIVISIONS.find((d) => d.key === divKey);
+    const div = divisions.find((d) => d.key === divKey);
     if (div && div.views.length > 0) {
       setActiveView(div.views[0].key);
     }
   };
+
+  const totalReportsCount = useMemo(() => {
+    return divisions.reduce((acc, div) => acc + (div.views?.length || 0), 0) + 6;
+  }, [divisions]);
 
   // Filtered rows for dynamic table
   const filteredRows = useMemo(() => {
@@ -148,7 +189,7 @@ export default function Reports() {
           <h1 style={{ margin: 0, display: "flex", alignItems: "center", gap: 10 }}>
             <span>Reports & Business Intelligence</span>
             <span style={{ fontSize: "0.75rem", background: "#f1f5f9", padding: "3px 8px", borderRadius: 12, color: "#64748b" }}>
-              Swipe 1:1 Engine
+              10 Divisions · {totalReportsCount}+ Reports (Swipe 1:1 Engine)
             </span>
           </h1>
           <p className="muted" style={{ margin: "4px 0 0" }}>
@@ -258,7 +299,7 @@ export default function Reports() {
           borderBottom: "1px solid #e2e8f0",
         }}
       >
-        {REPORT_DIVISIONS.map((div) => {
+        {divisions.map((div) => {
           const isActive = activeDivision === div.key;
           return (
             <button
