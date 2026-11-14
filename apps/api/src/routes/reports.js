@@ -204,7 +204,7 @@ export function reportRoutes({ store }) {
 
   // ---------- Swipe 1:1 Matrix Report Hub Endpoint (Phase 3)
   r.get("/reports/matrix", requirePerm("reports"), wrap(async (req, res) => {
-    let { tab = "gstr_1", division, view, fy = "", from = "", to = "", search = "", party = "", category = "", hub = "", includeCancelled = "false" } = req.query;
+    let { tab, division, view, fy = "", from = "", to = "", search = "", party = "", category = "", hub = "", includeCancelled = "false" } = req.query;
 
     if (fy && !from) {
       const match = String(fy).match(/(\d{2})-(\d{2})/);
@@ -247,39 +247,93 @@ export function reportRoutes({ store }) {
       ewaybill_report: { division: "eway", view: "eway_bills" },
     };
 
-    const resolved = tabMap[tab] || { division: division || "taxes", view: view || tab };
-    const result = await computeReportData({ division: resolved.division, view: resolved.view, from, to, search, store });
+    // Prioritize explicitly requested division and view over legacy tab parameter
+    const targetDivision = division || (tab && tabMap[tab]?.division) || "taxes";
+    const targetView = view || (tab && tabMap[tab]?.view) || (tab || "gstr1");
 
-    const invoicesAll = await store.invoices.all({ sort: { date: -1 } });
-    const creditNotesAll = await store.creditNotes.all({ sort: { date: -1 } });
-    const invoices = invoicesAll.filter(i => isIssuedInvoice(i) && (!from || i.date >= from) && (!to || i.date <= to));
-    const creditNotes = creditNotesAll.filter(c => (!from || c.date >= from) && (!to || c.date <= to));
+    const result = await computeReportData({ division: targetDivision, view: targetView, from, to, search, store });
 
-    let qty = 0, cgst = 0, sgst = 0, igst = 0, totalTaxable = 0, totalAmount = 0, amountPaid = 0;
+    const isCancelledIncluded = includeCancelled === "true" || includeCancelled === true;
+    const filterParty = String(party || "").trim().toLowerCase();
 
-    for (const inv of invoices) {
-      for (const item of inv.items || []) {
-        qty += Number(item.qty) || 0;
+    const [invoicesAll, creditNotesAll, purchasesAll, paymentsAll] = await Promise.all([
+      store.invoices.all({ sort: { date: -1 } }),
+      store.creditNotes.all({ sort: { date: -1 } }),
+      store.purchases.all({ sort: { createdAt: -1 } }),
+      store.payments.all({ sort: { date: -1 } }),
+    ]);
+
+    const paidByInvoice = new Map();
+    for (const p of paymentsAll) {
+      if (p.invoiceId && !p.reversedAt) {
+        paidByInvoice.set(p.invoiceId, (paidByInvoice.get(p.invoiceId) || 0) + (p.amount || 0));
       }
-      cgst += inv.totals?.cgst || 0;
-      sgst += inv.totals?.sgst || 0;
-      igst += inv.totals?.igst || 0;
-      totalTaxable += inv.totals?.taxable || 0;
-      totalAmount += inv.totals?.total || 0;
-      const rec = (inv.payments || []).reduce((a, b) => a + (b.amount || 0), 0);
-      amountPaid += rec;
     }
 
-    for (const cn of creditNotes) {
-      cgst -= cn.totals?.cgst || 0;
-      sgst -= cn.totals?.sgst || 0;
-      igst -= cn.totals?.igst || 0;
-      totalTaxable -= cn.totals?.taxable || 0;
-      totalAmount -= cn.totals?.total || 0;
+    let qty = 0, cgst = 0, sgst = 0, igst = 0, totalTaxable = 0, totalAmount = 0, amountPaid = 0, roundOffPaise = 0;
+
+    if (targetDivision === "purchases" || targetView === "purchase_summary" || targetView === "purchase_by_item") {
+      const filteredPurchases = purchasesAll.filter((p) => {
+        const d = p.date || p.createdAt?.slice(0, 10);
+        if (from && d < from) return false;
+        if (to && d > to) return false;
+        if (filterParty && !(p.supplierName || p.supplier?.name || "").toLowerCase().includes(filterParty)) return false;
+        return true;
+      });
+      for (const po of filteredPurchases) {
+        for (const it of po.items || []) {
+          qty += Number(it.qty) || 0;
+          const lineTaxable = (it.rate || 0) * (Number(it.qty) || 0);
+          const gstRt = it.gstRate !== undefined ? Number(it.gstRate) : 0;
+          const lineTax = Math.round((lineTaxable * gstRt) / 100);
+          totalTaxable += lineTaxable;
+          cgst += Math.round(lineTax / 2);
+          sgst += lineTax - Math.round(lineTax / 2);
+          totalAmount += lineTaxable + lineTax;
+        }
+      }
+      amountPaid = totalAmount;
+    } else {
+      const invoices = invoicesAll.filter((i) => {
+        if (!isCancelledIncluded && (i.status === "void" || i.status === "draft")) return false;
+        if (from && i.date < from) return false;
+        if (to && i.date > to) return false;
+        if (filterParty && !(i.customer?.name || "").toLowerCase().includes(filterParty)) return false;
+        return true;
+      });
+
+      const creditNotes = creditNotesAll.filter((c) => {
+        if (from && c.date < from) return false;
+        if (to && c.date > to) return false;
+        if (filterParty && !(c.customer?.name || "").toLowerCase().includes(filterParty)) return false;
+        return true;
+      });
+
+      for (const inv of invoices) {
+        for (const item of inv.items || []) {
+          qty += Number(item.qty) || 0;
+        }
+        cgst += inv.totals?.cgst || 0;
+        sgst += inv.totals?.sgst || 0;
+        igst += inv.totals?.igst || 0;
+        totalTaxable += inv.totals?.taxable || 0;
+        totalAmount += inv.totals?.total || 0;
+        roundOffPaise += inv.totals?.roundOff || inv.roundOff || 0;
+        const rec = paidByInvoice.get(inv.id) ?? inv.amountPaid ?? (inv.payments || []).reduce((a, b) => a + (b.amount || 0), 0);
+        amountPaid += rec;
+      }
+
+      for (const cn of creditNotes) {
+        cgst -= cn.totals?.cgst || 0;
+        sgst -= cn.totals?.sgst || 0;
+        igst -= cn.totals?.igst || 0;
+        totalTaxable -= cn.totals?.taxable || 0;
+        totalAmount -= cn.totals?.total || 0;
+        roundOffPaise -= cn.totals?.roundOff || cn.roundOff || 0;
+      }
     }
 
     const netAmount = totalTaxable;
-    const roundOff = Math.round(totalAmount) - totalAmount;
     const amountPending = Math.max(0, totalAmount - amountPaid);
 
     const totals = {
@@ -287,7 +341,7 @@ export function reportRoutes({ store }) {
       cgst: Number(((cgst || 0) / 100).toFixed(2)),
       sgst: Number(((sgst || 0) / 100).toFixed(2)),
       igst: Number(((igst || 0) / 100).toFixed(2)),
-      roundOff: Number(((roundOff || 0) / 100).toFixed(2)),
+      roundOff: Number(((roundOffPaise || 0) / 100).toFixed(2)),
       netAmount: Number(((netAmount || 0) / 100).toFixed(2)),
       totalAmount: Number(((totalAmount || 0) / 100).toFixed(2)),
       amountPaid: Number(((amountPaid || 0) / 100).toFixed(2)),
@@ -295,9 +349,9 @@ export function reportRoutes({ store }) {
     };
 
     res.json({
-      tab,
-      division: resolved.division,
-      view: resolved.view,
+      tab: tab || targetView,
+      division: targetDivision,
+      view: targetView,
       columns: result.columns,
       rows: result.rows,
       totals,
@@ -306,15 +360,16 @@ export function reportRoutes({ store }) {
   }));
 
   r.get("/reports/matrix.csv", requirePerm("reports"), wrap(async (req, res) => {
-    let { tab = "gstr_1", division, view, from = "", to = "", search = "" } = req.query;
+    let { tab, division, view, from = "", to = "", search = "" } = req.query;
     const tabMap = {
       gstr_1: { division: "taxes", view: "gstr1" },
       transactions_sales: { division: "transactions", view: "sales_summary" },
       transactions_purchases: { division: "transactions", view: "purchase_summary" },
       stock_summary: { division: "items", view: "stock_summary" },
     };
-    const resolved = tabMap[tab] || { division: division || "taxes", view: view || tab };
-    const result = await computeReportData({ division: resolved.division, view: resolved.view, from, to, search, store });
+    const targetDivision = division || (tab && tabMap[tab]?.division) || "taxes";
+    const targetView = view || (tab && tabMap[tab]?.view) || (tab || "gstr1");
+    const result = await computeReportData({ division: targetDivision, view: targetView, from, to, search, store });
     const colKeys = result.columns.map((c) => c.key);
     const colLabels = result.columns.map((c) => c.label);
     const csvRows = result.rows.map((r) => {

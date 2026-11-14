@@ -13,7 +13,13 @@ function toEinvoiceDate(ymd) {
 }
 
 function normalizeHsn(rawHsn) {
-  let hsn = String(rawHsn || "96032100").replace(/\D/g, "");
+  if (!rawHsn) {
+    throw new Error("Mandatory HSN code is missing for E-Invoicing item.");
+  }
+  let hsn = String(rawHsn).replace(/\D/g, "");
+  if (!hsn || hsn.length < 4) {
+    throw new Error(`Invalid HSN code "${rawHsn}". E-Invoicing requires at least a 4-digit numeric HSN.`);
+  }
   if (hsn.length === 8 && hsn.endsWith("0000")) hsn = hsn.slice(0, 4);
   return hsn.slice(0, 8);
 }
@@ -216,19 +222,43 @@ export async function generateSandboxEinvoice({ invoice, settings = {}, cfg = {}
     if (res.ok) {
       const data = await res.json();
       const einvData = data.data?.data || data.data || {};
-      const irn = String(einvData.Irn || einvData.irn || "");
+      const irn = String(einvData.Irn || einvData.irn || "").trim();
 
       if (irn) {
+        const ackNo = String(einvData.AckNo || einvData.ackNo || "").trim();
+        const ackDate = String(einvData.AckDt || einvData.ackDate || "").trim();
+        const signedInvoice = String(einvData.SignedInvoice || einvData.signedInvoice || "").trim();
+        const signedQrCode = String(einvData.SignedQRCode || einvData.signedQrCode || "").trim();
+
+        // Fail-closed verification: active status strictly requires verified response containing signed QR, signed invoice, and IRP ack
+        const isVerifiedActive = Boolean(irn && irn.length === 64 && ackNo && ackDate && signedInvoice && signedQrCode);
+
+        if (!isVerifiedActive) {
+          return {
+            ok: false,
+            source: "sandbox_irp_api",
+            error: "IRP response is incomplete: missing AckNo, AckDt, SignedInvoice, or SignedQRCode. Cannot mark IRN as verified active.",
+            status: "unverified",
+            irn,
+            ackNo: ackNo || null,
+            ackDate: ackDate || null,
+            signedInvoice: signedInvoice || null,
+            signedQrCode: signedQrCode || null,
+            govtJson,
+          };
+        }
+
         return {
           ok: true,
           source: "sandbox_irp_api",
           irn,
-          ackNo: String(einvData.AckNo || einvData.ackNo || ""),
-          ackDate: einvData.AckDt || einvData.ackDate || new Date().toISOString(),
-          signedInvoice: einvData.SignedInvoice || "",
-          signedQrCode: einvData.SignedQRCode || "",
-          ewbNo: einvData.EwbNo || "",
+          ackNo,
+          ackDate,
+          signedInvoice,
+          signedQrCode,
+          ewbNo: String(einvData.EwbNo || "").trim(),
           status: "active",
+          isVerified: true,
           govtJson,
         };
       }
@@ -272,7 +302,7 @@ export async function generateSandboxEinvoice({ invoice, settings = {}, cfg = {}
  * Cancels an E-Invoice on IRP (Allowed within 24 hours of generation)
  */
 export async function cancelSandboxEinvoice({ irn, reason = "1", remarks = "Cancelled by admin", cfg = {}, fetchImpl = fetch }) {
-  if (!irn || irn.length < 32) {
+  if (!irn || irn.length !== 64) {
     return { ok: false, error: "Valid 64-character IRN is required for cancellation" };
   }
 
@@ -298,8 +328,15 @@ export async function cancelSandboxEinvoice({ irn, reason = "1", remarks = "Canc
 
     if (res.ok) {
       const data = await res.json();
+      if (data.status === "FAILED" || data.error) {
+        return { ok: false, error: data.error?.message || data.message || "IRP rejected cancellation request" };
+      }
       const cancelData = data.data?.data || data.data || {};
-      return { ok: true, data: cancelData, cancelDate: cancelData.CancelDate || new Date().toISOString() };
+      const cancelDate = cancelData.CancelDate || cancelData.cancelDate;
+      if (!cancelDate) {
+        return { ok: false, error: "IRP cancellation response did not contain an authoritative CancelDate" };
+      }
+      return { ok: true, data: cancelData, cancelDate };
     }
     const txt = await res.text().catch(() => "");
     return { ok: false, error: `IRP cancellation returned ${res.status}: ${txt.slice(0, 150)}` };

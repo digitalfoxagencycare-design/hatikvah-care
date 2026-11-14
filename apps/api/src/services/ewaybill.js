@@ -27,12 +27,18 @@ function translateNicErrors(errCodesStr, defaultInfo = "") {
 }
 
 function normalizeHsnForNic(rawHsn) {
-  let hsn = String(rawHsn || "96032100").replace(/\D/g, "");
+  if (!rawHsn) {
+    throw new Error("Mandatory HSN code is missing for product in E-Way bill.");
+  }
+  let hsn = String(rawHsn).replace(/\D/g, "");
+  if (!hsn || hsn.length < 4) {
+    throw new Error(`Invalid HSN code "${rawHsn}". E-Way Bill requires at least a 4-digit numeric HSN.`);
+  }
   // If 8 digits and ends in 0000 (e.g. 96050000 where chapter only has 4/6 digits)
   if (hsn.length === 8 && hsn.endsWith("0000")) {
     hsn = hsn.slice(0, 4);
   }
-  return Number(hsn) || 96032100;
+  return Number(hsn);
 }
 
 const taxpayerTokenCache = new Map();
@@ -113,10 +119,7 @@ function toRs(paise) {
  * Ready for 1-click bulk upload on ewaybillgst.gov.in (Zero Cost) and Sandbox API.
  */
 export function buildEwbGovtJson({ invoice, settings = {}, transport = {}, cfg = {} }) {
-  let sellerGstin = (settings.gstin || cfg.ewbGstin || "36ADDPC0083H1Z0").trim().toUpperCase();
-  if (!GSTIN_RE.test(sellerGstin)) {
-    sellerGstin = (cfg.ewbGstin || "36ADDPC0083H1Z0").trim().toUpperCase();
-  }
+  const sellerGstin = (settings.gstin || cfg.ewbGstin || "36ADDPC0083H1Z0").trim().toUpperCase();
   const sellerStateCode = Number(settings.stateCode || sellerGstin.slice(0, 2) || "36");
 
   let buyerGstin = (invoice.customer?.gstin || "URP").trim().toUpperCase();
@@ -125,6 +128,9 @@ export function buildEwbGovtJson({ invoice, settings = {}, transport = {}, cfg =
   }
   const buyerStateCode = Number(invoice.placeOfSupply || invoice.customer?.stateCode || sellerStateCode);
   const isInterState = sellerStateCode !== buyerStateCode;
+
+  // Destination PIN with state-level fallback (520001 for AP (37), 500001 for TS (36))
+  const toPin = Number(transport.toPincode || invoice.customer?.deliveryPincode || invoice.customer?.pincode || (buyerStateCode === 37 ? 520001 : 500001));
 
   // Item list mapped to strict NIC schema
   const itemList = (invoice.items || []).map((it, idx) => {
@@ -181,7 +187,7 @@ export function buildEwbGovtJson({ invoice, settings = {}, transport = {}, cfg =
     toTrdName: String(invoice.customer?.name || "Customer").slice(0, 100),
     toAddr1: buyerAddr.slice(0, 120),
     toPlace: String(invoice.customer?.city || "Hyderabad").slice(0, 50),
-    toPincode: Number(transport.toPincode || invoice.customer?.deliveryPincode || invoice.customer?.pincode || (buyerStateCode === 37 ? "520001" : "500001")),
+    toPincode: toPin,
     toStateCode: buyerStateCode,
     actToStateCode: buyerStateCode,
 

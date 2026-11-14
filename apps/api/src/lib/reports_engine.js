@@ -989,30 +989,73 @@ export async function computeReportData({ division = "taxes", view = "gstr1", fr
   }
 
   // 10. E-WAY & E-INVOICE
-  const ewbInvoices = invoicesAll.filter((i) => i.ewaybill?.ewbNo);
-  const rows = ewbInvoices.map((i) => ({
-    col1: i.ewaybill?.ewbNo,
-    col2: i.number,
-    col3: i.date,
-    col4: i.customer?.name || "Customer",
-    col5: i.ewaybill?.vehicleNo || "-",
-    col6: i.ewaybill?.distance ? `${i.ewaybill.distance} KM` : "-",
-    col7: fmtRs(i.totals?.total || 0),
-    status: "Active ✓",
-  }));
+  if (view === "eway_bills") {
+    const ewbInvoices = invoicesAll.filter((i) => i.ewaybill?.ewbNo);
+    const rows = ewbInvoices.map((i) => ({
+      col1: i.ewaybill?.ewbNo,
+      col2: i.number,
+      col3: i.date,
+      col4: i.customer?.name || "Customer",
+      col5: i.ewaybill?.vehicleNo || "-",
+      col6: i.ewaybill?.distance ? `${i.ewaybill.distance} KM` : "-",
+      col7: fmtRs(i.totals?.total || 0),
+      status: "Active ✓",
+    }));
+    return {
+      columns: [
+        { key: "col1", label: "E-Way Bill Number" },
+        { key: "col2", label: "Invoice Number" },
+        { key: "col3", label: "Date" },
+        { key: "col4", label: "Customer Name" },
+        { key: "col5", label: "Vehicle Number" },
+        { key: "col6", label: "Distance (KM)" },
+        { key: "col7", label: "Invoice Value (₹)", align: "right" },
+        { key: "status", label: "Status" },
+      ],
+      rows,
+      totals: { count: rows.length, total: fmtRs(ewbInvoices.reduce((a, b) => a + (b.totals?.total || 0), 0)) },
+    };
+  }
+
+  if (view === "shipments") {
+    const dispatchedInvoices = invoicesAll.filter((i) => i.shipment || i.dispatchSlip);
+    const rows = dispatchedInvoices.map((i) => ({
+      col1: i.shipment?.awb || i.number,
+      col2: i.shipment?.courier || "Direct Delivery",
+      col3: i.date,
+      col4: i.customer?.name || "Customer",
+      col5: i.shipment?.status || "Dispatched",
+      col6: fmtRs(i.totals?.total || 0),
+    }));
+    return {
+      columns: [
+        { key: "col1", label: "AWB / Tracking No" },
+        { key: "col2", label: "Courier Partner" },
+        { key: "col3", label: "Dispatch Date" },
+        { key: "col4", label: "Recipient" },
+        { key: "col5", label: "Delivery Status" },
+        { key: "col6", label: "Consignment Value (₹)", align: "right" },
+      ],
+      rows,
+      totals: { count: rows.length, total: fmtRs(dispatchedInvoices.reduce((a, b) => a + (b.totals?.total || 0), 0)) },
+    };
+  }
+
+  // Explicit fallback: fail-closed, never misrepresent as an unrelated report
   return {
     columns: [
-      { key: "col1", label: "E-Way Bill Number" },
-      { key: "col2", label: "Invoice Number" },
-      { key: "col3", label: "Date" },
-      { key: "col4", label: "Customer Name" },
-      { key: "col5", label: "Vehicle Number" },
-      { key: "col6", label: "Distance (KM)" },
-      { key: "col7", label: "Invoice Value (₹)", align: "right" },
-      { key: "status", label: "Status" },
+      { key: "col1", label: "Report View" },
+      { key: "col2", label: "Status" },
+      { key: "col3", label: "Notes" },
     ],
-    rows,
-    totals: { count: rows.length, total: fmtRs(ewbInvoices.reduce((a, b) => a + (b.totals?.total || 0), 0)) },
+    rows: [
+      {
+        col1: `${division} / ${view}`,
+        col2: "No records found",
+        col3: "No transactional records available for selected date filters.",
+      },
+    ],
+    totals: { count: 0, total: "0.00" },
   };
 }
 

@@ -166,42 +166,64 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
   r.post("/quotes/:id/convert-doc", requirePerm("quotes"), wrap(async (req, res) => {
     const q = await store.quotes.get(req.params.id);
     if (!q) return notFound(res, "Quote");
-    const { targetType = "proforma" } = req.body || {};
+
+    const { targetType } = req.body || {};
     const prefixMap = {
       proforma: "PF",
       challan: "DC",
       packing_list: "PK",
     };
-    const pfx = prefixMap[targetType] || "PF";
-    const newNumber = await nextNumber(store, pfx);
-    const conversionEntry = {
-      fromQuoteId: q.id,
-      fromQuoteNumber: q.number,
-      targetType,
-      newNumber,
-      convertedAt: now(),
-      by: by(req),
-    };
-    const cloned = await store.quotes.insert({
-      ...q,
-      id: undefined,
-      number: newNumber,
-      docType: targetType,
-      token: token(),
-      status: "draft",
-      parentQuoteId: q.id,
-      parentQuoteNumber: q.number,
-      createdAt: now(),
-      updatedAt: now(),
-      createdBy: by(req),
+    if (!targetType || !prefixMap[targetType]) {
+      return bad(res, "Invalid targetType. Must be one of: 'proforma', 'challan', or 'packing_list'", 400);
+    }
+    const pfx = prefixMap[targetType];
+
+    const { newDoc, updatedQuote } = await store.atomic(async () => {
+      const currentQuote = await store.quotes.get(q.id);
+      if (!currentQuote) throw new Error("Quote not found");
+
+      const newNumber = await nextNumber(store, pfx);
+      const conversionEntry = {
+        fromQuoteId: currentQuote.id,
+        fromQuoteNumber: currentQuote.number,
+        targetType,
+        newNumber,
+        convertedAt: now(),
+        by: by(req),
+      };
+
+      // Create clean document without copying stale linked states or execution tokens
+      const docPayload = {
+        number: newNumber,
+        docType: targetType,
+        customerId: currentQuote.customerId,
+        customer: currentQuote.customer,
+        items: (currentQuote.items || []).map(({ amount, tax, total, ...l }) => l),
+        totals: currentQuote.totals,
+        placeOfSupply: currentQuote.placeOfSupply,
+        notes: currentQuote.notes,
+        terms: currentQuote.terms,
+        token: token(),
+        status: "draft",
+        parentQuoteId: currentQuote.id,
+        parentQuoteNumber: currentQuote.number,
+        createdAt: now(),
+        updatedAt: now(),
+        createdBy: by(req),
+      };
+
+      const inserted = await store.quotes.insert(docPayload);
+      const existingHist = Array.isArray(currentQuote.conversionHistory) ? currentQuote.conversionHistory : [];
+      const updated = await store.quotes.update(currentQuote.id, {
+        conversionHistory: [...existingHist, conversionEntry],
+        updatedAt: now(),
+      });
+
+      return { newDoc: inserted, updatedQuote: updated };
     });
-    const existingHist = Array.isArray(q.conversionHistory) ? q.conversionHistory : [];
-    await store.quotes.update(q.id, {
-      conversionHistory: [...existingHist, conversionEntry],
-      updatedAt: now(),
-    });
-    await audit(req, "quote.convert", q.number, { targetType, newNumber });
-    res.status(201).json(cloned);
+
+    await audit(req, "quote.convert", q.number, { targetType, newNumber: newDoc.number });
+    res.status(201).json(newDoc);
   }));
   r.delete("/quotes/:id", requirePerm("quotes"), wrap(async (req, res) => {
     const q = await store.quotes.get(req.params.id); if (!q) return notFound(res, "Quote");
@@ -477,26 +499,37 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
 
   // ---------- Government IRP E-Invoice Integration (IRN & Signed QR)
   r.post("/invoices/:id/einvoice/generate", requirePerm("invoices"), wrap(async (req, res) => {
-    const inv = await store.invoices.get(req.params.id);
-    if (!inv) return notFound(res, "Invoice");
-    if (inv.status === "draft") return bad(res, "Cannot generate Government E-Invoice for an unissued draft invoice. Issue the invoice first.", 400);
-    if (inv.status === "void") return bad(res, "Cannot generate E-Invoice for a void invoice", 409);
-    if (inv.einvoice?.status === "active") return bad(res, "This invoice already has an active Government E-Invoice registered.", 409);
-
-    // Concurrency / In-Progress lock
-    if (inv.einvoice?.status === "in_progress") {
-      const claimAge = Date.now() - new Date(inv.einvoice.claimedAt || 0).getTime();
-      if (claimAge < 120_000) {
-        return bad(res, "An E-Invoice registration request is currently in progress for this invoice. Please wait.", 409);
+    // Atomic concurrency lock via store.atomic
+    const claimResult = await store.atomic(async () => {
+      const inv = await store.invoices.get(req.params.id);
+      if (!inv) return { error: "Invoice not found", code: 404 };
+      if (inv.status === "draft") {
+        return { error: "Cannot generate Government E-Invoice for an unissued draft invoice. Issue the invoice first.", code: 400 };
       }
-    }
-
-    // Set lock
-    await store.invoices.update(inv.id, {
-      einvoice: { status: "in_progress", claimedAt: now() },
-      updatedAt: now(),
+      if (inv.status === "void") {
+        return { error: "Cannot generate E-Invoice for a void invoice", code: 409 };
+      }
+      if (["active", "verified_active"].includes(inv.einvoice?.status)) {
+        return { error: "This invoice already has an active Government E-Invoice registered.", code: 409 };
+      }
+      if (inv.einvoice?.status === "in_progress") {
+        const claimAge = Date.now() - new Date(inv.einvoice.claimedAt || 0).getTime();
+        if (claimAge < 120_000) {
+          return { error: "An E-Invoice registration request is currently in progress for this invoice. Please wait.", code: 409 };
+        }
+      }
+      await store.invoices.update(inv.id, {
+        einvoice: { status: "in_progress", claimedAt: now() },
+        updatedAt: now(),
+      });
+      return { ok: true, invoice: inv };
     });
 
+    if (!claimResult.ok) {
+      return bad(res, claimResult.error, claimResult.code || 400);
+    }
+
+    const inv = claimResult.invoice;
     const settings = await getSettings(store);
     const result = await generateSandboxEinvoice({ invoice: inv, settings, cfg, fetchImpl });
 
@@ -504,10 +537,10 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
       const einvoice = {
         irn: result.irn,
         ackNo: result.ackNo || "",
-        ackDate: result.ackDate || new Date().toISOString(),
+        ackDate: result.ackDate,
         signedInvoice: result.signedInvoice || "",
         signedQrCode: result.signedQrCode || "",
-        status: "active",
+        status: result.status || "verified_active",
         generatedAt: now(),
       };
       await store.invoices.update(inv.id, { einvoice, updatedAt: now() });
@@ -543,17 +576,21 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
   r.post("/invoices/:id/einvoice/cancel", requirePerm("invoices"), wrap(async (req, res) => {
     const inv = await store.invoices.get(req.params.id);
     if (!inv) return notFound(res, "Invoice");
-    if (!inv.einvoice?.irn || inv.einvoice.status !== "active") {
+    if (!inv.einvoice?.irn || !["active", "verified_active"].includes(inv.einvoice.status)) {
       return bad(res, "Invoice does not have an active Government IRN to cancel", 409);
     }
 
-    // Enforce 24-hour statutory cancellation window
-    if (inv.einvoice.ackDate) {
-      const ackTime = new Date(inv.einvoice.ackDate).getTime();
-      const diffHours = (Date.now() - ackTime) / (3600 * 1000);
-      if (diffHours > 24) {
-        return bad(res, "Government IRP rules strictly prohibit cancelling an e-invoice after 24 hours of generation. You must issue a Credit Note instead.", 400);
-      }
+    // Fail-closed 24-hour statutory cancellation check against verified IRP acknowledgement date
+    if (!inv.einvoice.ackDate) {
+      return bad(res, "Cannot cancel: e-invoice is missing verified Government acknowledgement timestamp", 400);
+    }
+    const ackTime = new Date(inv.einvoice.ackDate).getTime();
+    if (isNaN(ackTime)) {
+      return bad(res, "Cannot cancel: e-invoice acknowledgement timestamp is invalid", 400);
+    }
+    const diffHours = (Date.now() - ackTime) / (3600 * 1000);
+    if (diffHours < 0 || diffHours > 24) {
+      return bad(res, "Government IRP rules strictly prohibit cancelling an e-invoice after 24 hours of generation. You must issue a Credit Note instead.", 400);
     }
 
     const { reason = "1", remarks = "Cancelled by admin" } = req.body || {};
@@ -575,8 +612,8 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
 
     const einvoice = {
       ...inv.einvoice,
-      status: "cancelled",
-      cancelledAt: now(),
+      status: "verified_cancelled",
+      cancelledAt: cancelRes.cancelDate || now(),
       cancelReason: reason,
       cancelRemarks: remarks,
     };
@@ -600,20 +637,29 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
     const inv = await store.invoices.get(req.params.id);
     if (!inv) return notFound(res, "Invoice");
 
-    const { irn = "", ackNo = "", ackDate = "", signedQrCode = "" } = req.body || {};
-    if (!irn.trim()) return bad(res, "Valid IRN is required");
+    const { irn = "", ackNo = "", ackDate = "", signedQrCode = "", signedInvoice = "" } = req.body || {};
+    const cleanIrn = String(irn).trim();
+    if (!cleanIrn || cleanIrn.length !== 64 || !/^[0-9a-fA-F]{64}$/.test(cleanIrn)) {
+      return bad(res, "Valid 64-character hexadecimal IRN is required");
+    }
+
+    // Fail-closed: manual entries without cryptographic provider verification remain "unverified"
+    const hasSignedArtifacts = Boolean(signedQrCode && signedInvoice && ackNo && ackDate);
+    const status = hasSignedArtifacts ? "verified_active" : "unverified";
 
     const einvoice = {
-      irn: String(irn).trim(),
-      ackNo: String(ackNo).trim(),
-      ackDate: ackDate || new Date().toISOString(),
-      signedQrCode: String(signedQrCode).trim(),
-      status: "active",
+      irn: cleanIrn,
+      ackNo: String(ackNo).trim() || null,
+      ackDate: ackDate || null,
+      signedQrCode: String(signedQrCode).trim() || null,
+      signedInvoice: String(signedInvoice).trim() || null,
+      status,
       savedAt: now(),
+      isManualEntry: true,
     };
     await store.invoices.update(inv.id, { einvoice, updatedAt: now() });
-    await logActivity(store, { entity: "invoice", entityId: inv.id, text: `E-Invoice IRN ${einvoice.irn.slice(0, 16)}... recorded`, by: by(req) });
-    await audit(req, "invoice.einvoice.save", inv.number, { irn: einvoice.irn });
+    await logActivity(store, { entity: "invoice", entityId: inv.id, text: `E-Invoice IRN ${cleanIrn.slice(0, 16)}... recorded (${status})`, by: by(req) });
+    await audit(req, "invoice.einvoice.save", inv.number, { irn: cleanIrn, status });
     res.json({ ok: true, einvoice });
   }));
 

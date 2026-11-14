@@ -213,14 +213,9 @@ export function stockRoutes({ store, audit }) {
       return bad(res, "At least one item must be returned on a debit note");
     }
 
-    const dnSeq = (po.debitNotes?.length || 0) + 1;
-    const cleanPoNum = String(po.number || "PO").replace(/[^A-Za-z0-9]/g, "");
-    const dnNumber = `DN-${cleanPoNum}-${String(dnSeq).padStart(2, "0")}`;
-    let totalTaxablePaise = 0;
-    let totalTaxPaise = 0;
-    const currentBuckets = await stockBuckets(store);
     const updatedPoItems = [...(po.items || [])];
 
+    // 1. Validate that each return line does not exceed the received returnable balance
     for (const retItem of items) {
       const itemIdx = updatedPoItems.findIndex((i) => i.productId === retItem.productId);
       if (itemIdx === -1) return bad(res, "Returned product is not on this purchase order");
@@ -236,25 +231,58 @@ export function stockRoutes({ store, audit }) {
       if (retQty > returnableBalance) {
         return bad(res, `Cannot return ${retQty} units of ${orig.name || "item"}. Only ${returnableBalance} units received and returnable.`);
       }
+    }
 
-      // Check physical stock availability
-      const avail = bucketOf(currentBuckets, orig.productId).available;
-      if (avail < retQty) {
-        return bad(res, `Insufficient stock to return ${retQty} units of ${orig.name || "item"}. Current available physical stock is ${avail} units.`);
+    // 2. Aggregate requested return quantities by product ID to prevent snapshot undercounting
+    const totalReturnByProduct = new Map();
+    for (const retItem of items) {
+      const pid = retItem.productId;
+      const q = Number(retItem.qty) || 0;
+      totalReturnByProduct.set(pid, (totalReturnByProduct.get(pid) || 0) + q);
+    }
+
+    // 3. Validate aggregated return quantity against available physical stock
+    const currentBuckets = await stockBuckets(store);
+    for (const [pid, totalQty] of totalReturnByProduct.entries()) {
+      const avail = bucketOf(currentBuckets, pid).available;
+      if (avail < totalQty) {
+        return bad(res, `Insufficient stock to return ${totalQty} total units of product ${pid}. Current available physical stock is ${avail} units.`);
       }
+    }
 
-      // Fetch product to verify batch tracking
-      const prod = await store.products.get(orig.productId);
+    // 4. For batch-tracked goods, verify specific batch availability
+    const allStockMoves = await store.stockMoves.all();
+    const batchLevelsForProd = (pid) => batchLevels(allStockMoves).filter(b => b.productId === pid);
+    for (const retItem of items) {
+      const prod = await store.products.get(retItem.productId);
       if (prod?.batchTracked) {
         if (!retItem.batch || !retItem.batch.batchNumber) {
-          return bad(res, `Product ${orig.name} is batch-tracked. Batch number is mandatory for return.`);
+          return bad(res, `Product ${prod.name} is batch-tracked. Batch number is mandatory for return.`);
+        }
+        const bList = batchLevelsForProd(prod.id);
+        const matchBatch = bList.find(b => b.batchNumber === retItem.batch.batchNumber);
+        const batchAvail = matchBatch?.qty || 0;
+        if (batchAvail < (Number(retItem.qty) || 0)) {
+          return bad(res, `Insufficient stock in batch ${retItem.batch.batchNumber} for product ${prod.name}. Available batch stock: ${batchAvail}, requested return: ${retItem.qty}`);
         }
       }
+    }
 
-      // Always trust server's purchase line rate, never client-submitted rate
+    const dnSeq = (po.debitNotes?.length || 0) + 1;
+    const cleanPoNum = String(po.number || "PO").replace(/[^A-Za-z0-9]/g, "");
+    const dnNumber = `DN-${cleanPoNum}-${String(dnSeq).padStart(2, "0")}`;
+    let totalTaxablePaise = 0;
+    let totalTaxPaise = 0;
+
+    for (const retItem of items) {
+      const itemIdx = updatedPoItems.findIndex((i) => i.productId === retItem.productId);
+      const orig = updatedPoItems[itemIdx];
+      const retQty = Number(retItem.qty) || 0;
+      const alreadyReturned = Number(orig.returnedQty || 0);
+
       const serverRate = orig.rate || 0;
       const lineTaxable = serverRate * retQty;
-      const gstRate = orig.gstRate !== undefined ? Number(orig.gstRate) : 18;
+      const gstRate = orig.gstRate !== undefined && orig.gstRate !== null ? Number(orig.gstRate) : (po.gstRate !== undefined ? Number(po.gstRate) : 18);
       const lineTax = Math.round((lineTaxable * gstRate) / 100);
 
       totalTaxablePaise += lineTaxable;

@@ -33,13 +33,26 @@ export function mapToUqc(unit) {
 }
 
 /**
+ * Returns B2CL threshold in integer paise based on statutory return period rule versioning.
+ * Notification 04/2024 effective from August 2024 return period: > ₹1 Lakh (10,000,000 paise).
+ * Prior to August 2024 (up to July 2024 return period): > ₹2.5 Lakh (25,000,000 paise).
+ */
+export function getB2clThresholdPaise(dateStr) {
+  if (!dateStr || String(dateStr).trim() >= "2024-08-01") {
+    return 10000000; // ₹1,00,000 in paise
+  }
+  return 25000000; // ₹2,50,000 in paise
+}
+
+/**
  * Builds standard official GSTR-1 structure and UI preview.
  */
 export function buildGstr1({ invoices = [], creditNotes = [], settings = {}, period }) {
-  const sellerGstin = (settings.gstin || "36ADDPC0083H1Z0").trim().toUpperCase();
-  if (!isValidGstin(sellerGstin)) {
+  const rawSellerGstin = String(settings.gstin || "").trim().toUpperCase();
+  if (!isValidGstin(rawSellerGstin)) {
     throw new Error("Valid 15-character Seller GSTIN is required to generate statutory GSTR-1. Configure GSTIN in Settings.");
   }
+  const sellerGstin = rawSellerGstin;
   const sellerState = settings.stateCode || (sellerGstin.length >= 2 ? sellerGstin.slice(0, 2) : "36");
 
   const from = period.from;
@@ -108,8 +121,8 @@ export function buildGstr1({ invoices = [], creditNotes = [], settings = {}, per
         customerName: inv.customer?.name || "",
       });
       b2bMap.set(custGstin, ctinEntry);
-    } else if (isInter && inv.totals.total > 10000000) {
-      // B2CL: Inter-state unregistered > ₹1.0 Lakh (GST Notification 04/2024 amending Rule 59)
+    } else if (isInter && inv.totals.total > getB2clThresholdPaise(inv.date)) {
+      // B2CL: Inter-state unregistered > ₹1.0 Lakh (post Aug 2024 per Notif 04/2024) or > ₹2.5 Lakh (pre Aug 2024)
       const posEntry = b2clMap.get(pos) || { pos, inv: [] };
       const itemsList = Array.from(rateGroups.entries()).map(([rt, vals], idx) => ({
         num: idx + 1,
@@ -129,7 +142,7 @@ export function buildGstr1({ invoices = [], creditNotes = [], settings = {}, per
       });
       b2clMap.set(pos, posEntry);
     } else {
-      // B2CS: Retail unregistered intra-state or inter-state <= ₹2.5L
+      // B2CS: Retail unregistered intra-state or inter-state <= B2CL threshold
       const sply_ty = isInter ? "INTER" : "INTRA";
       for (const [rt, vals] of rateGroups.entries()) {
         const key = `${sply_ty}|${pos}|${rt}`;
@@ -211,8 +224,9 @@ export function buildGstr1({ invoices = [], creditNotes = [], settings = {}, per
       ctinEntry.nt.push(notePayload);
       cdnrMap.set(custGstin, ctinEntry);
     } else {
+      const b2clThreshold = getB2clThresholdPaise(cn.date);
       cdnurList.push({
-        typ: isInter && cn.totals.total > 25000000 ? "B2CL" : "B2CS",
+        typ: isInter && cn.totals.total > b2clThreshold ? "B2CL" : "B2CS",
         nt_num: cn.number,
         nt_dt: toGstDate(cn.date),
         ntty: "C",
@@ -225,9 +239,15 @@ export function buildGstr1({ invoices = [], creditNotes = [], settings = {}, per
     }
   }
 
-  // --- 3. HSN Summary ---
+  // --- 3. HSN Summary (Separated at aggregation time for B2B vs B2C precision) ---
   const hsnMap = new Map();
+  const hsnB2bMap = new Map();
+  const hsnB2cMap = new Map();
+
   for (const inv of validInvoices) {
+    const isB2B = isValidGstin((inv.customer?.gstin || "").trim().toUpperCase());
+    const targetHsnMap = isB2B ? hsnB2bMap : hsnB2cMap;
+
     for (const item of inv.items || []) {
       const hsnCode = (item.hsn || "9999").trim();
       const uqc = mapToUqc(item.unit);
@@ -239,46 +259,55 @@ export function buildGstr1({ invoices = [], creditNotes = [], settings = {}, per
       const itemTot = itemTaxable + itemTax;
       const isInter = String(inv.placeOfSupply || sellerState) !== sellerState;
 
-      const entry = hsnMap.get(key) || {
-        hsn_sc: hsnCode,
-        desc: item.name || "Goods",
-        uqc,
-        qty: 0,
-        val: 0,
-        txval: 0,
-        camt: 0,
-        samt: 0,
-        iamt: 0,
-        csamt: 0,
+      const updateMap = (m) => {
+        const entry = m.get(key) || {
+          hsn_sc: hsnCode,
+          desc: item.name || "Goods",
+          uqc,
+          qty: 0,
+          val: 0,
+          txval: 0,
+          camt: 0,
+          samt: 0,
+          iamt: 0,
+          csamt: 0,
+        };
+        entry.qty += Number(item.qty) || 0;
+        entry.val += itemTot;
+        entry.txval += itemTaxable;
+        if (isInter) {
+          entry.iamt += itemTax;
+        } else {
+          const c = Math.round(itemTax / 2);
+          entry.camt += c;
+          entry.samt += itemTax - c;
+        }
+        m.set(key, entry);
       };
 
-      entry.qty += Number(item.qty) || 0;
-      entry.val += itemTot;
-      entry.txval += itemTaxable;
-      if (isInter) {
-        entry.iamt += itemTax;
-      } else {
-        const c = Math.round(itemTax / 2);
-        entry.camt += c;
-        entry.samt += itemTax - c;
-      }
-      hsnMap.set(key, entry);
+      updateMap(hsnMap);
+      updateMap(targetHsnMap);
     }
   }
 
-  const hsnData = Array.from(hsnMap.values()).map((h, idx) => ({
-    num: idx + 1,
-    hsn_sc: h.hsn_sc,
-    desc: h.desc,
-    uqc: h.uqc,
-    qty: Math.round(h.qty),
-    val: toRs(h.val),
-    txval: toRs(h.txval),
-    camt: toRs(h.camt),
-    samt: toRs(h.samt),
-    iamt: toRs(h.iamt),
-    csamt: 0,
-  }));
+  const formatHsnList = (m) =>
+    Array.from(m.values()).map((h, idx) => ({
+      num: idx + 1,
+      hsn_sc: h.hsn_sc,
+      desc: h.desc,
+      uqc: h.uqc,
+      qty: Math.round(h.qty),
+      val: toRs(h.val),
+      txval: toRs(h.txval),
+      camt: toRs(h.camt),
+      samt: toRs(h.samt),
+      iamt: toRs(h.iamt),
+      csamt: 0,
+    }));
+
+  const hsnData = formatHsnList(hsnMap);
+  const hsnB2bData = formatHsnList(hsnB2bMap);
+  const hsnB2cData = formatHsnList(hsnB2cMap);
 
   // --- 4. Document Issued Summary (doc_issue) ---
   const allPeriodInvoices = invoices.filter((i) => i.status !== "draft" && inRange(i.date)).sort((a, b) => (a.number < b.number ? -1 : 1));
@@ -397,8 +426,8 @@ export function buildGstr1({ invoices = [], creditNotes = [], settings = {}, per
     ),
     cdnur: cdnurList,
     hsn: hsnData,
-    hsnB2b: hsnData.filter((h) => validInvoices.some((i) => isValidGstin(i.customer?.gstin) && (i.items || []).some((it) => (it.hsn || "9999").trim() === h.hsn_sc))),
-    hsnB2c: hsnData.filter((h) => validInvoices.some((i) => !isValidGstin(i.customer?.gstin) && (i.items || []).some((it) => (it.hsn || "9999").trim() === h.hsn_sc))),
+    hsnB2b: hsnB2bData,
+    hsnB2c: hsnB2cData,
     consolidated: b2csList,
     eco: [],
     exp: [],

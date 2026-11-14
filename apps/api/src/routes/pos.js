@@ -185,6 +185,14 @@ export function posRoutes({ cfg, store, audit, automation, fetchImpl, log = cons
     }
 
     if (b.kind === "income") {
+      const lines = hasGst && taxAmount > 0
+        ? [
+            { account: mode, debit: amount, credit: 0 },
+            { account: "indirect_income", debit: 0, credit: netAmount },
+            { account: "gst_output_tax", debit: 0, credit: taxAmount },
+          ]
+        : undefined;
+
       const e = await postLedger(store, {
         contraAccount: "indirect_income",
         date,
@@ -195,6 +203,7 @@ export function posRoutes({ cfg, store, audit, automation, fetchImpl, log = cons
         netAmount,
         hasGst,
         gstRate,
+        lines,
         ref: String(b.category || "INCOME").toUpperCase().slice(0, 60),
         party: payee,
         narration,
@@ -205,6 +214,14 @@ export function posRoutes({ cfg, store, audit, automation, fetchImpl, log = cons
       await audit(req, "income.create", e.ref, { amount, mode, category });
       return res.status(201).json(e);
     } else {
+      const lines = hasGst && taxAmount > 0
+        ? [
+            { account: "operating_expense", debit: netAmount, credit: 0 },
+            { account: "gst_input_tax", debit: taxAmount, credit: 0 },
+            { account: mode, debit: 0, credit: amount },
+          ]
+        : undefined;
+
       const e = await postLedger(store, {
         contraAccount: "operating_expense",
         date,
@@ -215,6 +232,7 @@ export function posRoutes({ cfg, store, audit, automation, fetchImpl, log = cons
         netAmount,
         hasGst,
         gstRate,
+        lines,
         ref: String(b.category || "EXPENSE").toUpperCase().slice(0, 60),
         party: payee,
         narration,
@@ -227,6 +245,40 @@ export function posRoutes({ cfg, store, audit, automation, fetchImpl, log = cons
     }
   }));
 
+  // Reversal workflow for posted financial ledger entries (auditable accounting standard)
+  r.post("/ledger/entries/:id/reverse", requirePerm("ledger"), wrap(async (req, res) => {
+    const existing = await store.ledger.get(req.params.id);
+    if (!existing) return notFound(res, "Ledger entry not found");
+    if (existing.reversedAt) return bad(res, "This ledger entry has already been reversed", 409);
+
+    const lines = (existing.lines || []).map((l) => ({
+      account: l.account,
+      debit: l.credit,
+      credit: l.debit,
+    }));
+
+    const reversal = await postLedger(store, {
+      sourceKey: `reversal:${existing.id}`,
+      reversalOf: existing.id,
+      kind: existing.kind === "receipt" ? "payment" : "receipt",
+      account: existing.account,
+      contraAccount: existing.contraAccount,
+      amount: existing.amount,
+      date: now().slice(0, 10),
+      lines: lines.length > 0 ? lines : undefined,
+      ref: `REV-${existing.ref || existing.id}`,
+      party: existing.party,
+      narration: `Reversal of ${existing.ref || existing.id}: ${req.body?.reason || "Correction"}`,
+      by: by(req),
+      createdAt: now(),
+    });
+
+    await store.ledger.update(existing.id, { reversedAt: now(), reversedBy: by(req), reversalEntryId: reversal.id });
+    await audit(req, "ledger.reverse", existing.ref || existing.id, { reversalId: reversal.id });
+    res.status(201).json({ ok: true, reversal, original: existing });
+  }));
+
+  // Metadata updates only (notes, category, payee); financial lines remain immutable
   r.patch("/ledger/entries/:id", requirePerm("ledger"), wrap(async (req, res) => {
     const existing = await store.ledger.get(req.params.id);
     if (!existing) return notFound(res, "Ledger entry not found");
@@ -235,9 +287,8 @@ export function posRoutes({ cfg, store, audit, automation, fetchImpl, log = cons
     if (b.payee !== undefined) updates.party = String(b.payee).slice(0, 160);
     if (b.category !== undefined) updates.category = String(b.category).slice(0, 100);
     if (b.notes !== undefined) updates.narration = String(b.notes).slice(0, 300);
-    if (b.date !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(b.date)) updates.date = b.date;
-    const updated = await store.ledger.patch(req.params.id, updates);
-    await audit(req, "ledger.patch", existing.ref || req.params.id, updates);
+    const updated = await store.ledger.update(req.params.id, updates);
+    await audit(req, "ledger.metadata_update", existing.ref || req.params.id, updates);
     res.json(updated);
   }));
   return r;
