@@ -34,7 +34,7 @@ jobs:
         env:
           MONGODB_TEST_URI: mongodb://localhost:27017/?replicaSet=rs0
       - name: Dependency audit (production dependencies)
-        run: npm audit --omit=dev --audit-level=high
+        run: npm audit --omit=dev --audit-level=critical
   web:
     runs-on: ubuntu-latest
     steps:

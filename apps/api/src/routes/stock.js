@@ -196,5 +196,65 @@ export function stockRoutes({ store, audit }) {
     await logActivity(store, { entity: "purchase", entityId: po.id, text: `Goods received: ${d.lines.map((l) => `${l.qty} x ${items.find((i) => i.productId === l.productId).name}`).join(", ")}`, by: by(req) });
     await audit(req, "purchase.receive", po.number, { lines: d.lines.length }); res.json(upd);
   }));
+
+  // Purchase Returns / Debit Notes
+  r.post("/purchases/:id/debit-note", wrap(async (req, res) => {
+    const po = await store.purchases.get(req.params.id);
+    if (!po) return notFound(res, "Purchase order");
+    const { items = [], reason = "Goods returned to supplier", notes = "" } = req.body || {};
+    if (!Array.isArray(items) || items.length === 0) {
+      return bad(res, "At least one item must be returned on a debit note");
+    }
+
+    const dnSeq = (po.debitNotes?.length || 0) + 1;
+    const cleanPoNum = String(po.number || "PO").replace(/[^A-Za-z0-9]/g, "");
+    const dnNumber = `DN-${cleanPoNum}-${String(dnSeq).padStart(2, "0")}`;
+    let totalDebitPaise = 0;
+
+    for (const retItem of items) {
+      const orig = (po.items || []).find((i) => i.productId === retItem.productId);
+      if (!orig) return bad(res, "Returned product is not on this purchase order");
+      const retQty = Number(retItem.qty) || 0;
+      if (retQty <= 0) return bad(res, "Return quantity must be greater than zero");
+      const rate = retItem.rate || orig.rate || 0;
+      totalDebitPaise += rate * retQty;
+
+      await moveStock(store, {
+        productId: orig.productId,
+        sku: orig.sku,
+        qty: retQty,
+        kind: "out",
+        ref: dnNumber,
+        note: `Purchase return: ${reason}`,
+        by: by(req),
+      });
+    }
+
+    const debitNote = {
+      dnNumber,
+      date: now().slice(0, 10),
+      reason,
+      notes,
+      items,
+      amount: totalDebitPaise,
+      createdAt: now(),
+      createdBy: by(req),
+    };
+
+    const updatedDebitNotes = [...(po.debitNotes || []), debitNote];
+    const upd = await store.purchases.update(po.id, {
+      debitNotes: updatedDebitNotes,
+      updatedAt: now(),
+    });
+
+    await logActivity(store, {
+      entity: "purchase",
+      entityId: po.id,
+      text: `Debit Note ${dnNumber} issued: ₹${(totalDebitPaise / 100).toFixed(2)} (${reason})`,
+      by: by(req),
+    });
+    await audit(req, "purchase.debit_note", po.number, { dnNumber, amount: totalDebitPaise });
+    res.status(201).json({ ok: true, debitNote, purchase: upd });
+  }));
   return r;
 }

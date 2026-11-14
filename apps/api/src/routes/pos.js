@@ -160,5 +160,54 @@ export function posRoutes({ cfg, store, audit, automation, fetchImpl, log = cons
       party: String(b.party || "").slice(0, 160), narration: String(b.narration || "").slice(0, 300), by: by(req), createdAt: now() });
     await audit(req, "ledger.create", e.ref || e.account, { amount: e.amount, kind: e.kind }); res.status(201).json(e);
   }));
+
+  // Swipe Expenses+ & Indirect Income entries
+  r.post("/ledger/entries", requirePerm("ledger"), wrap(async (req, res) => {
+    const b = req.body || {};
+    const amount = Number(b.amount);
+    if (!Number.isInteger(amount) || amount <= 0 || amount > 10_000_000_000) {
+      return bad(res, "Amount must be positive integer paise");
+    }
+    const mode = ["cash", "bank", "razorpay"].includes(b.mode) ? b.mode : "bank";
+    const date = b.date && /^\d{4}-\d{2}-\d{2}$/.test(b.date) ? b.date : now().slice(0, 10);
+    const payee = String(b.payee || "").slice(0, 160);
+    const category = String(b.category || "General").slice(0, 100);
+    const notes = String(b.notes || "").slice(0, 300);
+    const narration = notes ? `${category}: ${notes}` : category;
+
+    if (b.kind === "income") {
+      const e = await postLedger(store, {
+        contraAccount: "indirect_income",
+        date,
+        account: mode,
+        kind: "receipt",
+        amount,
+        ref: String(b.category || "INCOME").toUpperCase().slice(0, 60),
+        party: payee,
+        narration,
+        category,
+        by: by(req),
+        createdAt: now(),
+      });
+      await audit(req, "income.create", e.ref, { amount, mode, category });
+      return res.status(201).json(e);
+    } else {
+      const e = await postLedger(store, {
+        contraAccount: "operating_expense",
+        date,
+        account: mode,
+        kind: "payment",
+        amount,
+        ref: String(b.category || "EXPENSE").toUpperCase().slice(0, 60),
+        party: payee,
+        narration,
+        category,
+        by: by(req),
+        createdAt: now(),
+      });
+      await audit(req, "expense.create", e.ref, { amount, mode, category });
+      return res.status(201).json(e);
+    }
+  }));
   return r;
 }
