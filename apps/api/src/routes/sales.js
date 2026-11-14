@@ -13,6 +13,7 @@ import { getSettings } from "../model.js";
 import { shadowfaxOn } from "../services/delivery_shadowfax.js";
 import { bookShipment } from "./logistics.js";
 import { buildEwbGovtJson, generateSandboxEwb } from "../services/ewaybill.js";
+import { buildEinvoiceGovtJson, generateSandboxEinvoice, cancelSandboxEinvoice } from "../services/einvoice.js";
 import { creditNoteInput, dispatchInput, invoiceInput, invoiceDraftInput, orderInput, paymentInput, quoteInput } from "../schemas.js";
 import { wrap } from "./public.js";
 import { bad, notFound, parse } from "./shared.js";
@@ -432,6 +433,96 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
     await logActivity(store, { entity: "invoice", entityId: inv.id, text: `E-Way Bill ${ewaybill.ewbNo} recorded`, by: by(req) });
     await audit(req, "invoice.ewaybill.save", inv.number, { ewbNo: ewaybill.ewbNo });
     res.json({ ok: true, ewaybill });
+  }));
+
+  // ---------- Government IRP E-Invoice Integration (IRN & Signed QR)
+  r.post("/invoices/:id/einvoice/generate", requirePerm("invoices"), wrap(async (req, res) => {
+    const inv = await store.invoices.get(req.params.id);
+    if (!inv) return notFound(res, "Invoice");
+    if (inv.status === "void") return bad(res, "Cannot generate E-Invoice for a void invoice", 409);
+
+    const settings = await getSettings(store);
+    const result = await generateSandboxEinvoice({ invoice: inv, settings, cfg, fetchImpl });
+
+    if (result.irn) {
+      const einvoice = {
+        irn: result.irn,
+        ackNo: result.ackNo || "",
+        ackDate: result.ackDate || new Date().toISOString(),
+        signedInvoice: result.signedInvoice || "",
+        signedQrCode: result.signedQrCode || "",
+        status: "active",
+        generatedAt: now(),
+      };
+      await store.invoices.update(inv.id, { einvoice, updatedAt: now() });
+      await logActivity(store, { entity: "invoice", entityId: inv.id, text: `E-Invoice IRN generated: ${result.irn.slice(0, 16)}...`, by: by(req) });
+      await audit(req, "invoice.einvoice.generate", inv.number, { irn: result.irn });
+      return res.json({ ok: true, irn: result.irn, einvoice, source: result.source });
+    }
+
+    if (result.error) {
+      return bad(res, `E-Invoice: ${result.error}`, 400);
+    }
+
+    res.json(result);
+  }));
+
+  r.post("/invoices/:id/einvoice/cancel", requirePerm("invoices"), wrap(async (req, res) => {
+    const inv = await store.invoices.get(req.params.id);
+    if (!inv) return notFound(res, "Invoice");
+    if (!inv.einvoice?.irn) return bad(res, "No active E-Invoice found to cancel", 409);
+
+    const { reason = "1", remarks = "Cancelled by admin" } = req.body || {};
+    const cancelRes = await cancelSandboxEinvoice({
+      irn: inv.einvoice.irn,
+      reason,
+      remarks,
+      cfg,
+      fetchImpl,
+    });
+
+    const einvoice = {
+      ...inv.einvoice,
+      status: "cancelled",
+      cancelledAt: now(),
+      cancelReason: reason,
+      cancelRemarks: remarks,
+    };
+    await store.invoices.update(inv.id, { einvoice, updatedAt: now() });
+    await logActivity(store, { entity: "invoice", entityId: inv.id, text: `E-Invoice cancelled (${remarks})`, by: by(req) });
+    await audit(req, "invoice.einvoice.cancel", inv.number, { irn: inv.einvoice.irn });
+    res.json({ ok: true, einvoice, cancelRes });
+  }));
+
+  r.get("/invoices/:id/einvoice/json", requirePerm("invoices"), wrap(async (req, res) => {
+    const inv = await store.invoices.get(req.params.id);
+    if (!inv) return notFound(res, "Invoice");
+
+    const settings = await getSettings(store);
+    const govtJson = buildEinvoiceGovtJson({ invoice: inv, settings, cfg });
+    res.setHeader("Content-Disposition", `attachment; filename="EINV_${inv.number.replace(/\//g, "-")}.json"`);
+    res.json(govtJson);
+  }));
+
+  r.post("/invoices/:id/einvoice/save", requirePerm("invoices"), wrap(async (req, res) => {
+    const inv = await store.invoices.get(req.params.id);
+    if (!inv) return notFound(res, "Invoice");
+
+    const { irn = "", ackNo = "", ackDate = "", signedQrCode = "" } = req.body || {};
+    if (!irn.trim()) return bad(res, "Valid IRN is required");
+
+    const einvoice = {
+      irn: String(irn).trim(),
+      ackNo: String(ackNo).trim(),
+      ackDate: ackDate || new Date().toISOString(),
+      signedQrCode: String(signedQrCode).trim(),
+      status: "active",
+      savedAt: now(),
+    };
+    await store.invoices.update(inv.id, { einvoice, updatedAt: now() });
+    await logActivity(store, { entity: "invoice", entityId: inv.id, text: `E-Invoice IRN ${einvoice.irn.slice(0, 16)}... recorded`, by: by(req) });
+    await audit(req, "invoice.einvoice.save", inv.number, { irn: einvoice.irn });
+    res.json({ ok: true, einvoice });
   }));
 
   // ---------- credit notes (GST sales returns / price adjustments against an invoice)

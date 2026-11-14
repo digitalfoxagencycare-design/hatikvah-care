@@ -187,6 +187,14 @@ export default function DocPage() {
               <strong style={{ color: "#166534" }}>{d.ewaybill.ewbNo}</strong>
             </div>
           )}
+          {d.einvoice?.irn && (
+            <div className="bill-meta-cell" style={{ background: "#eff6ff" }}>
+              <span className="meta-label">Govt E-Invoice:</span>
+              <strong style={{ color: "#0284c7", fontFamily: "monospace", fontSize: "0.78rem" }} title={d.einvoice.irn}>
+                Ack #{d.einvoice.ackNo || d.einvoice.irn.slice(0, 12)}
+              </strong>
+            </div>
+          )}
         </div>
 
         {/* Customer Details & Billing Address */}
@@ -213,6 +221,7 @@ export default function DocPage() {
           {d.poNumber && <span>Customer PO #: <strong>{d.poNumber}</strong></span>}
           {d.orderNumber && <span>Order #: <strong>{d.orderNumber}</strong></span>}
           {d.ewaybill?.ewbNo && <span style={{ color: "#166534" }}>E-Way Bill: <strong>#{d.ewaybill.ewbNo}</strong> {d.ewaybill.vehicleNo ? `(Veh: ${d.ewaybill.vehicleNo})` : ""}</span>}
+          {d.einvoice?.irn && <span style={{ color: "#0284c7" }}>E-Invoice IRN: <strong style={{ fontFamily: "monospace" }}>{d.einvoice.irn.slice(0, 16)}...</strong></span>}
           {credit && <span>Reason: <strong>{String(d.reason || "").replace(/_/g, " ")}</strong>{d.restock ? " (goods returned)" : ""}</span>}
         </div>
 

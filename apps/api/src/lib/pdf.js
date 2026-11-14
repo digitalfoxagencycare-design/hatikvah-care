@@ -77,6 +77,11 @@ export async function generateDocumentPdf({ kind, doc, company }) {
       const placeState = doc.placeOfSupply ? stateName(doc.placeOfSupply) : (company.state || "Telangana");
       pdf.font("Helvetica").text("Place of Supply:", metaBoxX + 8, metaY + 56).font("Helvetica-Bold").text(placeState, metaBoxX + 70, metaY + 56);
 
+      // IRN / Government E-Invoice Header if present
+      if (doc.einvoice?.irn) {
+        pdf.fontSize(6.5).font("Helvetica-Bold").fillColor("#0284C7").text(`IRN: ${doc.einvoice.irn}`, 36, 142, { width: 523 });
+      }
+
       // 3. Customer Info Section
       y = 150;
       pdf.rect(36, y, 523, 44).fill("#F8FAFC");

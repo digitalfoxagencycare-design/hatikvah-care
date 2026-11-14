@@ -8,6 +8,7 @@ import { ask, askText } from "./toast.jsx";
 import { InvoiceDispatch } from "./Logistics.jsx";
 import { PayLinkActions } from "./PayLink.jsx";
 import { EwbModal } from "./EwbModal.jsx";
+import { EinvModal } from "./EinvModal.jsx";
 import { DocEditor, fmtDate, Modal, Msg, rs, Timeline, today, toPaise, useAction } from "./ui.jsx";
 
 function getWhatsAppInvoice(inv) {
@@ -32,6 +33,7 @@ export default function InvoiceDetail() {
   const [credit, setCredit] = useState(null);
   const [editingDraft, setEditingDraft] = useState(false);
   const [showEwb, setShowEwb] = useState(false);
+  const [showEinv, setShowEinv] = useState(false);
   const [st, run] = useAction();
   const inv = isNew ? null : s.data;
   const wa = getWhatsAppInvoice(inv);
@@ -128,6 +130,11 @@ export default function InvoiceDetail() {
                       🚚 E-Way Bill {inv.ewaybill?.ewbNo ? "✓" : ""}
                     </button>
                   )}
+                  {inv.status !== "void" && (
+                    <button type="button" className="btn ghost" onClick={() => setShowEinv(true)} style={{ borderColor: inv.einvoice?.irn ? "#0284c7" : undefined }}>
+                      🏛️ E-Invoice {inv.einvoice?.irn ? "✓" : ""}
+                    </button>
+                  )}
                   {inv.ewaybill?.ewbNo && (
                     <a
                       className="btn ghost"
@@ -172,6 +179,25 @@ export default function InvoiceDetail() {
                 </a>
               </div>
             )}
+            {inv.einvoice?.irn && (
+              <div className="tile" style={{ borderLeft: "4px solid #0284c7", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                <div>
+                  <strong style={{ color: "#0284c7" }}>IRN Active ✓</strong>
+                  <span>Govt E-Invoice</span>
+                  <small style={{ fontFamily: "monospace", wordBreak: "break-all" }}>
+                    Ack #{inv.einvoice.ackNo || inv.einvoice.irn.slice(0, 10)}
+                  </small>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowEinv(true)}
+                  className="btn ghost sm"
+                  style={{ marginTop: 8, textAlign: "center", color: "#0284c7", borderColor: "#0284c7", padding: "4px 8px", fontSize: "0.8rem", fontWeight: 600 }}
+                >
+                  Manage / View QR ↗
+                </button>
+              </div>
+            )}
           </div>
           <DocView d={inv} extraInfo={<p className="muted small-print">{inv.orderNumber && <>Order <Link to={`/admin/orders/${inv.orderId}`}>{inv.orderNumber}</Link><br /></>}{inv.poNumber && <>Customer PO {inv.poNumber}<br /></>}{inv.voidReason && <>Void: {inv.voidReason}</>}</p>}>
             {inv.balance > 0 && <PayLinkActions base={`/api/admin/invoices/${id}`} doc={inv} due={inv.balance} onChange={() => s.reload()} />}
@@ -194,6 +220,7 @@ export default function InvoiceDetail() {
           <div className="panel"><h2>History</h2><Timeline entity="invoice" entityId={inv.id} items={inv.activities} onAdded={s.reload} /></div>
           {credit && <CreditNoteModal inv={inv} c={credit} setC={setCredit} st={st} onSave={(body) => run(async () => { const r = await api("/api/admin/credit-notes", { method: "POST", body }); setCredit(null); s.reload(); return r; }, "Credit note issued ✓")} />}
           {showEwb && <EwbModal invoice={inv} onClose={() => setShowEwb(false)} onUpdated={() => { setShowEwb(false); s.reload(); }} />}
+          {showEinv && <EinvModal invoice={inv} onClose={() => setShowEinv(false)} onUpdated={() => { setShowEinv(false); s.reload(); }} />}
           {pay && (
             <Modal title={`Payment for ${inv.number}`} onClose={() => setPay(null)}>
               <form className="form" onSubmit={(e) => { e.preventDefault(); const amount = toPaise(pay.amount); if (!amount || Number.isNaN(amount)) return; run(async () => { await api(`/api/admin/invoices/${id}/payments`, { method: "POST", body: { ...pay, amount } }); setPay(null); s.reload(); }, "Payment recorded ✓ Receipt sent to the customer."); }}>
