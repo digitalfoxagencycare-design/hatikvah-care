@@ -119,6 +119,8 @@ export const REPORT_DIVISIONS = [
   },
 ];
 
+export const isIssuedInvoice = (i) => i && i.status !== "draft" && i.status !== "void";
+
 const toRs = (p) => Number(((p || 0) / 100).toFixed(2));
 const fmtRs = (p) => (Number(((p || 0) / 100).toFixed(2))).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const inRange = (d, from, to) => (!from || d >= from) && (!to || d <= to);
@@ -127,7 +129,7 @@ const inRange = (d, from, to) => (!from || d >= from) && (!to || d <= to);
  * Computes tabular data for any Swipe 1:1 Report View
  */
 export async function computeReportData({ division = "taxes", view = "gstr1", from = "", to = "", search = "", store }) {
-  const [invoicesAll, creditNotesAll, purchasesAll, productsAll, customersAll, suppliersAll, paymentsAll, ledgerAll, stockMovesAll, auditAll] =
+  const [invoicesAll, creditNotesAll, purchasesAll, productsAll, customersAll, suppliersAll, paymentsAll, ledgerAll, stockMovesAll, auditAll, settingsDoc] =
     await Promise.all([
       store.invoices.all({ sort: { date: -1 } }),
       store.creditNotes.all({ sort: { date: -1 } }),
@@ -139,9 +141,15 @@ export async function computeReportData({ division = "taxes", view = "gstr1", fr
       store.ledger.all({ sort: { date: -1 } }),
       store.stockMoves.all({ sort: { createdAt: -1 } }),
       store.audit.all({ sort: { at: -1 } }),
+      store.settings?.findBy?.("key", "company"),
     ]);
 
-  const invoices = invoicesAll.filter((i) => i.status !== "void" && inRange(i.date, from, to));
+  const settings = settingsDoc || {};
+  const sellerGstin = String(settings.gstin || "36ADDPC0083H1Z0").trim().toUpperCase();
+  const sellerState = String(settings.stateCode || (sellerGstin.length >= 2 ? sellerGstin.slice(0, 2) : "36"));
+
+  // Strictly filter out draft and void invoices across all revenue, sales, and tax reports
+  const invoices = invoicesAll.filter((i) => isIssuedInvoice(i) && inRange(i.date, from, to));
   const creditNotes = creditNotesAll.filter((c) => inRange(c.date, from, to));
   const purchases = purchasesAll.filter((p) => p.status !== "void" && p.status !== "cancelled" && inRange((p.date || p.createdAt || "").slice(0, 10), from, to));
   const payments = paymentsAll.filter((p) => !p.reversedAt && inRange(p.date, from, to));
@@ -156,19 +164,22 @@ export async function computeReportData({ division = "taxes", view = "gstr1", fr
     if (view === "tax_summary") {
       const rates = {};
       for (const i of invoices) {
+        const isInter = i.placeOfSupply && String(i.placeOfSupply) !== sellerState;
         for (const it of i.items || []) {
-          const r = Number(it.gstRate) || 0;
+          const r = Number(it.gstRate ?? 18);
           const k = `${r}%`;
           const entry = (rates[k] ||= { rate: k, taxable: 0, cgst: 0, sgst: 0, igst: 0, totalTax: 0 });
           const amt = it.amount || 0;
-          const tax = it.tax || Math.round((amt * r) / 100);
+          const tax = it.tax ?? Math.round((amt * r) / 100);
           entry.taxable += amt;
           entry.totalTax += tax;
-          if (i.placeOfSupply && i.placeOfSupply !== "36") {
+          if (isInter) {
             entry.igst += tax;
           } else {
-            entry.cgst += Math.round(tax / 2);
-            entry.sgst += Math.round(tax / 2);
+            // Guarantee cgst + sgst === tax exactly even for odd paise
+            const cg = Math.floor(tax / 2);
+            entry.cgst += cg;
+            entry.sgst += tax - cg;
           }
         }
       }
@@ -199,6 +210,94 @@ export async function computeReportData({ division = "taxes", view = "gstr1", fr
       };
     }
 
+    if (view === "gstr1") {
+      let b2bCount = 0, b2bTaxable = 0, b2bTax = 0;
+      let b2clCount = 0, b2clTaxable = 0, b2clTax = 0;
+      let b2csCount = 0, b2csTaxable = 0, b2csTax = 0;
+
+      for (const inv of invoices) {
+        const custGstin = (inv.customer?.gstin || "").trim().toUpperCase();
+        const isB2B = /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(custGstin);
+        const pos = String(inv.placeOfSupply || inv.customer?.stateCode || sellerState);
+        const isInter = pos !== sellerState;
+        const taxable = inv.totals?.taxable || 0;
+        const tax = inv.totals?.tax || 0;
+
+        if (isB2B) {
+          b2bCount++;
+          b2bTaxable += taxable;
+          b2bTax += tax;
+        } else if (isInter && (inv.totals?.total || 0) > 10000000) {
+          // B2CL: Inter-state unregistered > ₹1.0 Lakh (GST Notification 04/2024)
+          b2clCount++;
+          b2clTaxable += taxable;
+          b2clTax += tax;
+        } else {
+          b2csCount++;
+          b2csTaxable += taxable;
+          b2csTax += tax;
+        }
+      }
+
+      const rows = [
+        { col1: "Table 4A, 4B, 6B", col2: "B2B Invoices (Registered Recipients)", col3: b2bCount, col4: fmtRs(b2bTaxable), col5: fmtRs(b2bTax), col6: fmtRs(b2bTaxable + b2bTax) },
+        { col1: "Table 5A, 5B", col2: "B2CL (Large Interstate Unregistered > ₹1L)", col3: b2clCount, col4: fmtRs(b2clTaxable), col5: fmtRs(b2clTax), col6: fmtRs(b2clTaxable + b2clTax) },
+        { col1: "Table 7", col2: "B2CS (Other Retail / Unregistered Supplies)", col3: b2csCount, col4: fmtRs(b2csTaxable), col5: fmtRs(b2csTax), col6: fmtRs(b2csTaxable + b2csTax) },
+        { col1: "Table 9B", col2: "Credit / Debit Notes Registered & Unregistered", col3: creditNotes.length, col4: fmtRs(creditNotes.reduce((a, b) => a + (b.amount || 0), 0)), col5: "0.00", col6: fmtRs(creditNotes.reduce((a, b) => a + (b.amount || 0), 0)) },
+      ];
+
+      return {
+        columns: [
+          { key: "col1", label: "GSTR-1 Section" },
+          { key: "col2", label: "Description of Outward Supplies" },
+          { key: "col3", label: "Invoice Count", align: "right" },
+          { key: "col4", label: "Taxable Value (₹)", align: "right" },
+          { key: "col5", label: "Tax Amount (₹)", align: "right" },
+          { key: "col6", label: "Total Invoice Value (₹)", align: "right" },
+        ],
+        rows,
+        totals: {
+          count: invoices.length,
+          taxable: fmtRs(b2bTaxable + b2clTaxable + b2csTaxable),
+          tax: fmtRs(b2bTax + b2clTax + b2csTax),
+        },
+      };
+    }
+
+    if (view === "gstr3b") {
+      const outwardTaxable = invoices.reduce((a, b) => a + (b.totals?.taxable || 0), 0);
+      const outwardTax = invoices.reduce((a, b) => a + (b.totals?.tax || 0), 0);
+      const outwardIgst = invoices.reduce((a, b) => a + (b.totals?.igst || 0), 0);
+      const outwardCgst = invoices.reduce((a, b) => a + (b.totals?.cgst || 0), 0);
+      const outwardSgst = invoices.reduce((a, b) => a + (b.totals?.sgst || 0), 0);
+
+      const inwardTaxable = purchases.reduce((a, b) => a + (b.totals?.taxable || b.total || 0), 0);
+      const inwardItc = purchases.reduce((a, b) => a + (b.totals?.tax || Math.round((b.total || 0) * 0.18)), 0);
+
+      const rows = [
+        { col1: "3.1 (a)", col2: "Outward taxable supplies (other than zero-rated, nil and exempted)", col3: fmtRs(outwardTaxable), col4: fmtRs(outwardIgst), col5: fmtRs(outwardCgst), col6: fmtRs(outwardSgst) },
+        { col1: "3.1 (b)", col2: "Outward taxable supplies (zero-rated)", col3: "0.00", col4: "0.00", col5: "0.00", col6: "0.00" },
+        { col1: "3.1 (c)", col2: "Other outward supplies (Nil rated, exempted)", col3: "0.00", col4: "0.00", col5: "0.00", col6: "0.00" },
+        { col1: "4(A)(5)", col2: "Eligible Input Tax Credit (ITC on Purchases)", col3: fmtRs(inwardTaxable), col4: fmtRs(inwardItc), col5: "0.00", col6: "0.00" },
+      ];
+
+      return {
+        columns: [
+          { key: "col1", label: "GSTR-3B Table" },
+          { key: "col2", label: "Nature of Supplies" },
+          { key: "col3", label: "Total Taxable (₹)", align: "right" },
+          { key: "col4", label: "Integrated Tax (₹)", align: "right" },
+          { key: "col5", label: "Central Tax (₹)", align: "right" },
+          { key: "col6", label: "State Tax (₹)", align: "right" },
+        ],
+        rows,
+        totals: {
+          taxable: fmtRs(outwardTaxable),
+          tax: fmtRs(outwardTax),
+        },
+      };
+    }
+
     if (view === "gstr2b" || view === "hsn_purchase") {
       const rows = purchases.map((p) => {
         const sup = sMap.get(p.supplierId) || p.supplier || {};
@@ -221,12 +320,16 @@ export async function computeReportData({ division = "taxes", view = "gstr1", fr
           { key: "col2", label: "Date" },
           { key: "col3", label: "Supplier Name" },
           { key: "col4", label: "Supplier GSTIN" },
-          { key: "col5", label: "Taxable (₹)", align: "right" },
-          { key: "col6", label: "Eligible ITC (₹)", align: "right" },
+          { key: "col5", label: "Taxable Value (₹)", align: "right" },
+          { key: "col6", label: "Reconciled ITC (₹)", align: "right" },
           { key: "col7", label: "Total Bill (₹)", align: "right" },
         ],
         rows,
-        totals: { count: rows.length },
+        totals: {
+          count: rows.length,
+          taxable: fmtRs(purchases.reduce((a, b) => a + (b.totals?.taxable || b.total || 0), 0)),
+          itc: fmtRs(purchases.reduce((a, b) => a + (b.totals?.tax || Math.round((b.total || 0) * 0.18)), 0)),
+        },
       };
     }
 
@@ -385,16 +488,18 @@ export async function computeReportData({ division = "taxes", view = "gstr1", fr
     };
   }
 
-  // 3. BILL-WISE ITEM REPORTS & PROFITABILITY
-  if (division === "bill_items" || division === "pl") {
-    if (view === "bill_profit_loss" || view === "gross_profit" || division === "pl") {
+  // 3. BILL-WISE ITEM REPORTS
+  if (division === "bill_items") {
+    if (view === "bill_profit_loss") {
       const rows = invoices.map((i) => {
         let rev = i.totals?.taxable || 0;
         let cogs = 0;
+        let hasEstimatedCost = false;
         for (const it of i.items || []) {
           const p = pMap.get(it.productId);
-          const cost = p?.costPrice ?? p?.purchasePrice ?? Math.round((it.rate || 0) * 0.7);
-          cogs += cost * (it.qty || 1);
+          const cost = p?.costPrice ?? p?.purchasePrice;
+          if (cost == null) hasEstimatedCost = true;
+          cogs += (cost ?? 0) * (it.qty || 1);
         }
         const profit = rev - cogs;
         const marginPct = rev > 0 ? ((profit / rev) * 100).toFixed(1) + "%" : "0.0%";
@@ -403,7 +508,7 @@ export async function computeReportData({ division = "taxes", view = "gstr1", fr
           col2: i.date,
           col3: i.customer?.name || "Customer",
           col4: fmtRs(rev),
-          col5: fmtRs(cogs),
+          col5: fmtRs(cogs) + (hasEstimatedCost ? " *" : ""),
           col6: fmtRs(profit),
           col7: marginPct,
           status: profit >= 0 ? "profit" : "loss",
@@ -414,8 +519,7 @@ export async function computeReportData({ division = "taxes", view = "gstr1", fr
       for (const i of invoices) {
         for (const it of i.items || []) {
           const p = pMap.get(it.productId);
-          const cost = p?.costPrice ?? p?.purchasePrice ?? Math.round((it.rate || 0) * 0.7);
-          totCogs += cost * (it.qty || 1);
+          totCogs += (p?.costPrice ?? p?.purchasePrice ?? 0) * (it.qty || 1);
         }
       }
       const totProfit = totRev - totCogs;
@@ -426,7 +530,7 @@ export async function computeReportData({ division = "taxes", view = "gstr1", fr
           { key: "col2", label: "Date" },
           { key: "col3", label: "Customer Name" },
           { key: "col4", label: "Revenue (₹)", align: "right" },
-          { key: "col5", label: "Estimated COGS (₹)", align: "right" },
+          { key: "col5", label: "COGS (₹)", align: "right" },
           { key: "col6", label: "Gross Profit (₹)", align: "right" },
           { key: "col7", label: "Margin %", align: "right" },
         ],
@@ -558,12 +662,13 @@ export async function computeReportData({ division = "taxes", view = "gstr1", fr
         const cName = i.customer?.name || "Customer";
         const late = daysBetween(i.dueDate || i.date, today);
         const bal = balance(i);
-        const entry = (customerAging[cId] ||= { name: cName, phone: i.customer?.phone || "-", current: 0, d30: 0, d60: 0, d90: 0, total: 0 });
+        const entry = (customerAging[cId] ||= { name: cName, phone: i.customer?.phone || "-", current: 0, d30: 0, d60: 0, d90: 0, dOver90: 0, total: 0 });
         entry.total += bal;
         if (late <= 0) entry.current += bal;
         else if (late <= 30) entry.d30 += bal;
         else if (late <= 60) entry.d60 += bal;
-        else entry.d90 += bal;
+        else if (late <= 90) entry.d90 += bal;
+        else entry.dOver90 += bal;
       }
       const rows = Object.values(customerAging).map((c) => ({
         col1: c.name,
@@ -572,7 +677,8 @@ export async function computeReportData({ division = "taxes", view = "gstr1", fr
         col4: fmtRs(c.d30),
         col5: fmtRs(c.d60),
         col6: fmtRs(c.d90),
-        col7: fmtRs(c.total),
+        col7: fmtRs(c.dOver90),
+        col8: fmtRs(c.total),
       }));
       return {
         columns: [
@@ -581,8 +687,9 @@ export async function computeReportData({ division = "taxes", view = "gstr1", fr
           { key: "col3", label: "Not Overdue (₹)", align: "right" },
           { key: "col4", label: "1-30 Days (₹)", align: "right" },
           { key: "col5", label: "31-60 Days (₹)", align: "right" },
-          { key: "col6", label: "60+ Days (₹)", align: "right" },
-          { key: "col7", label: "Total Outstanding (₹)", align: "right" },
+          { key: "col6", label: "61-90 Days (₹)", align: "right" },
+          { key: "col7", label: "90+ Days (₹)", align: "right" },
+          { key: "col8", label: "Total Outstanding (₹)", align: "right" },
         ],
         rows,
         totals: {
@@ -621,6 +728,141 @@ export async function computeReportData({ division = "taxes", view = "gstr1", fr
       ],
       rows,
       totals: { count: rows.length, total: fmtRs(Object.values(cSales).reduce((a, b) => a + b.total, 0)) },
+    };
+  }
+
+  // 7. PROFIT & LOSS (P&L)
+  if (division === "pl") {
+    const totRev = invoices.reduce((a, b) => a + (b.totals?.taxable || 0), 0);
+    let totCogs = 0;
+    for (const i of invoices) {
+      for (const it of i.items || []) {
+        const p = pMap.get(it.productId);
+        totCogs += (p?.costPrice ?? p?.purchasePrice ?? 0) * (it.qty || 1);
+      }
+    }
+    const grossProfit = totRev - totCogs;
+
+    // Calculate actual operating expenses from ledger
+    const opExpenses = ledger
+      .filter((l) => l.account === "operating_expenses" || (l.kind === "payment" && l.account !== "accounts_payable"))
+      .reduce((a, b) => a + (b.amount || 0), 0);
+
+    const indirectIncome = ledger
+      .filter((l) => l.account === "indirect_income")
+      .reduce((a, b) => a + (b.amount || 0), 0);
+
+    const netProfit = grossProfit - opExpenses + indirectIncome;
+
+    if (view === "net_profit") {
+      const rows = [
+        { col1: "1. Revenue from Operations", col2: "Invoiced Taxable Sales (Drafts Excluded)", col3: fmtRs(totRev), status: "income" },
+        { col1: "2. Cost of Goods Sold (COGS)", col2: "Product Purchase / Cost Basis", col3: fmtRs(totCogs), status: "expense" },
+        { col1: "3. Gross Operating Profit", col2: "Revenue − Cost of Goods Sold", col3: fmtRs(grossProfit), status: grossProfit >= 0 ? "profit" : "loss" },
+        { col1: "4. Operating & Administrative Expenses", col2: "Rent, Electricity, Logistics, Packaging", col3: fmtRs(opExpenses), status: "expense" },
+        { col1: "5. Other / Indirect Income", col2: "Interest, Discounts Received, Scrap Sales", col3: fmtRs(indirectIncome), status: "income" },
+        { col1: "6. Net Profit / (Loss) for Period", col2: "Gross Profit − Operating Expenses + Indirect Income", col3: fmtRs(netProfit), status: netProfit >= 0 ? "profit" : "loss" },
+      ];
+      return {
+        columns: [
+          { key: "col1", label: "P&L Line Item" },
+          { key: "col2", label: "Particulars / Basis" },
+          { key: "col3", label: "Amount (₹)", align: "right" },
+        ],
+        rows,
+        totals: {
+          revenue: fmtRs(totRev),
+          cogs: fmtRs(totCogs),
+          profit: fmtRs(netProfit),
+          margin: totRev > 0 ? ((netProfit / totRev) * 100).toFixed(1) + "%" : "0.0%",
+        },
+      };
+    }
+
+    if (view === "category_profit") {
+      const catMap = {};
+      for (const i of invoices) {
+        for (const it of i.items || []) {
+          const p = pMap.get(it.productId);
+          const cat = p?.category || "General";
+          const e = (catMap[cat] ||= { category: cat, revenue: 0, cogs: 0, qty: 0 });
+          const rev = it.amount || 0;
+          const cost = (p?.costPrice ?? p?.purchasePrice ?? 0) * (it.qty || 1);
+          e.revenue += rev;
+          e.cogs += cost;
+          e.qty += it.qty || 1;
+        }
+      }
+      const rows = Object.values(catMap).map((c) => {
+        const profit = c.revenue - c.cogs;
+        const marginPct = c.revenue > 0 ? ((profit / c.revenue) * 100).toFixed(1) + "%" : "0.0%";
+        return {
+          col1: c.category,
+          col2: c.qty.toLocaleString("en-IN"),
+          col3: fmtRs(c.revenue),
+          col4: fmtRs(c.cogs),
+          col5: fmtRs(profit),
+          col6: marginPct,
+          status: profit >= 0 ? "profit" : "loss",
+        };
+      });
+      return {
+        columns: [
+          { key: "col1", label: "Product Category" },
+          { key: "col2", label: "Units Sold", align: "right" },
+          { key: "col3", label: "Revenue (₹)", align: "right" },
+          { key: "col4", label: "COGS (₹)", align: "right" },
+          { key: "col5", label: "Gross Margin (₹)", align: "right" },
+          { key: "col6", label: "Margin %", align: "right" },
+        ],
+        rows,
+        totals: {
+          revenue: fmtRs(totRev),
+          cogs: fmtRs(totCogs),
+          profit: fmtRs(grossProfit),
+          margin: totRev > 0 ? ((grossProfit / totRev) * 100).toFixed(1) + "%" : "0.0%",
+        },
+      };
+    }
+
+    // Default / gross_profit
+    const rows = invoices.map((i) => {
+      let rev = i.totals?.taxable || 0;
+      let cogs = 0;
+      for (const it of i.items || []) {
+        const p = pMap.get(it.productId);
+        cogs += (p?.costPrice ?? p?.purchasePrice ?? 0) * (it.qty || 1);
+      }
+      const profit = rev - cogs;
+      const marginPct = rev > 0 ? ((profit / rev) * 100).toFixed(1) + "%" : "0.0%";
+      return {
+        col1: i.number,
+        col2: i.date,
+        col3: i.customer?.name || "Customer",
+        col4: fmtRs(rev),
+        col5: fmtRs(cogs),
+        col6: fmtRs(profit),
+        col7: marginPct,
+        status: profit >= 0 ? "profit" : "loss",
+      };
+    });
+    return {
+      columns: [
+        { key: "col1", label: "Invoice No" },
+        { key: "col2", label: "Date" },
+        { key: "col3", label: "Customer Name" },
+        { key: "col4", label: "Revenue (₹)", align: "right" },
+        { key: "col5", label: "COGS (₹)", align: "right" },
+        { key: "col6", label: "Gross Profit (₹)", align: "right" },
+        { key: "col7", label: "Margin %", align: "right" },
+      ],
+      rows,
+      totals: {
+        revenue: fmtRs(totRev),
+        cogs: fmtRs(totCogs),
+        profit: fmtRs(grossProfit),
+        margin: totRev > 0 ? ((grossProfit / totRev) * 100).toFixed(1) + "%" : "0.0%",
+      },
     };
   }
 
@@ -678,7 +920,8 @@ export async function computeReportData({ division = "taxes", view = "gstr1", fr
   if (division === "summary") {
     if (view === "trial_balance") {
       const accTotals = {};
-      for (const l of ledgerAll) {
+      const ledgerFiltered = ledgerAll.filter((l) => inRange(l.date, from, to));
+      for (const l of ledgerFiltered) {
         if (l.lines) {
           for (const line of l.lines) {
             const acc = line.account || "general";
@@ -707,7 +950,11 @@ export async function computeReportData({ division = "taxes", view = "gstr1", fr
           { key: "col4", label: "Net Balance (₹)", align: "right" },
         ],
         rows,
-        totals: { count: rows.length },
+        totals: {
+          count: rows.length,
+          debit: fmtRs(Object.values(accTotals).reduce((a, b) => a + b.debit, 0)),
+          credit: fmtRs(Object.values(accTotals).reduce((a, b) => a + b.credit, 0)),
+        },
       };
     }
 
@@ -768,3 +1015,4 @@ export async function computeReportData({ division = "taxes", view = "gstr1", fr
     totals: { count: rows.length, total: fmtRs(ewbInvoices.reduce((a, b) => a + (b.totals?.total || 0), 0)) },
   };
 }
+

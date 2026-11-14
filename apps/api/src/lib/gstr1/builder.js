@@ -36,7 +36,10 @@ export function mapToUqc(unit) {
  * Builds standard official GSTR-1 structure and UI preview.
  */
 export function buildGstr1({ invoices = [], creditNotes = [], settings = {}, period }) {
-  const sellerGstin = (settings.gstin || "36AAAPL1234C1ZV").trim();
+  const sellerGstin = (settings.gstin || "36ADDPC0083H1Z0").trim().toUpperCase();
+  if (!isValidGstin(sellerGstin)) {
+    throw new Error("Valid 15-character Seller GSTIN is required to generate statutory GSTR-1. Configure GSTIN in Settings.");
+  }
   const sellerState = settings.stateCode || (sellerGstin.length >= 2 ? sellerGstin.slice(0, 2) : "36");
 
   const from = period.from;
@@ -105,8 +108,8 @@ export function buildGstr1({ invoices = [], creditNotes = [], settings = {}, per
         customerName: inv.customer?.name || "",
       });
       b2bMap.set(custGstin, ctinEntry);
-    } else if (isInter && inv.totals.total > 25000000) {
-      // B2CL: Inter-state unregistered > ₹2.5 Lakhs
+    } else if (isInter && inv.totals.total > 10000000) {
+      // B2CL: Inter-state unregistered > ₹1.0 Lakh (GST Notification 04/2024 amending Rule 59)
       const posEntry = b2clMap.get(pos) || { pos, inv: [] };
       const itemsList = Array.from(rateGroups.entries()).map(([rt, vals], idx) => ({
         num: idx + 1,

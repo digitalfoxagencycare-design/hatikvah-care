@@ -79,7 +79,10 @@ export async function generateDocumentPdf({ kind, doc, company }) {
 
       // IRN / Government E-Invoice Header if present
       if (doc.einvoice?.irn) {
-        pdf.fontSize(6.5).font("Helvetica-Bold").fillColor("#0284C7").text(`IRN: ${doc.einvoice.irn}`, 36, 142, { width: 523 });
+        pdf.fontSize(6.5).font("Helvetica-Bold").fillColor("#0284C7").text(`IRN: ${doc.einvoice.irn}`, 36, 142, { width: 350 });
+        if (doc.einvoice.ackNo) {
+          pdf.fontSize(6.5).font("Helvetica").fillColor("#475569").text(`Ack No: ${doc.einvoice.ackNo} · Ack Date: ${fmtDate(doc.einvoice.ackDate)}`, 380, 142, { width: 179, align: "right" });
+        }
       }
 
       // 3. Customer Info Section
@@ -181,6 +184,16 @@ export async function generateDocumentPdf({ kind, doc, company }) {
         pdf.text("Account #: 42157988420", 130, y + 23);
         pdf.text("IFSC Code: SBIN0020308", 130, y + 34);
         pdf.text("Branch: SANJEEVA REDDY NGR", 130, y + 45);
+
+        // Government E-Invoice Signed QR if active
+        if (doc.einvoice?.signedQrCode) {
+          try {
+            const einvQrBuffer = await QRCode.toBuffer(doc.einvoice.signedQrCode, { width: 140, margin: 1, errorCorrectionLevel: "M" });
+            pdf.image(einvQrBuffer, 295, y - 4, { width: 68 });
+            pdf.fontSize(6.5).font("Helvetica-Bold").fillColor("#166534").text("IRP SIGNED QR", 280, y + 68, { width: 98, align: "center" });
+            pdf.fontSize(5.5).font("Helvetica").fillColor("#475569").text(`Ack: ${doc.einvoice.ackNo || "IRP Verified"}`, 270, y + 76, { width: 118, align: "center" });
+          } catch {}
+        }
 
         // Signatory Stamp
         pdf.fontSize(8).font("Helvetica-Bold").fillColor("#0F172A").text(`For ${company.legalName || "M/s. EXL MARKETING"}`, 400, y);

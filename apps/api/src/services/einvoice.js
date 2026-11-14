@@ -32,16 +32,26 @@ export function computeIrnHash(supplierGstin, finYear, docType, docNo) {
  * Suitable for direct 1-click submission to IRP or offline portal upload on einvoice1.gst.gov.in
  */
 export function buildEinvoiceGovtJson({ invoice, settings = {}, cfg = {} }) {
-  let sellerGstin = (settings.gstin || cfg.ewbGstin || "36ADDPC0083H1Z0").trim().toUpperCase();
-  if (!GSTIN_RE.test(sellerGstin)) sellerGstin = "36ADDPC0083H1Z0";
+  const rawSellerGstin = (settings.gstin || cfg.einvoiceGstin || cfg.ewbGstin || "").trim().toUpperCase();
+  if (!rawSellerGstin || !GSTIN_RE.test(rawSellerGstin)) {
+    throw new Error("Valid 15-character Seller GSTIN is required for E-Invoicing. Configure GSTIN in Settings.");
+  }
+  const sellerGstin = rawSellerGstin;
   const sellerStateCode = String(settings.stateCode || sellerGstin.slice(0, 2) || "36").padStart(2, "0");
 
-  let buyerGstin = (invoice.customer?.gstin || "URP").trim().toUpperCase();
-  const isB2B = GSTIN_RE.test(buyerGstin);
-  const supTyp = isB2B ? "B2B" : "B2C";
-
+  const rawBuyerGstin = (invoice.customer?.gstin || "").trim().toUpperCase();
+  if (!rawBuyerGstin || !GSTIN_RE.test(rawBuyerGstin) || rawBuyerGstin === "URP") {
+    throw new Error("E-Invoicing is legally restricted to B2B supplies and requires a valid 15-character recipient GSTIN.");
+  }
+  const buyerGstin = rawBuyerGstin;
   const buyerStateCode = String(invoice.placeOfSupply || invoice.customer?.stateCode || sellerStateCode).padStart(2, "0");
   const isInterState = sellerStateCode !== buyerStateCode;
+
+  const rawBuyerPin = String(invoice.customer?.deliveryPincode || invoice.customer?.pincode || "").replace(/\D/g, "");
+  if (rawBuyerPin.length !== 6) {
+    throw new Error("Valid 6-digit delivery/billing PIN code is required for E-Invoicing recipient.");
+  }
+  const buyerPin = Number(rawBuyerPin);
 
   const docNo = String(invoice.number || "INV01").replace(/[^A-Za-z0-9\/-]/g, "").slice(0, 16);
   const docDate = toEinvoiceDate(invoice.date);
@@ -49,10 +59,12 @@ export function buildEinvoiceGovtJson({ invoice, settings = {}, cfg = {} }) {
   const cleanItems = (invoice.items || []).map((it, idx) => {
     const qty = Number(it.qty) || 1;
     const rateRs = toRs(it.rate);
-    const grossAmtRs = toRs((it.amount ?? (it.rate * qty)));
+    const grossAmtRs = toRs(it.amount ?? (it.rate * qty));
     const discountRs = toRs(it.discount || 0);
-    const taxableRs = toRs(grossAmtRs - discountRs);
-    const gstRate = Number(it.gstRate) || 18;
+    // Correct rupee subtraction without double division by 100
+    const taxableRs = Number(Math.max(0, grossAmtRs - discountRs).toFixed(2));
+    // Preserve 0% GST (nil-rated / exempt)
+    const gstRate = it.gstRate !== undefined && it.gstRate !== null ? Number(it.gstRate) : 18;
 
     const cgstAmtRs = isInterState ? 0 : Number(((taxableRs * (gstRate / 2)) / 100).toFixed(2));
     const sgstAmtRs = isInterState ? 0 : Number(((taxableRs * (gstRate / 2)) / 100).toFixed(2));
@@ -90,13 +102,12 @@ export function buildEinvoiceGovtJson({ invoice, settings = {}, cfg = {} }) {
 
   const sellerAddr = (settings.address || "Kondapur, Hyderabad").replace(/[\r\n]+/g, ", ");
   const buyerAddr = (invoice.customer?.shippingAddress || invoice.customer?.billingAddress || "Hyderabad, Telangana").replace(/[\r\n]+/g, ", ");
-  const buyerPin = Number(invoice.customer?.deliveryPincode || invoice.customer?.pincode || (buyerStateCode === "37" ? "520001" : "500001"));
 
   const payload = {
     Version: "1.1",
     TranDtls: {
       TaxSch: "GST",
-      SupTyp: supTyp,
+      SupTyp: "B2B",
       RegRev: "N",
       EcmGstin: null,
       IgstOnIntra: "N",
@@ -116,7 +127,7 @@ export function buildEinvoiceGovtJson({ invoice, settings = {}, cfg = {} }) {
       Stcd: sellerStateCode,
     },
     BuyerDtls: {
-      Gstin: isB2B ? buyerGstin : "URP",
+      Gstin: buyerGstin,
       LglNm: String(invoice.customer?.name || "Customer").slice(0, 100),
       TrdNm: String(invoice.customer?.name || "Customer").slice(0, 100),
       Pos: buyerStateCode,
@@ -141,10 +152,10 @@ export function buildEinvoiceGovtJson({ invoice, settings = {}, cfg = {} }) {
 }
 
 /**
- * Generates an IRP E-Invoice through Sandbox.co.in or official fallback
+ * Generates an IRP E-Invoice through Sandbox.co.in or official Government JSON export.
+ * NEVER returns a fabricated IRN hash or fake acknowledgement number as active.
  */
 export async function generateSandboxEinvoice({ invoice, settings = {}, cfg = {}, fetchImpl = fetch }) {
-  const govtJson = buildEinvoiceGovtJson({ invoice, settings, cfg });
   const buyerGstin = (invoice.customer?.gstin || "").trim().toUpperCase();
   const isB2B = GSTIN_RE.test(buyerGstin);
 
@@ -153,7 +164,16 @@ export async function generateSandboxEinvoice({ invoice, settings = {}, cfg = {}
       ok: false,
       error: "E-Invoice is only mandatory and valid for B2B supplies with registered GSTIN.",
       isB2B: false,
-      govtJson,
+    };
+  }
+
+  let govtJson;
+  try {
+    govtJson = buildEinvoiceGovtJson({ invoice, settings, cfg });
+  } catch (err) {
+    return {
+      ok: false,
+      error: err.message,
     };
   }
 
@@ -163,17 +183,16 @@ export async function generateSandboxEinvoice({ invoice, settings = {}, cfg = {}
   );
 
   if (!hasCredentials) {
-    // Generate verified deterministic IRN hash for offline portal upload
-    const fyStr = (invoice.date || "").slice(0, 4) || "2026";
-    const simIrn = computeIrnHash(govtJson.SellerDtls.Gstin, fyStr, "INV", govtJson.DocDtls.No);
+    // Return verified official JSON for manual upload without claiming fake active IRN
     return {
       ok: true,
       source: "govt_json_ready",
-      irn: simIrn,
-      ackNo: `ACK${Date.now().toString().slice(-12)}`,
-      ackDate: new Date().toISOString(),
-      status: "active",
-      message: "Official E-Invoice JSON generated (Compliant with NIC schema v1.1)",
+      status: "prepared",
+      irn: null,
+      ackNo: null,
+      ackDate: null,
+      signedQrCode: null,
+      message: "Official Government E-Invoice JSON (schema v1.1) generated. Ready for manual upload on einvoice1.gst.gov.in",
       govtJson,
     };
   }
@@ -228,22 +247,25 @@ export async function generateSandboxEinvoice({ invoice, settings = {}, cfg = {}
       };
     }
   } catch (err) {
-    console.warn("IRP API call exception, falling back to JSON:", err.message);
-    const fyStr = (invoice.date || "").slice(0, 4) || "2026";
-    const simIrn = computeIrnHash(govtJson.SellerDtls.Gstin, fyStr, "INV", govtJson.DocDtls.No);
+    console.warn("IRP API call exception:", err.message);
     return {
-      ok: true,
-      source: "govt_json_ready",
-      irn: simIrn,
-      ackNo: `ACK${Date.now().toString().slice(-12)}`,
-      ackDate: new Date().toISOString(),
-      status: "active",
-      message: `Offline Government JSON ready (Compliant with GST e-Invoice v1.1): ${err.message}`,
+      ok: false,
+      source: "error",
+      error: `IRP registration failed: ${err.message}`,
       govtJson,
     };
   }
 
-  return { ok: true, source: "govt_json_ready", govtJson };
+  return {
+    ok: true,
+    source: "govt_json_ready",
+    status: "prepared",
+    irn: null,
+    ackNo: null,
+    ackDate: null,
+    signedQrCode: null,
+    govtJson,
+  };
 }
 
 /**
@@ -276,7 +298,8 @@ export async function cancelSandboxEinvoice({ irn, reason = "1", remarks = "Canc
 
     if (res.ok) {
       const data = await res.json();
-      return { ok: true, data: data.data || {} };
+      const cancelData = data.data?.data || data.data || {};
+      return { ok: true, data: cancelData, cancelDate: cancelData.CancelDate || new Date().toISOString() };
     }
     const txt = await res.text().catch(() => "");
     return { ok: false, error: `IRP cancellation returned ${res.status}: ${txt.slice(0, 150)}` };
@@ -284,3 +307,4 @@ export async function cancelSandboxEinvoice({ irn, reason = "1", remarks = "Canc
     return { ok: false, error: err.message };
   }
 }
+

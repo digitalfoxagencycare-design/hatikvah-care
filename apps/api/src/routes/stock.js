@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { nextNumber } from "../lib/gst.js";
 import { requirePerm } from "../lib/permissions.js";
-import { batchLevels, bucketOf, isLow, logActivity, moveStock, now, stockBuckets, token } from "../lib/sales.js";
+import { batchLevels, bucketOf, isLow, logActivity, moveStock, now, stockBuckets, token, postLedger } from "../lib/sales.js";
 import { measureLabel } from "../lib/units.js";
 import { purchaseInput, receiveInput, stockAdjustInput, supplierInput } from "../schemas.js";
 import { wrap as plainWrap } from "./public.js";
@@ -201,6 +201,13 @@ export function stockRoutes({ store, audit }) {
   r.post("/purchases/:id/debit-note", wrap(async (req, res) => {
     const po = await store.purchases.get(req.params.id);
     if (!po) return notFound(res, "Purchase order");
+
+    const idempotencyKey = String(req.headers["x-idempotency-key"] || req.body?.idempotencyKey || "").trim();
+    if (idempotencyKey && (po.debitNotes || []).some(dn => dn.idempotencyKey === idempotencyKey)) {
+      const existing = po.debitNotes.find(dn => dn.idempotencyKey === idempotencyKey);
+      return res.status(200).json({ ok: true, debitNote: existing, purchase: po, duplicated: true });
+    }
+
     const { items = [], reason = "Goods returned to supplier", notes = "" } = req.body || {};
     if (!Array.isArray(items) || items.length === 0) {
       return bad(res, "At least one item must be returned on a debit note");
@@ -209,16 +216,51 @@ export function stockRoutes({ store, audit }) {
     const dnSeq = (po.debitNotes?.length || 0) + 1;
     const cleanPoNum = String(po.number || "PO").replace(/[^A-Za-z0-9]/g, "");
     const dnNumber = `DN-${cleanPoNum}-${String(dnSeq).padStart(2, "0")}`;
-    let totalDebitPaise = 0;
+    let totalTaxablePaise = 0;
+    let totalTaxPaise = 0;
+    const currentBuckets = await stockBuckets(store);
+    const updatedPoItems = [...(po.items || [])];
 
     for (const retItem of items) {
-      const orig = (po.items || []).find((i) => i.productId === retItem.productId);
-      if (!orig) return bad(res, "Returned product is not on this purchase order");
+      const itemIdx = updatedPoItems.findIndex((i) => i.productId === retItem.productId);
+      if (itemIdx === -1) return bad(res, "Returned product is not on this purchase order");
+      const orig = updatedPoItems[itemIdx];
+
       const retQty = Number(retItem.qty) || 0;
       if (retQty <= 0) return bad(res, "Return quantity must be greater than zero");
-      const rate = retItem.rate || orig.rate || 0;
-      totalDebitPaise += rate * retQty;
 
+      const received = Number(orig.received || 0);
+      const alreadyReturned = Number(orig.returnedQty || 0);
+      const returnableBalance = Math.max(0, received - alreadyReturned);
+
+      if (retQty > returnableBalance) {
+        return bad(res, `Cannot return ${retQty} units of ${orig.name || "item"}. Only ${returnableBalance} units received and returnable.`);
+      }
+
+      // Check physical stock availability
+      const avail = bucketOf(currentBuckets, orig.productId).available;
+      if (avail < retQty) {
+        return bad(res, `Insufficient stock to return ${retQty} units of ${orig.name || "item"}. Current available physical stock is ${avail} units.`);
+      }
+
+      // Fetch product to verify batch tracking
+      const prod = await store.products.get(orig.productId);
+      if (prod?.batchTracked) {
+        if (!retItem.batch || !retItem.batch.batchNumber) {
+          return bad(res, `Product ${orig.name} is batch-tracked. Batch number is mandatory for return.`);
+        }
+      }
+
+      // Always trust server's purchase line rate, never client-submitted rate
+      const serverRate = orig.rate || 0;
+      const lineTaxable = serverRate * retQty;
+      const gstRate = orig.gstRate !== undefined ? Number(orig.gstRate) : 18;
+      const lineTax = Math.round((lineTaxable * gstRate) / 100);
+
+      totalTaxablePaise += lineTaxable;
+      totalTaxPaise += lineTax;
+
+      // Deduct stock
       await moveStock(store, {
         productId: orig.productId,
         sku: orig.sku,
@@ -226,16 +268,57 @@ export function stockRoutes({ store, audit }) {
         kind: "out",
         ref: dnNumber,
         note: `Purchase return: ${reason}`,
+        batch: retItem.batch || null,
         by: by(req),
       });
+
+      // Track return quantity on purchase line
+      updatedPoItems[itemIdx] = {
+        ...orig,
+        returnedQty: alreadyReturned + retQty,
+      };
     }
+
+    const totalDebitPaise = totalTaxablePaise + totalTaxPaise;
+
+    // Post double-entry balanced accounting reversal to ledger
+    const supName = po.supplierName || po.supplier?.name || "Supplier";
+    const debitLines = [
+      { account: "accounts_payable", debit: totalDebitPaise, credit: 0 },
+      { account: "purchase_returns", debit: 0, credit: totalTaxablePaise },
+    ];
+    if (totalTaxPaise > 0) {
+      debitLines.push({ account: "input_gst", debit: 0, credit: totalTaxPaise });
+    }
+
+    await postLedger(store, {
+      sourceKey: `debit-note:${dnNumber}`,
+      kind: "purchase_return",
+      account: "accounts_payable",
+      amount: totalDebitPaise,
+      ref: dnNumber,
+      party: supName,
+      lines: debitLines,
+      narration: `Debit note issued to ${supName} against ${po.number}: ${reason}`,
+      by: by(req),
+    });
 
     const debitNote = {
       dnNumber,
+      idempotencyKey: idempotencyKey || null,
       date: now().slice(0, 10),
       reason,
       notes,
-      items,
+      items: items.map(it => {
+        const orig = updatedPoItems.find(i => i.productId === it.productId);
+        return {
+          productId: it.productId,
+          name: orig?.name || "Item",
+          qty: Number(it.qty) || 0,
+          rate: orig?.rate || 0,
+          batch: it.batch || null,
+        };
+      }),
       amount: totalDebitPaise,
       createdAt: now(),
       createdBy: by(req),
@@ -243,6 +326,7 @@ export function stockRoutes({ store, audit }) {
 
     const updatedDebitNotes = [...(po.debitNotes || []), debitNote];
     const upd = await store.purchases.update(po.id, {
+      items: updatedPoItems,
       debitNotes: updatedDebitNotes,
       updatedAt: now(),
     });

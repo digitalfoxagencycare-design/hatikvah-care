@@ -24,6 +24,7 @@ export default function DocPage() {
   const [s, setS] = useState({ loading: true });
   const [resp, setResp] = useState({ name: "", note: "", busy: false, error: null, done: null });
   const [qrData, setQrData] = useState("");
+  const [einvQrData, setEinvQrData] = useState("");
 
   const load = () => api(`/api/public/doc/${kind}/${token}`).then((data) => setS({ data })).catch((e) => setS({ error: e.message }));
   useEffect(() => { load(); }, [kind, token]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -50,6 +51,14 @@ export default function DocPage() {
     QRCode.toDataURL(qrTarget, { margin: 1, width: 140, errorCorrectionLevel: "M" })
       .then(setQrData)
       .catch(() => setQrData(""));
+
+    if (d.einvoice?.signedQrCode) {
+      QRCode.toDataURL(d.einvoice.signedQrCode, { margin: 1, width: 150, errorCorrectionLevel: "M" })
+        .then(setEinvQrData)
+        .catch(() => setEinvQrData(""));
+    } else {
+      setEinvQrData("");
+    }
   }, [s.data]);
 
   if (s.loading) return <p className="doc-note">Loading document…</p>;
@@ -440,6 +449,17 @@ export default function DocPage() {
             <p>IFSC Code: <strong>SBIN0020308</strong></p>
             <p>Branch: <strong>SANJEEVA REDDY NGR</strong></p>
           </div>}
+
+          {einvQrData && (
+            <div className="bill-einv-qr-col" style={{ textAlign: "center" }}>
+              <p className="bottom-label" style={{ color: "#166534" }}><strong>Government E-Invoice:</strong></p>
+              <div className="qr-container" style={{ display: "inline-block", padding: 4, background: "#fff", border: "1px solid #bbf7d0", borderRadius: 4 }}>
+                <img src={einvQrData} alt="IRP Signed E-Invoice QR" width="100" height="100" style={{ display: "block" }} />
+              </div>
+              <p style={{ fontSize: "0.68rem", color: "#166534", margin: "4px 0 0 0", fontWeight: 700 }}>IRP Verified QR Code</p>
+              <p style={{ fontSize: "0.62rem", color: "#64748b", margin: 0 }}>Ack #{d.einvoice?.ackNo || "Active"}</p>
+            </div>
+          )}
 
           <div className="bill-sign-col">
             <p className="sign-company">For <strong>{c.legalName || "M/s. EXL MARKETING"}</strong></p>

@@ -128,7 +128,7 @@ export function buildEwbGovtJson({ invoice, settings = {}, transport = {}, cfg =
     const qty = Number(it.qty) || 1;
     const rateRs = toRs(it.rate);
     const taxableRs = toRs((it.amount ?? (it.rate * qty)) - (it.discount || 0));
-    const gstRate = Number(it.gstRate) || 18;
+    const gstRate = it.gstRate !== undefined && it.gstRate !== null ? Number(it.gstRate) : 18;
 
     return {
       itemNo: idx + 1,
@@ -267,39 +267,6 @@ export async function generateSandboxEwb({ invoice, settings = {}, transport = {
       }
       if (data.data?.error || data.data?.info) {
         const errorCodes = data.data?.error?.errorCodes || "";
-        // If error is 212 (Invalid Consignee GSTIN) and not already URP, retry with URP automatically!
-        if (errorCodes.includes("212") && ewbRecord.toGstin !== "URP") {
-          console.warn("Invalid Consignee GSTIN detected from Govt, auto-retrying with URP...");
-          ewbRecord.toGstin = "URP";
-          const retryRes = await fetchImpl("https://api.sandbox.co.in/gst/compliance/e-way-bill/consignor/bill", {
-            method: "POST",
-            headers: {
-              authorization: taxpayerToken,
-              "x-api-key": apiKey,
-              "x-source": "primary",
-              "x-api-version": "1.0.0",
-              "content-type": "application/json",
-            },
-            body: JSON.stringify(ewbRecord),
-          });
-          if (retryRes.ok) {
-            const retryData = await retryRes.json();
-            const retryEwbData = retryData.data?.data || retryData.data || {};
-            const retryEwbNo = String(retryEwbData.ewayBillNo || retryEwbData.ewbNo || "");
-            if (retryEwbNo) {
-              return {
-                ok: true,
-                source: "sandbox_api",
-                ewbNo: retryEwbNo,
-                ewbDate: retryEwbData.ewayBillDate || new Date().toISOString(),
-                validUpto: retryEwbData.validUpto || "",
-                alert: "Generated as B2C/URP (Customer GSTIN was not active on Govt portal)",
-                raw: retryData,
-              };
-            }
-          }
-        }
-
         const defaultInfo = data.data?.info || "";
         const errMsg = translateNicErrors(errorCodes, defaultInfo);
         return {

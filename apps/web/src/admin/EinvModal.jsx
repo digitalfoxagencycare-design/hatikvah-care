@@ -254,3 +254,4 @@ export function EinvModal({ invoice, onClose, onUpdated }) {
     </Modal>
   );
 }
+

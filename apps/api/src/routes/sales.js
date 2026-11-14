@@ -439,12 +439,28 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
   r.post("/invoices/:id/einvoice/generate", requirePerm("invoices"), wrap(async (req, res) => {
     const inv = await store.invoices.get(req.params.id);
     if (!inv) return notFound(res, "Invoice");
+    if (inv.status === "draft") return bad(res, "Cannot generate Government E-Invoice for an unissued draft invoice. Issue the invoice first.", 400);
     if (inv.status === "void") return bad(res, "Cannot generate E-Invoice for a void invoice", 409);
+    if (inv.einvoice?.status === "active") return bad(res, "This invoice already has an active Government E-Invoice registered.", 409);
+
+    // Concurrency / In-Progress lock
+    if (inv.einvoice?.status === "in_progress") {
+      const claimAge = Date.now() - new Date(inv.einvoice.claimedAt || 0).getTime();
+      if (claimAge < 120_000) {
+        return bad(res, "An E-Invoice registration request is currently in progress for this invoice. Please wait.", 409);
+      }
+    }
+
+    // Set lock
+    await store.invoices.update(inv.id, {
+      einvoice: { status: "in_progress", claimedAt: now() },
+      updatedAt: now(),
+    });
 
     const settings = await getSettings(store);
     const result = await generateSandboxEinvoice({ invoice: inv, settings, cfg, fetchImpl });
 
-    if (result.irn) {
+    if (result.ok && result.source === "sandbox_irp_api" && result.irn) {
       const einvoice = {
         irn: result.irn,
         ackNo: result.ackNo || "",
@@ -455,24 +471,56 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
         generatedAt: now(),
       };
       await store.invoices.update(inv.id, { einvoice, updatedAt: now() });
-      await logActivity(store, { entity: "invoice", entityId: inv.id, text: `E-Invoice IRN generated: ${result.irn.slice(0, 16)}...`, by: by(req) });
+      await logActivity(store, { entity: "invoice", entityId: inv.id, text: `Government E-Invoice IRN registered: ${result.irn.slice(0, 16)}...`, by: by(req) });
       await audit(req, "invoice.einvoice.generate", inv.number, { irn: result.irn });
       return res.json({ ok: true, irn: result.irn, einvoice, source: result.source });
     }
 
-    if (result.error) {
-      return bad(res, `E-Invoice: ${result.error}`, 400);
+    if (result.ok && result.source === "govt_json_ready") {
+      const einvoice = {
+        status: "prepared",
+        preparedAt: now(),
+      };
+      await store.invoices.update(inv.id, { einvoice, updatedAt: now() });
+      return res.json({
+        ok: true,
+        source: "govt_json_ready",
+        status: "prepared",
+        message: result.message || "Official Government JSON prepared for portal upload",
+        govtJson: result.govtJson,
+      });
     }
 
-    res.json(result);
+    // Revert lock on failure
+    await store.invoices.update(inv.id, {
+      einvoice: { status: "failed", lastError: result.error || "Generation failed", failedAt: now() },
+      updatedAt: now(),
+    });
+
+    return bad(res, `E-Invoice: ${result.error || "Generation rejected by IRP"}`, 400);
   }));
 
   r.post("/invoices/:id/einvoice/cancel", requirePerm("invoices"), wrap(async (req, res) => {
     const inv = await store.invoices.get(req.params.id);
     if (!inv) return notFound(res, "Invoice");
-    if (!inv.einvoice?.irn) return bad(res, "No active E-Invoice found to cancel", 409);
+    if (!inv.einvoice?.irn || inv.einvoice.status !== "active") {
+      return bad(res, "Invoice does not have an active Government IRN to cancel", 409);
+    }
+
+    // Enforce 24-hour statutory cancellation window
+    if (inv.einvoice.ackDate) {
+      const ackTime = new Date(inv.einvoice.ackDate).getTime();
+      const diffHours = (Date.now() - ackTime) / (3600 * 1000);
+      if (diffHours > 24) {
+        return bad(res, "Government IRP rules strictly prohibit cancelling an e-invoice after 24 hours of generation. You must issue a Credit Note instead.", 400);
+      }
+    }
 
     const { reason = "1", remarks = "Cancelled by admin" } = req.body || {};
+    if (!["1", "2", "3", "4"].includes(String(reason))) {
+      return bad(res, "Invalid cancellation reason code. Must be 1 (Duplicate), 2 (Data entry error), 3 (Order cancelled), or 4 (Other)", 400);
+    }
+
     const cancelRes = await cancelSandboxEinvoice({
       irn: inv.einvoice.irn,
       reason,
@@ -480,6 +528,10 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
       cfg,
       fetchImpl,
     });
+
+    if (!cancelRes.ok) {
+      return bad(res, cancelRes.error || "Government IRP rejected cancellation", 400);
+    }
 
     const einvoice = {
       ...inv.einvoice,

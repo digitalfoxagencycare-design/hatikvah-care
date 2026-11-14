@@ -65,6 +65,7 @@ describe("Government IRP E-Invoice System (Phase 4)", () => {
       customer: {
         name: "Care & Cure Clinic",
         gstin: "36AAACC9012C1Z8",
+        pincode: "500032",
       },
       totals: { taxable: 10000000, total: 11800000 },
       items: [{ name: "Kit", hsn: "96032100", qty: 1000, rate: 10000 }],
