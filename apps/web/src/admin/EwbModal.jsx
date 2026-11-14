@@ -4,9 +4,14 @@ import { Modal, Msg, useAction } from "./ui.jsx";
 
 export function EwbModal({ invoice, onClose, onUpdated }) {
   const [st, run] = useAction();
-  const [vehicleNo, setVehicleNo] = useState(invoice.ewaybill?.vehicleNo || "");
-  const [distance, setDistance] = useState(invoice.ewaybill?.distance || "");
-  const [transporter, setTransporter] = useState("");
+  const shipment = invoice.shipment || invoice.order?.shipment;
+  const initialTransporter = shipment?.provider
+    ? `${shipment.provider.toUpperCase()}${shipment.awb ? ` · AWB: ${shipment.awb}` : ""}`
+    : (invoice.ewaybill?.transporterName || "");
+
+  const [vehicleNo, setVehicleNo] = useState(invoice.ewaybill?.vehicleNo || shipment?.vehicleNo || "");
+  const [distance, setDistance] = useState(invoice.ewaybill?.distance || (shipment?.distanceKm ? String(shipment.distanceKm) : ""));
+  const [transporter, setTransporter] = useState(initialTransporter);
   const [manualEwb, setManualEwb] = useState(invoice.ewaybill?.ewbNo || "");
 
   const totalRs = (invoice.totals?.total || 0) / 100;

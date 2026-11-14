@@ -39,9 +39,29 @@ const P = {
   PaymentsHub: page(() => import("./PaymentsHub.jsx")), LogisticsHub: page(() => import("./LogisticsHub.jsx")), More: page(() => import("./More.jsx")),
 };
 // [path, label, permission, component, icon]
+// Swipe 1:1 14 Primary Sidebar Modules
 const NAV = [
-  ["", [["pos", "Counter Billing", "pos", "POS", "pos"], ["quotes", "Quotations", "quotes", "Quotes", "quote"], ["invoices", "Invoices", "invoices", "Invoices", "invoice"], ["reports", "GSTR-1 & Reports", "reports", "Reports", "reports"], ["purchase-orders", "Purchase Orders", "stock", "Purchases", "purchase"], ["vendors", "Suppliers", "stock", "Suppliers", "vendor"], ["products", "Products & Inventory", "catalog", "Products", "product"]]],
-  ["Automations & Channels", [["whatsapp", "WhatsApp Hub", "enquiries", "WhatsApp", "chat"], ["payments-hub", "Razorpay Payments", "invoices", "PaymentsHub", "card"], ["logistics-hub", "Logistics & Delivery", "orders", "LogisticsHub", "truck"]]],
+  ["Core Sales & Billing", [
+    ["invoices", "Sales (Invoices)", "invoices", "Invoices", "invoice"],
+    ["pos", "Counter Billing (POS)", "pos", "POS", "pos"],
+    ["quotes", "Quotations+", "quotes", "Quotes", "quote"],
+    ["orders", "Projects & Orders", "orders", "Orders", "truck"],
+  ]],
+  ["Purchases & Expenses", [
+    ["purchase-orders", "Purchases", "stock", "Purchases", "purchase"],
+    ["ledger", "Expenses+ & Cash Book", "ledger", "Ledger", "card"],
+    ["vendors", "Vendors / Suppliers", "stock", "Suppliers", "vendor"],
+  ]],
+  ["Catalog & Inventory", [
+    ["products", "Products & Services", "catalog", "Products", "product"],
+    ["stock", "Inventory (Stock)", "stock", "Stock", "product"],
+  ]],
+  ["Finance, CRM & Insights", [
+    ["payments-hub", "Payments (Razorpay)", "invoices", "PaymentsHub", "card"],
+    ["customers", "Customers", "customers", "Customers", "chat"],
+    ["reports", "Reports & GSTR-1", "reports", "Reports", "reports"],
+    ["logistics-hub", "Logistics & Delivery", "orders", "LogisticsHub", "truck"],
+  ]],
 ];
 // Off the sidebar, on the More page: [path, label, permission, component, hint]
 export const MORE = [["enquiries", "Enquiries", "enquiries", "Enquiries", "Quote requests from the website"], ["customers", "Customers", "customers", "Customers", "Hotel accounts and credit terms"], ["orders", "Sales orders", "orders", "Orders", "Packing and dispatch"],
@@ -97,8 +117,9 @@ export default function AdminApp() {
         </aside>
         <main className="adm-main">
           <header className="cockpit-topbar">
-            <button className="command-trigger" onClick={() => setCommand(true)}><Icon name="search" /> Search navigation <kbd>Ctrl K</kbd></button>
+            <button className="command-trigger" onClick={() => setCommand(true)}><Icon name="search" /> Ask SwipeAI / Search <kbd>Ctrl K</kbd></button>
             <div className="top-actions">
+              {can(me, "invoices") && <NavLink className="top-link" to="/admin/invoices/new">+ Create Invoice</NavLink>}
               {can(me, "quotes") && <NavLink className="top-link" to="/admin/quotes/new">+ New quote</NavLink>}
               {can(me, "pos") && <NavLink className="top-primary" to="/admin/pos">+ POS walk-in</NavLink>}
             </div>

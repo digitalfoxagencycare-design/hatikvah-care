@@ -70,8 +70,8 @@ function getOverdueText(inv) {
     today.setHours(0, 0, 0, 0);
     due.setHours(0, 0, 0, 0);
     const diffDays = Math.round((today - due) / (1000 * 60 * 60 * 24));
-    if (diffDays > 0) return `since ${diffDays} day${diffDays === 1 ? "" : "s"}`;
-    if (diffDays === 0) return "due today";
+    if (diffDays > 0) return `⚡ ${diffDays} day${diffDays === 1 ? "" : "s"}`;
+    if (diffDays === 0) return "⚡ due today";
   } catch {}
   return null;
 }
@@ -86,6 +86,7 @@ export default function Invoices() {
   const [sortField, setSortField] = useState("createdAt");
   const [sortAsc, setSortAsc] = useState(false);
   const [quickCreate, setQuickCreate] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]);
   const [page, setPage] = useState(1);
   const pageSize = 20;
 
@@ -338,10 +339,21 @@ export default function Invoices() {
               <table className="swipe-table">
                 <thead>
                   <tr>
-                    <th className="sortable" onClick={() => toggleSort("amount")} style={{ width: 130 }}>
+                    <th style={{ width: 40, textAlign: "center" }}>
+                      <input
+                        type="checkbox"
+                        checked={pagedList.length > 0 && pagedList.every((x) => selectedIds.includes(x.id))}
+                        onChange={(e) => {
+                          if (e.target.checked) setSelectedIds([...new Set([...selectedIds, ...pagedList.map((x) => x.id)])]);
+                          else setSelectedIds(selectedIds.filter((id) => !pagedList.some((x) => x.id === id)));
+                        }}
+                        aria-label="Select all invoices"
+                      />
+                    </th>
+                    <th className="sortable" onClick={() => toggleSort("amount")} style={{ width: 140 }}>
                       Amount {sortField === "amount" ? (sortAsc ? "▲" : "▼") : "↕"}
                     </th>
-                    <th style={{ width: 120 }}>Status ▾</th>
+                    <th style={{ width: 130 }}>Status ▾</th>
                     <th style={{ width: 100 }}>Mode ▾</th>
                     <th className="sortable" onClick={() => toggleSort("number")} style={{ width: 160 }}>
                       Bill # {sortField === "number" ? (sortAsc ? "▲" : "▼") : "↕"}
@@ -350,7 +362,7 @@ export default function Invoices() {
                     <th className="sortable" onClick={() => toggleSort("createdAt")} style={{ width: 160 }}>
                       Date Created {sortField === "createdAt" ? (sortAsc ? "▲" : "▼") : "↕"}
                     </th>
-                    <th style={{ width: 130, textAlign: "right" }}></th>
+                    <th style={{ width: 170, textAlign: "right" }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -362,29 +374,47 @@ export default function Invoices() {
 
                     // Status pill tone
                     let statusClass = "pending";
-                    let statusLabel = "pending";
+                    let statusLabel = "pending ●";
 
                     if (i.status === "draft") {
                       statusClass = "draft";
-                      statusLabel = "draft";
+                      statusLabel = "draft ●";
                     } else if (i.status === "void") {
                       statusClass = "cancelled";
-                      statusLabel = "cancelled";
+                      statusLabel = "cancelled ●";
                     } else if (i.status === "paid") {
                       statusClass = "paid";
-                      statusLabel = "paid";
+                      statusLabel = "paid ●";
                     } else if (i.balance > 0 && i.status === "partial") {
                       statusClass = "pending";
-                      statusLabel = "part paid";
+                      statusLabel = "part paid ●";
                     }
 
                     return (
-                      <tr key={i.id}>
+                      <tr key={i.id} className={selectedIds.includes(i.id) ? "row-selected" : ""}>
+                        {/* Checkbox */}
+                        <td style={{ textAlign: "center" }}>
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(i.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) setSelectedIds([...selectedIds, i.id]);
+                              else setSelectedIds(selectedIds.filter((id) => id !== i.id));
+                            }}
+                            aria-label={`Select invoice ${i.number}`}
+                          />
+                        </td>
+
                         {/* Amount */}
                         <td>
                           <div className="swipe-amount-cell">
                             ₹ {formatRupees(totalPaise)}
                           </div>
+                          {i.balance > 0 && i.status !== "draft" && i.status !== "void" && (
+                            <span style={{ fontSize: "0.72rem", color: "#ef4444", fontWeight: 600, display: "block" }}>
+                              Due ₹ {formatRupees(i.balance)}
+                            </span>
+                          )}
                         </td>
 
                         {/* Status */}
@@ -396,8 +426,8 @@ export default function Invoices() {
                               </span>
                             </div>
                             {overdueNote && (
-                              <span className="swipe-cell-sub alert">
-                                🔔 {overdueNote}
+                              <span className="swipe-cell-sub alert" style={{ fontWeight: 700, color: "#dc2626" }}>
+                                {overdueNote}
                               </span>
                             )}
                           </div>
@@ -411,13 +441,20 @@ export default function Invoices() {
                         {/* Bill # */}
                         <td>
                           <div className="swipe-cell-stacked">
-                            <Link
-                              to={`/admin/invoices/${i.id}`}
-                              className="swipe-cell-title"
-                              style={{ textDecoration: "none", color: "#0f172a" }}
-                            >
-                              {i.number || "Draft"}
-                            </Link>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              <Link
+                                to={`/admin/invoices/${i.id}`}
+                                className="swipe-cell-title"
+                                style={{ textDecoration: "none", color: "#0f172a", fontWeight: 700 }}
+                              >
+                                {i.number || "Draft"}
+                              </Link>
+                              {i.ewaybill?.ewbNo && (
+                                <span title={`Govt E-Way Bill Active: #${i.ewaybill.ewbNo}`} style={{ cursor: "pointer", fontSize: "0.75rem", background: "#dcfce7", color: "#166534", padding: "1px 5px", borderRadius: 4, fontWeight: 700 }}>
+                                  EWB ✓
+                                </span>
+                              )}
+                            </div>
                             <span className="swipe-cell-sub">
                               by {creator}
                             </span>
@@ -427,7 +464,7 @@ export default function Invoices() {
                         {/* Customer */}
                         <td>
                           <div className="swipe-cell-stacked">
-                            <span className="swipe-cell-title" title={i.customer?.name}>
+                            <span className="swipe-cell-title" title={i.customer?.name} style={{ fontWeight: 600 }}>
                               {i.customer?.name || "Walk-in Customer"}
                             </span>
                             <span className="swipe-cell-sub">
@@ -450,25 +487,39 @@ export default function Invoices() {
 
                         {/* Actions */}
                         <td>
-                          <div className="swipe-row-actions">
+                          <div className="swipe-row-actions" style={{ justifyContent: "flex-end" }}>
+                            {i.status !== "draft" && i.status !== "void" && (
+                              <button
+                                type="button"
+                                className="swipe-btn-ghost"
+                                style={{ background: "#22c55e", color: "#fff", borderColor: "#16a34a", fontWeight: 700, padding: "4px 8px" }}
+                                disabled={st.busy}
+                                onClick={() => sendWhatsApp(i)}
+                                title="Send via WhatsApp / SMS with payment & tracking link"
+                              >
+                                💬 Send
+                              </button>
+                            )}
+
                             <Link
                               className="swipe-btn-ghost"
                               to={`/admin/invoices/${i.id}`}
                               title="View Invoice"
                             >
-                              👁️ View
+                              👁️
                             </Link>
 
-                            {i.status !== "draft" && i.status !== "void" && (
-                              <button
-                                type="button"
-                                className="swipe-btn-ghost"
-                                disabled={st.busy}
-                                onClick={() => sendWhatsApp(i)}
-                                title="Send via WhatsApp"
+                            {i.ewaybill?.ewbNo && i.token && (
+                              <a
+                                className="swipe-btn-icon"
+                                href={`/doc/ewaybill/${i.token}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title="Print Government E-Way Bill"
+                                style={{ textDecoration: "none", color: "#16a34a" }}
                               >
-                                ✈️ Send
-                              </button>
+                                🚚
+                              </a>
                             )}
 
                             {i.token && (
