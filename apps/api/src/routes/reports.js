@@ -5,6 +5,7 @@ import { requirePerm } from "../lib/permissions.js";
 import { balance, stockLevels } from "../lib/sales.js";
 import { parseGstr1Period } from "../lib/gstr1/period.js";
 import { buildGstr1 } from "../lib/gstr1/builder.js";
+import { REPORT_DIVISIONS, computeReportData } from "../lib/reports_engine.js";
 import { atomicWrap } from "./atomic.js";
 import { csvHeaders, rupees } from "./shared.js";
 
@@ -170,6 +171,34 @@ export function reportRoutes({ store }) {
     const { preview } = buildGstr1({ invoices, creditNotes, settings: settingsList[0] || {}, period });
     csvHeaders(res, `gstr1-hsn-${period.fp}.csv`).send(
       toCsv(["num", "hsn_sc", "desc", "uqc", "qty", "val", "txval", "camt", "samt", "iamt"], preview.hsn)
+    );
+  }));
+
+  // ---------- Swipe 1:1 10 Divisions & 68 Report Views Engine
+  r.get("/reports/divisions", requirePerm("reports"), wrap(async (_req, res) => {
+    res.json(REPORT_DIVISIONS);
+  }));
+
+  r.get("/reports/query", requirePerm("reports"), wrap(async (req, res) => {
+    const { division = "taxes", view = "gstr1", from = "", to = "", search = "" } = req.query;
+    const result = await computeReportData({ division, view, from, to, search, store });
+    res.json(result);
+  }));
+
+  r.get("/reports/query/export.csv", requirePerm("reports"), wrap(async (req, res) => {
+    const { division = "taxes", view = "gstr1", from = "", to = "", search = "" } = req.query;
+    const result = await computeReportData({ division, view, from, to, search, store });
+    const colKeys = result.columns.map((c) => c.key);
+    const colLabels = result.columns.map((c) => c.label);
+    const csvRows = result.rows.map((r) => {
+      const obj = {};
+      colKeys.forEach((k, idx) => {
+        obj[colLabels[idx]] = r[k] ?? "";
+      });
+      return obj;
+    });
+    csvHeaders(res, `report-${division}-${view}-${from || "all"}-to-${to || "now"}.csv`).send(
+      toCsv(colLabels, csvRows)
     );
   }));
 
