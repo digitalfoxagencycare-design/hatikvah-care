@@ -14,8 +14,9 @@ export function useLoad(path) {
   return { ...s, reload: load, setData: (d) => setS((x) => ({ ...x, data: typeof d === "function" ? d(x.data) : d })) };
 }
 
-export function Loader({ s, children }) {
-  if (s.loading && !s.data) return <p className="muted" role="status">Loading…</p>;
-  if (s.error) return <p className="alert" role="alert">{s.error} <button className="btn small" onClick={s.reload}>Try again</button></p>;
-  return children;
+export function Loader({ s, load, children }) {
+  const target = s || load;
+  if (!target || (target.loading && !target.data)) return <p className="muted" role="status">Loading…</p>;
+  if (target.error) return <p className="alert" role="alert">{target.error} <button className="btn small" onClick={target.reload}>Try again</button></p>;
+  return typeof children === "function" ? children(target.data) : children;
 }

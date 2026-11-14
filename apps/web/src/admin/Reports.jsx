@@ -232,8 +232,8 @@ export default function Reports() {
       </div>
 
       {/* Top 8 Sticky KPI Metrics Cards */}
-      <Loader load={s}>
-        {() => (
+      <Loader s={s}>
+        {d?.totals && (
           <div
             style={{
               display: "grid",
@@ -503,8 +503,8 @@ export default function Reports() {
             </div>
 
             {/* GSTR-1 Section Table Content */}
-            <Loader load={gstr}>
-              {() => {
+            <Loader s={gstr}>
+              {gd && (() => {
                 if (gstrTab === "B2B") {
                   const list = gd?.b2b || [];
                   if (!list.length) {
@@ -598,14 +598,14 @@ export default function Reports() {
                     No records found in this GSTR-1 table for {selectedFy}.
                   </div>
                 );
-              }}
+              })()}
             </Loader>
           </div>
         </div>
       ) : activeDivision === "summary" && activeView === "overview" ? (
         /* Original Analytics & Funnel Overview */
-        <Loader load={s}>
-          {() => (
+        <Loader s={s}>
+          {d && (
             <div style={{ display: "grid", gap: 16 }}>
               <div className="two-cols">
                 <div className="panel">
@@ -709,8 +709,8 @@ export default function Reports() {
             </div>
           </div>
 
-          <Loader load={dyn}>
-            {() => {
+          <Loader s={dyn}>
+            {dyn.data && (() => {
               const cols = dyn.data?.columns || [];
               if (!cols.length || !filteredRows.length) {
                 return (
@@ -798,7 +798,7 @@ export default function Reports() {
                   )}
                 </div>
               );
-            }}
+            })()}
           </Loader>
         </div>
       )}
