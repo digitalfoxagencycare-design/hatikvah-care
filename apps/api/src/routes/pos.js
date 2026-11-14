@@ -175,6 +175,15 @@ export function posRoutes({ cfg, store, audit, automation, fetchImpl, log = cons
     const notes = String(b.notes || "").slice(0, 300);
     const narration = notes ? `${category}: ${notes}` : category;
 
+    const hasGst = Boolean(b.hasGst);
+    const gstRate = Number(b.gstRate) || 0;
+    let taxAmount = 0;
+    let netAmount = amount;
+    if (hasGst && gstRate > 0) {
+      taxAmount = Math.round(amount - (amount / (1 + gstRate / 100)));
+      netAmount = amount - taxAmount;
+    }
+
     if (b.kind === "income") {
       const e = await postLedger(store, {
         contraAccount: "indirect_income",
@@ -182,6 +191,10 @@ export function posRoutes({ cfg, store, audit, automation, fetchImpl, log = cons
         account: mode,
         kind: "receipt",
         amount,
+        taxAmount,
+        netAmount,
+        hasGst,
+        gstRate,
         ref: String(b.category || "INCOME").toUpperCase().slice(0, 60),
         party: payee,
         narration,
@@ -198,6 +211,10 @@ export function posRoutes({ cfg, store, audit, automation, fetchImpl, log = cons
         account: mode,
         kind: "payment",
         amount,
+        taxAmount,
+        netAmount,
+        hasGst,
+        gstRate,
         ref: String(b.category || "EXPENSE").toUpperCase().slice(0, 60),
         party: payee,
         narration,
@@ -208,6 +225,20 @@ export function posRoutes({ cfg, store, audit, automation, fetchImpl, log = cons
       await audit(req, "expense.create", e.ref, { amount, mode, category });
       return res.status(201).json(e);
     }
+  }));
+
+  r.patch("/ledger/entries/:id", requirePerm("ledger"), wrap(async (req, res) => {
+    const existing = await store.ledger.get(req.params.id);
+    if (!existing) return notFound(res, "Ledger entry not found");
+    const b = req.body || {};
+    const updates = {};
+    if (b.payee !== undefined) updates.party = String(b.payee).slice(0, 160);
+    if (b.category !== undefined) updates.category = String(b.category).slice(0, 100);
+    if (b.notes !== undefined) updates.narration = String(b.notes).slice(0, 300);
+    if (b.date !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(b.date)) updates.date = b.date;
+    const updated = await store.ledger.patch(req.params.id, updates);
+    await audit(req, "ledger.patch", existing.ref || req.params.id, updates);
+    res.json(updated);
   }));
   return r;
 }

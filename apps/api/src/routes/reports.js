@@ -202,5 +202,132 @@ export function reportRoutes({ store }) {
     );
   }));
 
+  // ---------- Swipe 1:1 Matrix Report Hub Endpoint (Phase 3)
+  r.get("/reports/matrix", requirePerm("reports"), wrap(async (req, res) => {
+    let { tab = "gstr_1", division, view, fy = "", from = "", to = "", search = "", party = "", category = "", hub = "", includeCancelled = "false" } = req.query;
+
+    if (fy && !from) {
+      const match = String(fy).match(/(\d{2})-(\d{2})/);
+      if (match) {
+        from = `20${match[1]}-04-01`;
+        to = `20${match[2]}-03-31`;
+      }
+    }
+
+    const tabMap = {
+      gstr_1: { division: "taxes", view: "gstr1" },
+      gstr_2b: { division: "taxes", view: "gstr2b" },
+      gstr_3b: { division: "taxes", view: "gstr3b" },
+      tax_summary: { division: "taxes", view: "tax_summary" },
+      hsn_summary: { division: "taxes", view: "hsn_summary" },
+      transactions_sales: { division: "transactions", view: "sales_summary" },
+      transactions_purchases: { division: "transactions", view: "purchase_summary" },
+      transactions_sales_returns: { division: "transactions", view: "credit_notes" },
+      transactions_purchase_returns: { division: "transactions", view: "debit_notes" },
+      transactions_estimates: { division: "transactions", view: "quotations" },
+      transactions_sales_orders: { division: "transactions", view: "challans" },
+      transactions_delivery_challans: { division: "transactions", view: "challans" },
+      transactions_expense: { division: "transactions", view: "expenses" },
+      transactions_indirect_income: { division: "transactions", view: "indirect_income" },
+      bill_profit_loss: { division: "bill_items", view: "bill_profit_loss" },
+      sales_by_item: { division: "bill_items", view: "sales_by_item" },
+      stock_summary: { division: "items", view: "stock_summary" },
+      low_stock: { division: "items", view: "low_stock" },
+      stock_value: { division: "items", view: "stock_valuation" },
+      receivables_ageing: { division: "party", view: "receivables_ageing" },
+      all_customers: { division: "party", view: "customer_summary" },
+      all_vendors: { division: "party", view: "supplier_summary" },
+      warehouse_stock_summary: { division: "warehouse", view: "hub_stock" },
+      pl_statement: { division: "pl", view: "gross_profit" },
+      sales_pl: { division: "pl", view: "net_profit" },
+      cash_flow: { division: "payments", view: "payments_in" },
+      bank_transfers: { division: "payments", view: "payments_out" },
+      day_book: { division: "summary", view: "daily_sales" },
+      analytics_overview: { division: "summary", view: "overview" },
+      ewaybill_report: { division: "eway", view: "eway_bills" },
+    };
+
+    const resolved = tabMap[tab] || { division: division || "taxes", view: view || tab };
+    const result = await computeReportData({ division: resolved.division, view: resolved.view, from, to, search, store });
+
+    const invoicesAll = await store.invoices.all({ sort: { date: -1 } });
+    const creditNotesAll = await store.creditNotes.all({ sort: { date: -1 } });
+    const invoices = invoicesAll.filter(i => isIssuedInvoice(i) && (!from || i.date >= from) && (!to || i.date <= to));
+    const creditNotes = creditNotesAll.filter(c => (!from || c.date >= from) && (!to || c.date <= to));
+
+    let qty = 0, cgst = 0, sgst = 0, igst = 0, totalTaxable = 0, totalAmount = 0, amountPaid = 0;
+
+    for (const inv of invoices) {
+      for (const item of inv.items || []) {
+        qty += Number(item.qty) || 0;
+      }
+      cgst += inv.totals?.cgst || 0;
+      sgst += inv.totals?.sgst || 0;
+      igst += inv.totals?.igst || 0;
+      totalTaxable += inv.totals?.taxable || 0;
+      totalAmount += inv.totals?.total || 0;
+      const rec = (inv.payments || []).reduce((a, b) => a + (b.amount || 0), 0);
+      amountPaid += rec;
+    }
+
+    for (const cn of creditNotes) {
+      cgst -= cn.totals?.cgst || 0;
+      sgst -= cn.totals?.sgst || 0;
+      igst -= cn.totals?.igst || 0;
+      totalTaxable -= cn.totals?.taxable || 0;
+      totalAmount -= cn.totals?.total || 0;
+    }
+
+    const netAmount = totalTaxable;
+    const roundOff = Math.round(totalAmount) - totalAmount;
+    const amountPending = Math.max(0, totalAmount - amountPaid);
+
+    const totals = {
+      qty: Math.round(qty),
+      cgst: Number(((cgst || 0) / 100).toFixed(2)),
+      sgst: Number(((sgst || 0) / 100).toFixed(2)),
+      igst: Number(((igst || 0) / 100).toFixed(2)),
+      roundOff: Number(((roundOff || 0) / 100).toFixed(2)),
+      netAmount: Number(((netAmount || 0) / 100).toFixed(2)),
+      totalAmount: Number(((totalAmount || 0) / 100).toFixed(2)),
+      amountPaid: Number(((amountPaid || 0) / 100).toFixed(2)),
+      amountPending: Number(((amountPending || 0) / 100).toFixed(2)),
+    };
+
+    res.json({
+      tab,
+      division: resolved.division,
+      view: resolved.view,
+      columns: result.columns,
+      rows: result.rows,
+      totals,
+      subTabs: result.subTabs || [],
+    });
+  }));
+
+  r.get("/reports/matrix.csv", requirePerm("reports"), wrap(async (req, res) => {
+    let { tab = "gstr_1", division, view, from = "", to = "", search = "" } = req.query;
+    const tabMap = {
+      gstr_1: { division: "taxes", view: "gstr1" },
+      transactions_sales: { division: "transactions", view: "sales_summary" },
+      transactions_purchases: { division: "transactions", view: "purchase_summary" },
+      stock_summary: { division: "items", view: "stock_summary" },
+    };
+    const resolved = tabMap[tab] || { division: division || "taxes", view: view || tab };
+    const result = await computeReportData({ division: resolved.division, view: resolved.view, from, to, search, store });
+    const colKeys = result.columns.map((c) => c.key);
+    const colLabels = result.columns.map((c) => c.label);
+    const csvRows = result.rows.map((r) => {
+      const obj = {};
+      colKeys.forEach((k, idx) => {
+        obj[colLabels[idx]] = r[k] ?? "";
+      });
+      return obj;
+    });
+    csvHeaders(res, `swipe-report-${tab}-${from || "all"}-to-${to || "now"}.csv`).send(
+      toCsv(colLabels, csvRows)
+    );
+  }));
+
   return r;
 }

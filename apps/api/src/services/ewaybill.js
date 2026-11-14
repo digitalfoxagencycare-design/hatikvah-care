@@ -35,20 +35,24 @@ function normalizeHsnForNic(rawHsn) {
   return Number(hsn) || 96032100;
 }
 
-let cachedTaxpayerToken = null;
-let taxpayerTokenExpiresAt = 0;
+const taxpayerTokenCache = new Map();
 
 /**
  * Creates / fetches an active taxpayer session token from Sandbox E-Way Bill API.
+ * Uses 5.5-hour in-memory token caching keyed by GSTIN/username.
  */
 export async function getTaxpayerToken(cfg = {}, fetchImpl = fetch) {
-  if (cachedTaxpayerToken && Date.now() < taxpayerTokenExpiresAt - 60_000) {
-    return cachedTaxpayerToken;
-  }
-  const sandboxToken = await getSandboxToken(cfg, fetchImpl);
-  const apiKey = String(cfg.sandboxApiKey || "").split(/\s+/)[0].trim();
   const gstin = String(cfg.ewbGstin || "").trim().toUpperCase();
   const username = String(cfg.ewbUsername || "").trim();
+  const cacheKey = `${gstin}:${username}`;
+  const cached = taxpayerTokenCache.get(cacheKey);
+
+  if (cached && Date.now() < cached.expiresAt - 60_000) {
+    return cached.token;
+  }
+
+  const sandboxToken = await getSandboxToken(cfg, fetchImpl);
+  const apiKey = String(cfg.sandboxApiKey || "").split(/\s+/)[0].trim();
   const password = String(cfg.ewbPassword || "").trim();
 
   const res = await fetchImpl("https://api.sandbox.co.in/gst/compliance/e-way-bill/tax-payer/authenticate", {
@@ -73,9 +77,8 @@ export async function getTaxpayerToken(cfg = {}, fetchImpl = fetch) {
     throw new Error("No taxpayer access_token returned by E-Way Bill authentication");
   }
 
-  cachedTaxpayerToken = token;
-  const expiry = json.data?.expiry ? Number(json.data.expiry) : (Date.now() + 6 * 3600 * 1000);
-  taxpayerTokenExpiresAt = expiry > Date.now() ? expiry : (Date.now() + 6 * 3600 * 1000);
+  const expiresAt = Date.now() + 5.5 * 3600 * 1000;
+  taxpayerTokenCache.set(cacheKey, { token, expiresAt });
   return token;
 }
 

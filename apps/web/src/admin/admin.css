@@ -1605,27 +1605,27 @@ code.key {
 
 .adm .btn,
 .login .btn {
-  background: var(--gold);
-  border: 1px solid var(--gold);
+  background: #2563EB;
+  border: 1px solid #2563EB;
   color: #fff;
   font-weight: 600;
-  min-height: 40px;
+  min-height: 38px;
   border-radius: 8px;
-  box-shadow: none;
-  transition: background var(--ease), border-color var(--ease), color var(--ease);
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.12);
+  transition: all 0.15s ease;
 }
 
 .adm .btn:hover,
 .login .btn:hover {
-  background: var(--gold-2);
-  border-color: var(--gold-2);
+  background: #1D4ED8;
+  border-color: #1D4ED8;
   color: #fff;
   transform: none;
 }
 
 .adm .btn:focus-visible,
 .login .btn:focus-visible {
-  outline: 2px solid var(--gold-2);
+  outline: 2px solid #2563EB;
   outline-offset: 2px;
 }
 
@@ -4144,35 +4144,49 @@ i.d90plus {
   color: var(--text-secondary);
 }
 
-/* Enterprise cockpit shell */
+/* 1:1 Swipe Light Shell */
 .adm {
-  grid-template-columns: 250px minmax(0, 1fr);
-  background: #f8fafc;
+  grid-template-columns: 224px minmax(0, 1fr);
+  background: #FFFFFF;
+  font-family: 'Inter', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 .adm-side {
-  background: #0f172a;
-  border-color: #263449;
-  color: #cbd5e1;
-  padding: 18px 14px;
+  background: #F8FAFC !important;
+  border-right: 1px solid #E2E8F0 !important;
+  color: #334155 !important;
+  padding: 14px 10px;
 }
 
 .adm-side nav a {
-  color: #cbd5e1;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #334155;
+  padding: 8px 12px;
+  border-radius: 8px;
   display: flex;
   gap: 10px;
   align-items: center;
+  transition: all 0.15s ease;
 }
 
 .adm-side nav a:hover {
-  background: #1e293b;
-  color: white;
+  background: #F1F5F9;
+  color: #0F172A;
 }
 
 .adm-side nav a.active {
-  background: #18364d;
-  color: white;
-  box-shadow: inset 3px 0 #38bdf8;
+  background: #FFFFFF;
+  color: #0F172A;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  border: 1px solid #E2E8F0;
+}
+
+.adm-side nav a.active svg,
+.adm-side nav a.active .ico {
+  color: #2563EB !important;
+  stroke: #2563EB !important;
 }
 
 .adm .adm-side :where(small, span, strong) {
@@ -4180,21 +4194,32 @@ i.d90plus {
 }
 
 .adm-side .nav-group small {
-  color: #94a3b8;
+  color: #94A3B8;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0 8px;
+  margin-top: 14px;
+  display: block;
 }
 
 .adm-user {
-  border-color: #334155;
-  color: #e2e8f0;
+  border-color: #E2E8F0;
+  color: #334155;
+  background: #FFFFFF;
+  border-radius: 8px;
+  padding: 10px 12px;
+  border: 1px solid #E2E8F0;
 }
 
 .adm-user .link,
 .adm-user a {
-  color: #7dd3fc;
+  color: #2563EB;
 }
 
 .tenant-pill {
-  color: #f8fafc;
+  color: #0F172A;
   font-weight: 700;
   font-size: .88rem;
   padding: 0 6px 6px;
@@ -4203,22 +4228,23 @@ i.d90plus {
 .tenant-pill span {
   margin-left: 5px;
   font-size: .7rem;
-  color: #bae6fd !important;
-  background: #18364d;
+  color: #2563EB !important;
+  background: #EFF6FF;
+  border: 1px solid #DBEAFE;
   padding: 3px 7px;
   border-radius: 999px;
 }
 
 .nova-brand {
-  border-top: 1px solid #334155;
+  border-top: 1px solid #E2E8F0;
   padding: 13px 4px 0;
-  color: #cbd5e1;
+  color: #64748B;
   font-size: .76rem;
   font-weight: 600;
 }
 
 .nova-brand span {
-  color: #7dd3fc !important;
+  color: #2563EB !important;
   font-size: 1.2rem;
   vertical-align: middle;
 }
@@ -4228,26 +4254,78 @@ i.d90plus {
 }
 
 .cockpit-topbar {
-  min-height: 76px;
+  height: 56px;
+  min-height: 56px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E2E8F0;
+  margin-bottom: 24px;
+  padding: 0 20px;
   display: flex;
   align-items: center;
-  gap: 14px;
-  border-bottom: 1px solid #e2e8f0;
-  margin-bottom: 32px;
+  justify-content: space-between;
 }
 
 .command-trigger {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: white;
-  border: 1px solid #cbd5e1;
-  border-radius: 9px;
-  color: #475569;
-  padding: 9px 12px;
+  background: #F1F5F9;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  height: 36px;
+  color: #64748B;
+  padding: 0 14px;
   cursor: pointer;
-  min-width: 220px;
+  min-width: 280px;
   text-align: left;
+  font-size: 13px;
+}
+
+.command-trigger kbd {
+  margin-left: auto;
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  color: #64748B;
+}
+
+.top-primary {
+  background: #2563EB;
+  border: 1px solid #2563EB;
+  color: #FFFFFF;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+
+.top-primary:hover {
+  background: #1D4ED8;
+  border-color: #1D4ED8;
+}
+
+/* 1:1 Swipe Table Spacing */
+.swipe-table th {
+  font-size: 12.5px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  color: #64748B;
+  background: #F8FAFC;
+  padding: 12px 16px;
+  border-bottom: 1px solid #E2E8F0;
+}
+
+.swipe-table td {
+  padding: 14px 16px;
+  font-size: 13.5px;
+  color: #0F172A;
+  border-bottom: 1px solid #F1F5F9;
+  vertical-align: middle;
 }
 
 .command-trigger kbd {

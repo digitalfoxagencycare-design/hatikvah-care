@@ -136,6 +136,25 @@ export default function Reports() {
   const [selectedFy, setSelectedFy] = useState("FY 26-27");
   const [search, setSearch] = useState("");
   const [gstrTab, setGstrTab] = useState("B2B");
+  const [showTotals, setShowTotals] = useState(true);
+  const [collapsedDivs, setCollapsedDivs] = useState({});
+
+  const toggleDiv = (k) => {
+    setCollapsedDivs((prev) => ({ ...prev, [k]: !prev[k] }));
+  };
+
+  const matrixLoad = useLoad(`/api/admin/reports/matrix?division=${activeDivision}&view=${activeView}&from=${rg.from}&to=${rg.to}`);
+  const mTotals = matrixLoad.data?.totals || {
+    qty: 0,
+    cgst: 0,
+    sgst: 0,
+    igst: 0,
+    roundOff: 0,
+    netAmount: 0,
+    totalAmount: 0,
+    amountPaid: 0,
+    amountPending: 0,
+  };
 
   const q = `from=${rg.from}&to=${rg.to}`;
   const s = useLoad(`/api/admin/reports?${q}`);
@@ -157,12 +176,12 @@ export default function Reports() {
   const gd = gstr.data;
   const pct = (a, b) => (b ? Math.round((100 * a) / b) + "%" : "—");
 
-  const currentDivObj = divisions.find((div) => div.key === activeDivision) || divisions[0];
+  const currentDivObj = divisions.find((div) => div.key === activeDivision) || divisions[0] || { label: "Reports", views: [] };
 
   const handleDivisionChange = (divKey) => {
     setActiveDivision(divKey);
     const div = divisions.find((d) => d.key === divKey);
-    if (div && div.views.length > 0) {
+    if (div && Array.isArray(div.views) && div.views.length > 0) {
       setActiveView(div.views[0].key);
     }
   };
@@ -288,109 +307,170 @@ export default function Reports() {
         )}
       </Loader>
 
-      {/* 10 Division Primary Nav Tabs (Swipe 1:1 Bar) */}
-      <div
-        style={{
-          display: "flex",
-          gap: 6,
-          overflowX: "auto",
-          paddingBottom: 6,
-          marginBottom: 14,
-          borderBottom: "1px solid #e2e8f0",
-        }}
-      >
-        {divisions.map((div) => {
-          const isActive = activeDivision === div.key;
-          return (
-            <button
-              key={div.key}
-              type="button"
-              onClick={() => handleDivisionChange(div.key)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "8px 14px",
-                borderRadius: "6px 6px 0 0",
-                fontSize: "0.88rem",
-                fontWeight: isActive ? 700 : 500,
-                border: "none",
-                cursor: "pointer",
-                background: isActive ? "#0284c7" : "#f1f5f9",
-                color: isActive ? "#ffffff" : "#475569",
-                whiteSpace: "nowrap",
-                transition: "all 0.15s ease",
-              }}
-            >
-              <span>{div.icon}</span>
-              <span>{div.label}</span>
-              <span
-                style={{
-                  fontSize: "0.72rem",
-                  padding: "1px 6px",
-                  borderRadius: 10,
-                  background: isActive ? "rgba(255,255,255,0.25)" : "#e2e8f0",
-                  color: isActive ? "#fff" : "#64748b",
-                }}
-              >
-                {div.views.length}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Sub-Views Horizontal Pills for Active Division */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-          gap: 10,
-          marginBottom: 16,
-        }}
-      >
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {currentDivObj.views.map((v) => {
-            const isSelected = activeView === v.key;
+      {/* 1:1 Swipe 2-Pane Reports Workspace */}
+      <div style={{ display: "grid", gridTemplateColumns: "250px minmax(0, 1fr)", gap: 20, alignItems: "start" }}>
+        {/* Left Sub-Sidebar (10 Divisions & 68 Report Views) */}
+        <div
+          className="panel"
+          style={{
+            padding: "12px 8px",
+            background: "#F8FAFC",
+            border: "1px solid #E2E8F0",
+            borderRadius: 10,
+            display: "grid",
+            gap: 6,
+          }}
+        >
+          <div style={{ padding: "6px 10px", fontSize: "0.78rem", fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+            Report Divisions
+          </div>
+          {divisions.map((div) => {
+            const isActiveDiv = activeDivision === div.key;
+            const isCollapsed = collapsedDivs[div.key];
             return (
-              <button
-                key={v.key}
-                type="button"
-                onClick={() => setActiveView(v.key)}
-                style={{
-                  padding: "5px 12px",
-                  borderRadius: 20,
-                  fontSize: "0.82rem",
-                  fontWeight: isSelected ? 700 : 500,
-                  border: isSelected ? "1px solid #0284c7" : "1px solid #cbd5e1",
-                  background: isSelected ? "#eff6ff" : "#fff",
-                  color: isSelected ? "#0284c7" : "#475569",
-                  cursor: "pointer",
-                }}
-              >
-                {v.label}
-              </button>
+              <div key={div.key} style={{ borderRadius: 8, overflow: "hidden" }}>
+                <div
+                  onClick={() => {
+                    handleDivisionChange(div.key);
+                    if (isCollapsed) toggleDiv(div.key);
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "8px 12px",
+                    cursor: "pointer",
+                    fontSize: "0.85rem",
+                    fontWeight: isActiveDiv ? 700 : 500,
+                    color: isActiveDiv ? "#0F172A" : "#334155",
+                    background: isActiveDiv ? "#FFFFFF" : "transparent",
+                    border: isActiveDiv ? "1px solid #E2E8F0" : "1px solid transparent",
+                    borderRadius: 6,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span>{div.icon}</span>
+                    <span>{div.label}</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span
+                      style={{
+                        fontSize: "0.7rem",
+                        padding: "1px 6px",
+                        borderRadius: 10,
+                        background: isActiveDiv ? "#EFF6FF" : "#E2E8F0",
+                        color: isActiveDiv ? "#2563EB" : "#64748B",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {div.views?.length || 0}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleDiv(div.key);
+                      }}
+                      style={{ border: "none", background: "none", cursor: "pointer", fontSize: "0.75rem", color: "#94A3B8" }}
+                    >
+                      {isCollapsed ? "▼" : "▲"}
+                    </button>
+                  </div>
+                </div>
+
+                {!isCollapsed && (
+                  <div style={{ padding: "4px 0 6px 24px", display: "grid", gap: 2 }}>
+                    {(div.views || []).map((v) => {
+                      const isSelected = activeDivision === div.key && activeView === v.key;
+                      return (
+                        <button
+                          key={v.key}
+                          type="button"
+                          onClick={() => {
+                            setActiveDivision(div.key);
+                            setActiveView(v.key);
+                          }}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            textAlign: "left",
+                            padding: "6px 10px",
+                            borderRadius: 6,
+                            fontSize: "0.82rem",
+                            border: "none",
+                            cursor: "pointer",
+                            background: isSelected ? "#EFF6FF" : "transparent",
+                            color: isSelected ? "#2563EB" : "#475569",
+                            fontWeight: isSelected ? 600 : 400,
+                            borderLeft: isSelected ? "3px solid #2563EB" : "3px solid transparent",
+                          }}
+                        >
+                          <span>{v.label}</span>
+                          {["gstr3b", "hub_stock", "net_profit"].includes(v.key) && (
+                            <span style={{ fontSize: "0.65rem", background: "#DCFCE7", color: "#166534", padding: "1px 4px", borderRadius: 4, fontWeight: 700 }}>
+                              New
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
 
-        {/* Local Search Input for the table */}
-        <input
-          type="search"
-          placeholder="Search in table..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{
-            padding: "5px 10px",
-            fontSize: "0.85rem",
-            borderRadius: 6,
-            border: "1px solid #cbd5e1",
-            minWidth: 200,
-          }}
-        />
-      </div>
+        {/* Right Pane (Active View Content & Controls) */}
+        <div style={{ display: "grid", gap: 16 }}>
+          {/* Top Filter & Toolbar */}
+          <div
+            className="panel"
+            style={{
+              padding: "10px 14px",
+              background: "#FFFFFF",
+              borderRadius: 8,
+              border: "1px solid #E2E8F0",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 10,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <strong style={{ fontSize: "1.05rem", color: "#0F172A" }}>
+                {currentDivObj?.views?.find((v) => v.key === activeView)?.label || "Report View"}
+              </strong>
+              <span style={{ fontSize: "0.75rem", background: "#EFF6FF", color: "#2563EB", padding: "2px 8px", borderRadius: 10, fontWeight: 600 }}>
+                {currentDivObj?.label || "Division"}
+              </span>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <input
+                type="search"
+                placeholder="Search rows…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{
+                  padding: "5px 10px",
+                  fontSize: "0.85rem",
+                  borderRadius: 6,
+                  border: "1px solid #CBD5E1",
+                  minWidth: 180,
+                }}
+              />
+              <a
+                className="btn ghost small"
+                href={`/api/admin/reports/query/export.csv?division=${activeDivision}&view=${activeView}&from=${rg.from}&to=${rg.to}`}
+                style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px" }}
+              >
+                📥 Export CSV
+              </a>
+            </div>
+          </div>
 
       {/* View Branching: GSTR-1 Hub vs Analytics Overview vs Dynamic Table */}
       {activeDivision === "taxes" && activeView === "gstr1" ? (
@@ -701,7 +781,7 @@ export default function Reports() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
             <div>
               <h2 style={{ margin: 0, fontSize: "1.1rem" }}>
-                {currentDivObj.views.find((v) => v.key === activeView)?.label || "Report View"}
+                {currentDivObj?.views?.find((v) => v.key === activeView)?.label || "Report View"}
               </h2>
               <span className="muted" style={{ fontSize: "0.82rem" }}>
                 Date Range: {rg.from || "Start"} to {rg.to || "Today"} · {filteredRows.length} records found
@@ -802,6 +882,66 @@ export default function Reports() {
           </Loader>
         </div>
       )}
+        </div>
+      </div>
+
+      {/* 9-Metric Floating Totals Card (Swipe 1:1 Widget) */}
+      <div style={{ position: "fixed", bottom: 20, right: 24, zIndex: 100 }}>
+        <button
+          type="button"
+          onClick={() => setShowTotals((v) => !v)}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            background: "#0F172A",
+            color: "#FFFFFF",
+            padding: "8px 16px",
+            borderRadius: 24,
+            fontWeight: 600,
+            fontSize: "0.85rem",
+            border: "none",
+            cursor: "pointer",
+            boxShadow: "0 4px 14px rgba(0,0,0,0.2)",
+          }}
+        >
+          <span>Totals (9 Metrics) ⓘ</span>
+          <span>{showTotals ? "▼" : "▲"}</span>
+        </button>
+        {showTotals && (
+          <div
+            style={{
+              position: "absolute",
+              bottom: 44,
+              right: 0,
+              width: 380,
+              background: "#FFFFFF",
+              border: "1px solid #E2E8F0",
+              borderRadius: 12,
+              boxShadow: "0 10px 30px rgba(0,0,0,0.15)",
+              padding: 16,
+              display: "grid",
+              gap: 12,
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #F1F5F9", paddingBottom: 8 }}>
+              <strong style={{ fontSize: "0.92rem", color: "#0F172A" }}>9-Metric Floating Totals</strong>
+              <small style={{ color: "#64748B" }}>Period Summary</small>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, fontSize: "0.82rem" }}>
+              <div><span style={{ color: "#64748B", display: "block" }}>Quantity</span><strong>{mTotals.qty}</strong></div>
+              <div><span style={{ color: "#64748B", display: "block" }}>CGST</span><strong style={{ color: "#2563EB" }}>₹{mTotals.cgst.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</strong></div>
+              <div><span style={{ color: "#64748B", display: "block" }}>SGST</span><strong style={{ color: "#2563EB" }}>₹{mTotals.sgst.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</strong></div>
+              <div><span style={{ color: "#64748B", display: "block" }}>IGST</span><strong style={{ color: "#2563EB" }}>₹{mTotals.igst.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</strong></div>
+              <div><span style={{ color: "#64748B", display: "block" }}>Round Off</span><strong>₹{mTotals.roundOff.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</strong></div>
+              <div><span style={{ color: "#64748B", display: "block" }}>Net Amount</span><strong style={{ color: "#0F172A" }}>₹{mTotals.netAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</strong></div>
+              <div><span style={{ color: "#64748B", display: "block" }}>Total Amount</span><strong style={{ color: "#0F172A" }}>₹{mTotals.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</strong></div>
+              <div><span style={{ color: "#64748B", display: "block" }}>Amount Paid</span><strong style={{ color: "#16A34A" }}>₹{mTotals.amountPaid.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</strong></div>
+              <div><span style={{ color: "#64748B", display: "block" }}>Pending</span><strong style={{ color: "#DC2626" }}>₹{mTotals.amountPending.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</strong></div>
+            </div>
+          </div>
+        )}
+      </div>
     </>
   );
 }

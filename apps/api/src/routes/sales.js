@@ -163,6 +163,46 @@ export function salesRoutes({ cfg, store, audit, automation, fetchImpl }) {
     req.body = { customerId: q.customerId, items: q.items.map(({ amount, tax, total, ...l }) => l), notes: q.notes, terms: q.terms, placeOfSupply: q.placeOfSupply };
     return saveQuote(req, res);
   }));
+  r.post("/quotes/:id/convert-doc", requirePerm("quotes"), wrap(async (req, res) => {
+    const q = await store.quotes.get(req.params.id);
+    if (!q) return notFound(res, "Quote");
+    const { targetType = "proforma" } = req.body || {};
+    const prefixMap = {
+      proforma: "PF",
+      challan: "DC",
+      packing_list: "PK",
+    };
+    const pfx = prefixMap[targetType] || "PF";
+    const newNumber = await nextNumber(store, pfx);
+    const conversionEntry = {
+      fromQuoteId: q.id,
+      fromQuoteNumber: q.number,
+      targetType,
+      newNumber,
+      convertedAt: now(),
+      by: by(req),
+    };
+    const cloned = await store.quotes.insert({
+      ...q,
+      id: undefined,
+      number: newNumber,
+      docType: targetType,
+      token: token(),
+      status: "draft",
+      parentQuoteId: q.id,
+      parentQuoteNumber: q.number,
+      createdAt: now(),
+      updatedAt: now(),
+      createdBy: by(req),
+    });
+    const existingHist = Array.isArray(q.conversionHistory) ? q.conversionHistory : [];
+    await store.quotes.update(q.id, {
+      conversionHistory: [...existingHist, conversionEntry],
+      updatedAt: now(),
+    });
+    await audit(req, "quote.convert", q.number, { targetType, newNumber });
+    res.status(201).json(cloned);
+  }));
   r.delete("/quotes/:id", requirePerm("quotes"), wrap(async (req, res) => {
     const q = await store.quotes.get(req.params.id); if (!q) return notFound(res, "Quote");
     if (q.status !== "draft") return bad(res, "Only draft quotes can be deleted. Mark it rejected instead.", 409);

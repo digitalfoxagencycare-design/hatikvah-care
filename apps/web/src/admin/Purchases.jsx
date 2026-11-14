@@ -68,6 +68,14 @@ export default function Purchases() {
   const filtered = useMemo(() => {
     let list = [...allPurchases];
 
+    if (currentSub === "debit_notes") {
+      list = list.filter((p) => p.docType === "debit_note" || p.type === "debit_note" || (p.number && p.number.startsWith("DN")) || p.debitNote);
+    } else if (currentSub === "purchases") {
+      list = list.filter((p) => !(p.number && p.number.startsWith("DN")) && (p.received || p.status === "received" || p.status === "paid"));
+    } else {
+      list = list.filter((p) => !(p.number && p.number.startsWith("DN")));
+    }
+
     if (currentTab === "cancelled") list = list.filter((p) => p.status === "cancelled" || p.status === "void");
     else if (currentTab === "paid") list = list.filter((p) => p.status === "paid");
     else if (currentTab === "received") list = list.filter((p) => p.received || p.status === "received");
